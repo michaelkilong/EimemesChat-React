@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://eimemes-chat-nu.vercel.app/sitemap.xml
