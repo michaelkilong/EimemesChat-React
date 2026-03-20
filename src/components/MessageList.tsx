@@ -21,8 +21,7 @@ interface Props {
   streamDone: boolean;
   streamModel: string;
   streamDisclaimer: boolean;
-  streamImageUrl: string;
-  streamImagePrompt: string;
+  pendingImage: { url: string; prompt: string } | null;
   convId: string | null;
   chipsUsed: boolean;
   onChipClick: (prompt: string) => void;
@@ -32,7 +31,7 @@ interface Props {
 export default function MessageList({
   messages, isTyping, isStreaming,
   streamText, streamDone, streamModel, streamDisclaimer,
-  streamImageUrl, streamImagePrompt,
+  pendingImage,
   convId, chipsUsed, onChipClick, onRegen,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -139,15 +138,15 @@ export default function MessageList({
 
         {isTyping && <TypingIndicator />}
 
-        {isStreaming && streamImageUrl && (
+        {pendingImage && (
           <ImageBubble
-            imageUrl={streamImageUrl}
-            imagePrompt={streamImagePrompt}
+            imageUrl={pendingImage.url}
+            imagePrompt={pendingImage.prompt}
             time={getTime()}
           />
         )}
 
-        {isStreaming && !streamImageUrl && (
+        {isStreaming && !pendingImage && (
           <StreamingBubble
             text={streamText}
             done={streamDone}
