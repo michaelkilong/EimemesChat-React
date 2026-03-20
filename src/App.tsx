@@ -57,13 +57,14 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     const ref = doc(db, 'users', currentUser.uid);
-    getDoc(ref).then(snap => {
-      if (!snap.exists()) return;
-      const { dailyCount = 0, lastDate = '' } = snap.data();
-      if (lastDate === todayStr() && dailyCount >= DAILY_LIMIT) setDailyLimitReached(true);
-    }).catch(() => {});
-
-    async function getDoc(r: any) { return (await import('firebase/firestore')).getDoc(r); }
+    import('firebase/firestore').then(({ getDoc }) => {
+      getDoc(ref).then(snap => {
+        if (!snap.exists()) return;
+        const data = snap.data() as { dailyCount?: number; lastDate?: string };
+        const { dailyCount = 0, lastDate = '' } = data;
+        if (lastDate === todayStr() && dailyCount >= DAILY_LIMIT) setDailyLimitReached(true);
+      }).catch(() => {});
+    });
   }, [currentUser]);
 
   const handleSend = useCallback((text: string) => {
@@ -100,7 +101,7 @@ export default function App() {
   if (!authReady) return <LoadingScreen visible />;
 
   return (
-    <div style={{ display: 'flex', height: '100vh', height: '100dvh', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
 
       <LoadingScreen visible={false} />
 
