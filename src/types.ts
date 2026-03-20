@@ -1,13 +1,24 @@
 export type View = 'chat' | 'settings' | 'profile';
 
+export interface Attachment {
+  name: string;
+  type: 'image' | 'pdf' | 'text' | 'docx';
+  mimeType: string;
+  // For images: base64 data URL
+  // For others: extracted text content
+  content: string;
+}
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
   time: string;
   model?: string;
   disclaimer?: boolean;
-  imageUrl?: string;
-  imagePrompt?: string;
+  attachment?: {
+    name: string;
+    type: string;
+  };
 }
 
 export interface Conversation {
