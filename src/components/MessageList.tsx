@@ -102,15 +102,26 @@ export default function MessageList({
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <MessageBubble
-            key={i}
-            message={msg}
-            isLast={i === messages.length - 1 && msg.role === 'assistant' && !isStreaming}
-            convId={convId || ''}
-            onRegen={onRegen}
-          />
-        ))}
+        {messages.map((msg, i) => {
+          const isLast = i === messages.length - 1 && msg.role === 'assistant' && !isStreaming;
+          // Find the last user message before this AI message for regen
+          let lastUserMsg = '';
+          if (isLast) {
+            for (let j = i - 1; j >= 0; j--) {
+              if (messages[j].role === 'user') { lastUserMsg = messages[j].content; break; }
+            }
+          }
+          return (
+            <MessageBubble
+              key={i}
+              message={msg}
+              isLast={isLast}
+              lastUserMsg={lastUserMsg}
+              convId={convId || ''}
+              onRegen={onRegen}
+            />
+          );
+        })}
 
         {isTyping && <TypingIndicator />}
 
