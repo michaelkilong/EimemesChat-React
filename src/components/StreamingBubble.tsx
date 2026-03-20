@@ -30,7 +30,7 @@ export default function StreamingBubble({ text, done, model, disclaimer, time }:
         <div
           ref={bodyRef}
           className="msg-body"
-          style={{ color: 'var(--text-1)', fontSize: '15.5px', lineHeight: 1.72, padding: '2px 0' }}
+          style={{ color: 'var(--text-1)', fontSize: '16px', lineHeight: 1.75, padding: '2px 0' }}
         />
         {done && (
           <>
