@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import MessageBubble from './MessageBubble';
 import StreamingBubble from './StreamingBubble';
 import TypingIndicator from './TypingIndicator';
+import ImageBubble from './ImageBubble';
 import { getTime, escHtml } from '../lib/markdown';
 import type { Message } from '../types';
 
@@ -20,6 +21,8 @@ interface Props {
   streamDone: boolean;
   streamModel: string;
   streamDisclaimer: boolean;
+  streamImageUrl: string;
+  streamImagePrompt: string;
   convId: string | null;
   chipsUsed: boolean;
   onChipClick: (prompt: string) => void;
@@ -29,6 +32,7 @@ interface Props {
 export default function MessageList({
   messages, isTyping, isStreaming,
   streamText, streamDone, streamModel, streamDisclaimer,
+  streamImageUrl, streamImagePrompt,
   convId, chipsUsed, onChipClick, onRegen,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -103,8 +107,18 @@ export default function MessageList({
         )}
 
         {messages.map((msg, i) => {
+          // Image message
+          if (msg.role === 'assistant' && msg.imageUrl) {
+            return (
+              <ImageBubble
+                key={i}
+                imageUrl={msg.imageUrl}
+                imagePrompt={msg.imagePrompt || ''}
+                time={msg.time}
+              />
+            );
+          }
           const isLast = i === messages.length - 1 && msg.role === 'assistant' && !isStreaming;
-          // Find the last user message before this AI message for regen
           let lastUserMsg = '';
           if (isLast) {
             for (let j = i - 1; j >= 0; j--) {
@@ -125,7 +139,15 @@ export default function MessageList({
 
         {isTyping && <TypingIndicator />}
 
-        {isStreaming && (
+        {isStreaming && streamImageUrl && (
+          <ImageBubble
+            imageUrl={streamImageUrl}
+            imagePrompt={streamImagePrompt}
+            time={getTime()}
+          />
+        )}
+
+        {isStreaming && !streamImageUrl && (
           <StreamingBubble
             text={streamText}
             done={streamDone}
