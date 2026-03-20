@@ -6,17 +6,19 @@ import { useApp } from '../context/AppContext';
 
 export function useMessages(convId: string | null) {
   const { currentUser } = useApp();
-  const [messages, setMessages]     = useState<Message[]>([]);
-  const [convTitle, setConvTitle]   = useState('');
-  const isStreamingRef              = useRef(false);
+  const [messages,  setMessages]  = useState<Message[]>([]);
+  const [convTitle, setConvTitle] = useState('');
+  // isStreamingRef used by useChat to suppress snapshot during active stream
+  const isStreamingRef = useRef(false);
 
   useEffect(() => {
     if (!convId || !currentUser) { setMessages([]); setConvTitle(''); return; }
 
-    const ref  = doc(db, 'users', currentUser.uid, 'conversations', convId);
+    const ref   = doc(db, 'users', currentUser.uid, 'conversations', convId);
     const unsub = onSnapshot(ref, snap => {
       if (!snap.exists()) { setMessages([]); setConvTitle(''); return; }
-      // Don't overwrite while streaming — race condition prevention
+      // Only block snapshot updates while actively streaming tokens
+      // Once streaming ends we always accept — this prevents the blank gap
       if (!isStreamingRef.current) {
         const data = snap.data();
         setMessages(data.messages || []);
