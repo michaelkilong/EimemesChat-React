@@ -28,8 +28,9 @@ export function useChat(
   const [streamDone,  setStreamDone]   = useState(false);
   const [streamModel, setStreamModel]  = useState('');
   const [streamDisclaimer, setStreamDisclaimer] = useState(false);
-  const [streamImageUrl,    setStreamImageUrl]    = useState('');
-  const [streamImagePrompt, setStreamImagePrompt] = useState('');
+  // pendingImage persists after isStreaming=false so the bubble doesn't flash away
+  // before Firestore snapshot arrives with the saved message
+  const [pendingImage, setPendingImage] = useState<{ url: string; prompt: string } | null>(null);
 
   const imageUrlRef    = useRef('');
   const imagePromptRef = useRef('');
@@ -144,8 +145,7 @@ export function useChat(
     setStreamDone(false);
     setStreamModel('');
     setStreamDisclaimer(false);
-    setStreamImageUrl('');
-    setStreamImagePrompt('');
+    setPendingImage(null);
     imageUrlRef.current    = '';
     imagePromptRef.current = '';
 
@@ -206,10 +206,9 @@ export function useChat(
 
             // Image generation response
             if (parsed.imageUrl) {
-              imageUrlRef.current   = parsed.imageUrl;
+              imageUrlRef.current    = parsed.imageUrl;
               imagePromptRef.current = parsed.imagePrompt || '';
-              setStreamImageUrl(parsed.imageUrl);
-              setStreamImagePrompt(parsed.imagePrompt || '');
+              setPendingImage({ url: parsed.imageUrl, prompt: parsed.imagePrompt || '' });
             }
 
             if (parsed.outputBlocked && parsed.safeReply) {
@@ -253,10 +252,13 @@ export function useChat(
       };
       await updateDoc(convRef, { messages: arrayUnion(aiMsg), updatedAt: new Date() });
 
-      // Now release streaming lock — Firestore snapshot will render the saved message
+      // Release streaming — Firestore snapshot will render the saved message
+      // Clear pendingImage only after a short delay to avoid flash
       isStreamingRef.current = false;
       setIsStreaming(false);
       streamController.current = null;
+      // Small delay before clearing pendingImage so Firestore snapshot has time to arrive
+      setTimeout(() => setPendingImage(null), 1500);
 
     } catch (err: any) {
       clearTimeout(timer);
@@ -290,7 +292,7 @@ export function useChat(
   return {
     isSending, isStreaming, isTyping,
     streamText, streamDone, streamModel, streamDisclaimer,
-    streamImageUrl, streamImagePrompt,
+    pendingImage,
     sendMessage, stopStreaming,
     setStreamDone,
   };
