@@ -81,7 +81,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
               </span>
             </div>
           )}
-          {/* Soft fully-rounded bubble — ChatGPT style */}
+          {/* Soft fully-rounded bubble — */}
           <div style={{
             background: '#2f2f2f',
             borderRadius: '999px',
