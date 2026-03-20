@@ -137,6 +137,15 @@ export function useChat(
 
     setIsTyping(true);
 
+    // Detect image request on frontend immediately — show skeleton right away
+    // instead of waiting for SSE event (which causes the blank gap)
+    const IMAGE_INTENT = /\b(generate|create|make|draw|design|paint|produce|show|give me|can you make|i want)\b.{0,40}\b(image|photo|picture|illustration|artwork|painting|drawing|portrait|wallpaper|logo|icon|poster|banner|sketch|render|scene|landscape|avatar)\b|\b(image|photo|picture|illustration|artwork|painting|drawing)\b.{0,20}\b(of|for|showing|depicting|with)\b/i;
+    const isImageRequest = IMAGE_INTENT.test(text);
+    if (isImageRequest) {
+      // Set a placeholder so skeleton shows immediately during typing
+      setPendingImage({ url: '', prompt: text });
+    }
+
     // Reset stream state
     renderQueueRef.current = [];
     displayedRef.current   = '';
