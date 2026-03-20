@@ -119,5 +119,4 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
       </div>
     </div>
   );
-      }
-      
+}
