@@ -60,8 +60,6 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
           style={{ color: 'var(--text-1)', fontSize: '16px', lineHeight: 1.75, padding: '2px 0' }}
         />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginTop: '6px' }}>
-
         {message.disclaimer && (
           <div style={{
             fontSize: '11.5px', color: 'var(--text-3)', marginTop: '8px',
@@ -72,8 +70,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
         )}
 
         {isLast && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', marginTop: '8px' }}>
-            {/* Regenerate */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', marginTop: '6px' }}>
             <button
               className="msg-action-btn regen-btn"
               title="Regenerate"
@@ -84,7 +81,6 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
                 <path d="M3.51 15a9 9 0 1 0 .49-3.54"/>
               </svg>
             </button>
-            {/* Thumb up */}
             <button
               className={`msg-action-btn thumb-up ${thumbUp ? 'active' : ''}`}
               title="Good response"
@@ -99,7 +95,6 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
                 <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
               </svg>
             </button>
-            {/* Thumb down */}
             <button
               className={`msg-action-btn thumb-down ${thumbDown ? 'active' : ''}`}
               title="Bad response"
