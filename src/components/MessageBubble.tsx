@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { arrayUnion, updateDoc, getDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { renderMarkdown, highlightCodeBlocks, getTime } from '../lib/markdown';
+import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
+import { getFileIcon } from '../lib/fileReader';
 import type { Message } from '../types';
 
 interface Props {
@@ -14,7 +13,7 @@ interface Props {
 }
 
 export default function MessageBubble({ message, isLast, lastUserMsg, convId, onRegen }: Props) {
-  const { currentUser, showToast } = useApp();
+  const { showToast } = useApp();
   const bodyRef = useRef<HTMLDivElement>(null);
   const [thumbUp,   setThumbUp]   = useState(false);
   const [thumbDown, setThumbDown] = useState(false);
@@ -32,7 +31,21 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
   if (isUser) {
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 0 12px' }}>
-        <div style={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        <div style={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+          {/* Attachment badge */}
+          {message.attachment && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '7px',
+              padding: '7px 12px', borderRadius: '12px',
+              background: 'var(--glass-2)', border: '1px solid var(--border)',
+              fontSize: '12px', color: 'var(--text-2)',
+            }}>
+              <span style={{ fontSize: '14px' }}>{getFileIcon(message.attachment.type)}</span>
+              <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {message.attachment.name}
+              </span>
+            </div>
+          )}
           <div style={{
             background: '#2f2f2f',
             borderRadius: '18px',
