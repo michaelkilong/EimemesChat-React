@@ -136,8 +136,11 @@ export default function MessageList({
           );
         })}
 
-        {isTyping && <TypingIndicator />}
+        {/* Typing dots only for non-image requests */}
+        {isTyping && !pendingImage && <TypingIndicator />}
 
+        {/* Pending image — skeleton shows immediately on send,
+            url fills in when SSE arrives, stays until Firestore saves */}
         {pendingImage && (
           <ImageBubble
             imageUrl={pendingImage.url}
@@ -146,6 +149,7 @@ export default function MessageList({
           />
         )}
 
+        {/* Text streaming */}
         {isStreaming && !pendingImage && (
           <StreamingBubble
             text={streamText}
@@ -160,4 +164,4 @@ export default function MessageList({
       </div>
     </div>
   );
-}
+                }
