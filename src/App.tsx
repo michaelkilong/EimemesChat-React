@@ -1,7 +1,8 @@
 // App.tsx
-// v1.2 — Reverted keyboard fix to clean CSS; removed visualViewport JS hack
+// v1.3 — In-app PWA install banner using beforeinstallprompt event
 // Changelog:
-//   v1.2 — Removed position:fixed + visualViewport that broke iOS input bar
+//   v1.3 — Install app banner catches beforeinstallprompt for Android Chrome
+//   v1.2 — Reverted keyboard fix to clean CSS; removed visualViewport JS hack
 //   v1.1 — visualViewport listener (reverted — broke iOS)
 //   v1.0 — Full React + TypeScript + Tailwind rewrite; feature-parity with HTML v3.4
 
@@ -48,6 +49,7 @@ export default function App() {
   const {
     isSending, isStreaming, isTyping,
     streamText, streamDone, streamModel, streamDisclaimer,
+    streamImageUrl, streamImagePrompt,
     sendMessage, stopStreaming,
   } = useChat(
     currentConvId, setCurrentConvId,
@@ -166,6 +168,8 @@ export default function App() {
               streamDone={streamDone}
               streamModel={streamModel}
               streamDisclaimer={streamDisclaimer}
+              streamImageUrl={streamImageUrl}
+              streamImagePrompt={streamImagePrompt}
               convId={currentConvId}
               chipsUsed={chipsUsed}
               onChipClick={handleSend}
@@ -206,4 +210,3 @@ export default function App() {
     </div>
   );
 }
-                  
