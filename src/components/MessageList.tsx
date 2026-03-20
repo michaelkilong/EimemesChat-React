@@ -6,10 +6,20 @@ import { getTime } from '../lib/markdown';
 import type { Message } from '../types';
 
 const CHIPS = [
-  { label: 'Write a professional email',  prompt: 'Help me write a professional email' },
-  { label: 'Explain quantum computing',   prompt: 'Explain quantum computing simply' },
-  { label: 'Debug my code',               prompt: 'Help me debug my code' },
-  { label: 'Plan a trip to Tokyo',        prompt: 'Plan a 5-day trip to Tokyo' },
+  { label: 'Design an iOS app',        prompt: 'Help me design an iOS app' },
+  { label: 'Explain quantum computing', prompt: 'Explain quantum computing simply' },
+  { label: 'Write a poem',             prompt: 'Write me a creative poem' },
+  { label: 'Plan a trip',              prompt: 'Help me plan a trip' },
+  { label: 'Code a website',           prompt: 'Help me code a website' },
+  { label: 'Debug my code',            prompt: 'Help me debug my code' },
+];
+
+// Staggered chip layout — rows of [1, 2, 2, 1] like proposed design
+const CHIP_ROWS = [
+  [CHIPS[0]],
+  [CHIPS[1], CHIPS[2]],
+  [CHIPS[3], CHIPS[4]],
+  [CHIPS[5]],
 ];
 
 interface Props {
@@ -44,28 +54,59 @@ export default function MessageList({
       className="scroll-thin"
       style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any, overscrollBehavior: 'none', background: 'transparent' }}
     >
-      <div style={{ maxWidth: '740px', margin: '0 auto', padding: '24px 22px 20px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ maxWidth: '740px', margin: '0 auto', padding: '24px 20px 20px', display: 'flex', flexDirection: 'column' }}>
 
         {showWelcome && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '60px 20px 40px', gap: '10px' }}>
-            <div style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 700, fontSize: '38px', letterSpacing: '-0.6px', background: 'linear-gradient(135deg, #5e9cff, #c96eff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+          <div style={{
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            textAlign: 'center', padding: '48px 16px 32px', gap: '12px',
+          }}>
+            {/* Large gradient title */}
+            <div style={{
+              fontFamily: "'Bricolage Grotesque', sans-serif",
+              fontWeight: 700, fontSize: '42px', letterSpacing: '-1px',
+              lineHeight: 1.1,
+              background: 'linear-gradient(135deg, #5e9cff 0%, #c96eff 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            }}>
               EimemesChat AI
             </div>
-            <div style={{ fontSize: '17px', color: 'var(--text-3)', fontWeight: 400 }}>
+            <div style={{ fontSize: '17px', color: 'var(--text-3)', fontWeight: 400, letterSpacing: '0.1px' }}>
               How can I help you today?
             </div>
+
+            {/* Staggered chips */}
             {!chipsUsed && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '22px', maxWidth: '560px' }}>
-                {CHIPS.map(c => (
-                  <button
-                    key={c.label}
-                    onClick={() => onChipClick(c.prompt)}
-                    style={{ padding: '10px 18px', borderRadius: '30px', border: '1px solid var(--border)', background: 'var(--glass-2)', backdropFilter: 'blur(15px)', WebkitBackdropFilter: 'blur(15px)', color: 'var(--text-2)', fontSize: '14px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' }}
-                    onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = 'var(--accent)'; b.style.background = 'var(--accent-dim)'; b.style.color = 'var(--accent)'; }}
-                    onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = 'var(--border)'; b.style.background = 'var(--glass-2)'; b.style.color = 'var(--text-2)'; }}
-                  >
-                    {c.label}
-                  </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '20px', width: '100%', maxWidth: '480px' }}>
+                {CHIP_ROWS.map((row, ri) => (
+                  <div key={ri} style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                    {row.map(c => (
+                      <button
+                        key={c.label}
+                        onClick={() => onChipClick(c.prompt)}
+                        style={{
+                          padding: '12px 22px',
+                          borderRadius: '999px',
+                          border: 'none',
+                          background: 'rgba(255,255,255,0.07)',
+                          color: 'var(--text-1)',
+                          fontSize: '15px', fontWeight: 500,
+                          cursor: 'pointer',
+                          transition: 'background 0.15s, transform 0.1s',
+                          WebkitTapHighlightColor: 'transparent',
+                        }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.12)';
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)';
+                        }}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
             )}
