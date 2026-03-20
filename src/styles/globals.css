@@ -211,13 +211,13 @@ a:hover { text-decoration: underline; }
   font-family: 'Bricolage Grotesque', sans-serif;
   font-weight: 600; margin: 18px 0 8px; color: var(--text-1);
 }
-.msg-body h1 { font-size: 26px; letter-spacing: -0.4px; }
-.msg-body h2 { font-size: 22px; letter-spacing: -0.3px; }
-.msg-body h3 { font-size: 18px; }
-.msg-body h4 { font-size: 15.5px; }
-.msg-body p  { margin: 0 0 8px; }
-.msg-body ul, .msg-body ol { padding-left: 20px; margin-bottom: 8px; }
-.msg-body li { margin-bottom: 4px; }
+.msg-body h1 { font-size: 28px; letter-spacing: -0.4px; }
+.msg-body h2 { font-size: 23px; letter-spacing: -0.3px; }
+.msg-body h3 { font-size: 19px; }
+.msg-body h4 { font-size: 16px; }
+.msg-body p  { margin: 0 0 12px; }
+.msg-body ul, .msg-body ol { padding-left: 22px; margin-bottom: 12px; }
+.msg-body li { margin-bottom: 6px; line-height: 1.75; }
 .msg-body a  { color: var(--accent); }
 .msg-body strong { font-weight: 600; color: var(--text-1); }
 .msg-body em { font-style: italic; }
