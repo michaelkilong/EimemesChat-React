@@ -1,16 +1,14 @@
-// useChat.ts — v1.1 — Fixed: pendingImage order, AI_TIMEOUT for images, no-gap streaming end
+// useChat.ts — v2.0 — Clean rewrite: removed image gen, added file attachment support
 import { useState, useRef, useCallback } from 'react';
 import { arrayUnion, updateDoc, getDoc, setDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useApp } from '../context/AppContext';
 import { getTime } from '../lib/markdown';
-import type { Message } from '../types';
+import type { Message, Attachment } from '../types';
 
 const MAX_MSGS    = 100;
 const DAILY_LIMIT = 150;
-const AI_TIMEOUT  = 65000; // 65s — covers image generation (up to 60s)
-
-const IMAGE_INTENT = /\b(generate|create|make|draw|design|paint|produce|show|give me|can you make|i want)\b.{0,40}\b(image|photo|picture|illustration|artwork|painting|drawing|portrait|wallpaper|logo|icon|poster|banner|sketch|render|scene|landscape|avatar)\b|\b(image|photo|picture|illustration|artwork|painting|drawing)\b.{0,20}\b(of|for|showing|depicting|with)\b/i;
+const AI_TIMEOUT  = 30000;
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
@@ -32,10 +30,6 @@ export function useChat(
   const [streamDone,       setStreamDone]        = useState(false);
   const [streamModel,      setStreamModel]       = useState('');
   const [streamDisclaimer, setStreamDisclaimer]  = useState(false);
-  const [pendingImage,     setPendingImage]      = useState<{ url: string; prompt: string } | null>(null);
-
-  const imageUrlRef    = useRef('');
-  const imagePromptRef = useRef('');
 
   const streamController = useRef<AbortController | null>(null);
   const renderQueueRef   = useRef<string[]>([]);
@@ -85,7 +79,7 @@ export function useChat(
     currentUser ? doc(db, 'users', currentUser.uid, 'conversations', id) : null,
   [currentUser]);
 
-  const sendMessage = useCallback(async (text: string, chipsUsedSetter: () => void) => {
+  const sendMessage = useCallback(async (text: string, chipsUsedSetter: () => void, attachment?: Attachment) => {
     if (!text.trim() || isSending || !currentUser) return;
 
     const allowed = await checkAndIncrementDailyCount();
@@ -121,8 +115,11 @@ export function useChat(
       setConvTitle(tempTitle);
     }
 
-    // Save user message
-    const userMsg: Message = { role: 'user', content: text, time: getTime() };
+    // Save user message — include attachment name/type for display
+    const userMsg: Message = {
+      role: 'user', content: text, time: getTime(),
+      ...(attachment && { attachment: { name: attachment.name, type: attachment.type } }),
+    };
     try {
       await updateDoc(convRef, { messages: arrayUnion(userMsg), updatedAt: new Date() });
     } catch (err: any) {
@@ -132,7 +129,7 @@ export function useChat(
       setIsSending(false); return;
     }
 
-    // ── Reset ALL stream state first ──────────────────────────────
+    // Reset stream state
     renderQueueRef.current = [];
     displayedRef.current   = '';
     if (renderTimerRef.current) { clearTimeout(renderTimerRef.current); renderTimerRef.current = null; }
@@ -140,16 +137,6 @@ export function useChat(
     setStreamDone(false);
     setStreamModel('');
     setStreamDisclaimer(false);
-    imageUrlRef.current    = '';
-    imagePromptRef.current = '';
-
-    // ── Detect image intent — set skeleton AFTER reset, not before ─
-    const isImageRequest = IMAGE_INTENT.test(text);
-    if (isImageRequest) {
-      setPendingImage({ url: '', prompt: text });
-    } else {
-      setPendingImage(null);
-    }
 
     setIsTyping(true);
 
@@ -161,6 +148,18 @@ export function useChat(
       const snap    = await getDoc(convRef);
       const history = snap.exists() ? (snap.data().messages || []).slice(-20) : [];
 
+      // Build request body — include attachment content for backend processing
+      const body: Record<string, unknown> = { message: text, history, isFirstMessage };
+      if (attachment) {
+        // For images send full base64, for docs send extracted text
+        body.attachment = {
+          name:     attachment.name,
+          type:     attachment.type,
+          mimeType: attachment.mimeType,
+          content:  attachment.content,
+        };
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -168,24 +167,22 @@ export function useChat(
           'Authorization': `Bearer ${await currentUser.getIdToken()}`,
         },
         signal: controller.signal,
-        body: JSON.stringify({ message: text, history, isFirstMessage }),
+        body: JSON.stringify(body),
       });
 
       clearTimeout(timer);
       setIsTyping(false);
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        const errMsg = body.error || `Server error (${res.status}). Please try again.`;
+        const errBody = await res.json().catch(() => ({}));
+        const errMsg  = errBody.error || `Server error (${res.status}). Please try again.`;
         await updateDoc(convRef, {
           messages: arrayUnion({ role: 'assistant', content: errMsg, time: getTime(), model: '' }),
           updatedAt: new Date(),
         });
-        setPendingImage(null);
         setIsSending(false); return;
       }
 
-      // Start streaming — block Firestore snapshots during active token stream
       isStreamingRef.current = true;
       setIsStreaming(true);
 
@@ -209,16 +206,8 @@ export function useChat(
           const raw = line.slice(6).trim();
           try {
             const parsed = JSON.parse(raw);
-
-            if (parsed.error) { enqueue(parsed.error); }
-            if (parsed.token) { fullText += parsed.token; enqueue(parsed.token); }
-
-            if (parsed.imageUrl) {
-              imageUrlRef.current    = parsed.imageUrl;
-              imagePromptRef.current = parsed.imagePrompt || '';
-              // Update pendingImage with real URL — skeleton becomes actual image
-              setPendingImage({ url: parsed.imageUrl, prompt: parsed.imagePrompt || '' });
-            }
+            if (parsed.error)  { enqueue(parsed.error); }
+            if (parsed.token)  { fullText += parsed.token; enqueue(parsed.token); }
 
             if (parsed.outputBlocked && parsed.safeReply) {
               fullText = parsed.safeReply;
@@ -243,25 +232,15 @@ export function useChat(
       }
 
       await drainQueue();
-
       setStreamModel(model);
       setStreamDisclaimer(disclaimer);
       setStreamDone(true);
 
-      // Save AI message to Firestore
-      const aiMsg: Message = {
-        role: 'assistant',
-        content: imageUrlRef.current || fullText,
-        time: getTime(), model, disclaimer,
-        ...(imageUrlRef.current && {
-          imageUrl:    imageUrlRef.current,
-          imagePrompt: imagePromptRef.current,
-        }),
-      };
+      // Save AI message
+      const aiMsg: Message = { role: 'assistant', content: fullText, time: getTime(), model, disclaimer };
       await updateDoc(convRef, { messages: arrayUnion(aiMsg), updatedAt: new Date() });
 
-      // ── Force-update messages from Firestore before clearing streaming ──
-      // This eliminates the blank gap — messages are ready before StreamingBubble disappears
+      // Force-fetch latest messages before clearing streaming to prevent blank gap
       try {
         const freshSnap = await getDoc(convRef);
         if (freshSnap.exists()) {
@@ -271,12 +250,10 @@ export function useChat(
         }
       } catch { /* fallback to snapshot */ }
 
-      // Now safe to release streaming — messages already updated above
       isStreamingRef.current = false;
       setIsStreaming(false);
       setStreamDone(false);
       streamController.current = null;
-      setPendingImage(null);
 
     } catch (err: any) {
       clearTimeout(timer);
@@ -284,13 +261,12 @@ export function useChat(
       isStreamingRef.current = false;
       setIsStreaming(false);
       streamController.current = null;
-      setPendingImage(null);
 
       if (err.name === 'AbortError') { setIsSending(false); return; }
 
       const errorMsg = err.code === 'permission-denied'
         ? 'Permission denied. Please sign out and back in.'
-        : 'I\'m sorry, all AI providers are currently unavailable. Please try again in a moment.';
+        : 'I\'m sorry, something went wrong. Please try again.';
       try {
         await updateDoc(getConvDocRef(activeConvId)!, {
           messages: arrayUnion({ role: 'assistant', content: errorMsg, time: getTime(), model: '' }),
@@ -311,7 +287,6 @@ export function useChat(
   return {
     isSending, isStreaming, isTyping,
     streamText, streamDone, streamModel, streamDisclaimer,
-    pendingImage,
     sendMessage, stopStreaming,
     setStreamDone,
   };
