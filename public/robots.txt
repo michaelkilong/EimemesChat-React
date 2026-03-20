@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 
 # Sitemap location
-Sitemap: https://eimemes-chat-nu.vercel.app/sitemap.xml
+Sitemap: https://eimemes-chat-ai.vercel.app/sitemap.xml
