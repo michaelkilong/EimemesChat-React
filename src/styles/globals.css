@@ -413,6 +413,6 @@ a:hover { text-decoration: underline; }
 }
 @media (min-width: 769px) {
   .menu-btn-mobile { display: none !important; }
-  .topbar-newchat  { display: none !important; }
+  .topbar-newchat  { display: flex !important; }
   .sidebar-mask    { display: none !important; }
 }
