@@ -1,3 +1,4 @@
+// useChat.ts — v1.1 — Fixed: pendingImage order, AI_TIMEOUT for images, no-gap streaming end
 import { useState, useRef, useCallback } from 'react';
 import { arrayUnion, updateDoc, getDoc, setDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -7,7 +8,9 @@ import type { Message } from '../types';
 
 const MAX_MSGS    = 100;
 const DAILY_LIMIT = 150;
-const AI_TIMEOUT  = 30000;
+const AI_TIMEOUT  = 65000; // 65s — covers image generation (up to 60s)
+
+const IMAGE_INTENT = /\b(generate|create|make|draw|design|paint|produce|show|give me|can you make|i want)\b.{0,40}\b(image|photo|picture|illustration|artwork|painting|drawing|portrait|wallpaper|logo|icon|poster|banner|sketch|render|scene|landscape|avatar)\b|\b(image|photo|picture|illustration|artwork|painting|drawing)\b.{0,20}\b(of|for|showing|depicting|with)\b/i;
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
@@ -18,28 +21,26 @@ export function useChat(
   createNewChat: () => Promise<string | null>,
   setConvTitle: (t: string) => void,
   isStreamingRef: React.MutableRefObject<boolean>,
+  setMessages: (msgs: Message[]) => void,
 ) {
   const { currentUser, showToast } = useApp();
 
-  const [isSending,   setIsSending]   = useState(false);
-  const [isStreaming, setIsStreaming]  = useState(false);
-  const [isTyping,    setIsTyping]     = useState(false);
-  const [streamText,  setStreamText]   = useState('');
-  const [streamDone,  setStreamDone]   = useState(false);
-  const [streamModel, setStreamModel]  = useState('');
-  const [streamDisclaimer, setStreamDisclaimer] = useState(false);
-  // pendingImage persists after isStreaming=false so the bubble doesn't flash away
-  // before Firestore snapshot arrives with the saved message
-  const [pendingImage, setPendingImage] = useState<{ url: string; prompt: string } | null>(null);
+  const [isSending,        setIsSending]        = useState(false);
+  const [isStreaming,      setIsStreaming]       = useState(false);
+  const [isTyping,         setIsTyping]          = useState(false);
+  const [streamText,       setStreamText]        = useState('');
+  const [streamDone,       setStreamDone]        = useState(false);
+  const [streamModel,      setStreamModel]       = useState('');
+  const [streamDisclaimer, setStreamDisclaimer]  = useState(false);
+  const [pendingImage,     setPendingImage]      = useState<{ url: string; prompt: string } | null>(null);
 
   const imageUrlRef    = useRef('');
   const imagePromptRef = useRef('');
 
   const streamController = useRef<AbortController | null>(null);
-  // Render queue
-  const renderQueueRef = useRef<string[]>([]);
-  const displayedRef   = useRef('');
-  const renderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const renderQueueRef   = useRef<string[]>([]);
+  const displayedRef     = useRef('');
+  const renderTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pumpQueue = useCallback(() => {
     if (renderQueueRef.current.length === 0) { renderTimerRef.current = null; return; }
@@ -61,11 +62,9 @@ export function useChat(
     check();
   });
 
-  // Daily limit helpers
   const getUserMetaRef = useCallback(() =>
     currentUser ? doc(db, 'users', currentUser.uid) : null,
-    [currentUser]
-  );
+  [currentUser]);
 
   const checkAndIncrementDailyCount = useCallback(async (): Promise<boolean> => {
     if (!currentUser) return false;
@@ -84,8 +83,7 @@ export function useChat(
 
   const getConvDocRef = useCallback((id: string) =>
     currentUser ? doc(db, 'users', currentUser.uid, 'conversations', id) : null,
-    [currentUser]
-  );
+  [currentUser]);
 
   const sendMessage = useCallback(async (text: string, chipsUsedSetter: () => void) => {
     if (!text.trim() || isSending || !currentUser) return;
@@ -107,8 +105,8 @@ export function useChat(
       setConvId(newId);
     }
 
-    const convRef  = getConvDocRef(activeConvId)!;
-    const conv     = conversations.find(c => c.id === activeConvId);
+    const convRef = getConvDocRef(activeConvId)!;
+    const conv    = conversations.find(c => c.id === activeConvId);
 
     if ((conv?.messages?.length ?? 0) >= MAX_MSGS) {
       showToast(`Max ${MAX_MSGS} messages reached. Start a new chat.`);
@@ -117,7 +115,6 @@ export function useChat(
 
     const isFirstMessage = !conv?.messages?.length;
 
-    // Set temp title immediately
     if (isFirstMessage) {
       const tempTitle = text.slice(0, 50) + (text.length > 50 ? '…' : '');
       updateDoc(convRef, { title: tempTitle }).catch(console.error);
@@ -135,18 +132,7 @@ export function useChat(
       setIsSending(false); return;
     }
 
-    setIsTyping(true);
-
-    // Detect image request on frontend immediately — show skeleton right away
-    // instead of waiting for SSE event (which causes the blank gap)
-    const IMAGE_INTENT = /\b(generate|create|make|draw|design|paint|produce|show|give me|can you make|i want)\b.{0,40}\b(image|photo|picture|illustration|artwork|painting|drawing|portrait|wallpaper|logo|icon|poster|banner|sketch|render|scene|landscape|avatar)\b|\b(image|photo|picture|illustration|artwork|painting|drawing)\b.{0,20}\b(of|for|showing|depicting|with)\b/i;
-    const isImageRequest = IMAGE_INTENT.test(text);
-    if (isImageRequest) {
-      // Set a placeholder so skeleton shows immediately during typing
-      setPendingImage({ url: '', prompt: text });
-    }
-
-    // Reset stream state
+    // ── Reset ALL stream state first ──────────────────────────────
     renderQueueRef.current = [];
     displayedRef.current   = '';
     if (renderTimerRef.current) { clearTimeout(renderTimerRef.current); renderTimerRef.current = null; }
@@ -154,9 +140,18 @@ export function useChat(
     setStreamDone(false);
     setStreamModel('');
     setStreamDisclaimer(false);
-    setPendingImage(null);
     imageUrlRef.current    = '';
     imagePromptRef.current = '';
+
+    // ── Detect image intent — set skeleton AFTER reset, not before ─
+    const isImageRequest = IMAGE_INTENT.test(text);
+    if (isImageRequest) {
+      setPendingImage({ url: '', prompt: text });
+    } else {
+      setPendingImage(null);
+    }
+
+    setIsTyping(true);
 
     streamController.current = new AbortController();
     const controller = streamController.current;
@@ -181,19 +176,24 @@ export function useChat(
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        const errorMsg = body.error || `Server error (${res.status}). Please try again.`;
-        await updateDoc(convRef, { messages: arrayUnion({ role: 'assistant', content: errorMsg, time: getTime(), model: '' }), updatedAt: new Date() });
+        const errMsg = body.error || `Server error (${res.status}). Please try again.`;
+        await updateDoc(convRef, {
+          messages: arrayUnion({ role: 'assistant', content: errMsg, time: getTime(), model: '' }),
+          updatedAt: new Date(),
+        });
+        setPendingImage(null);
         setIsSending(false); return;
       }
 
+      // Start streaming — block Firestore snapshots during active token stream
       isStreamingRef.current = true;
       setIsStreaming(true);
 
       const reader  = res.body!.getReader();
       const decoder = new TextDecoder();
-      let buf       = '';
-      let fullText  = '';
-      let model     = '';
+      let buf        = '';
+      let fullText   = '';
+      let model      = '';
       let disclaimer = false;
 
       while (true) {
@@ -210,13 +210,13 @@ export function useChat(
           try {
             const parsed = JSON.parse(raw);
 
-            if (parsed.error)  { enqueue(parsed.error); }
-            if (parsed.token)  { fullText += parsed.token; enqueue(parsed.token); }
+            if (parsed.error) { enqueue(parsed.error); }
+            if (parsed.token) { fullText += parsed.token; enqueue(parsed.token); }
 
-            // Image generation response
             if (parsed.imageUrl) {
               imageUrlRef.current    = parsed.imageUrl;
               imagePromptRef.current = parsed.imagePrompt || '';
+              // Update pendingImage with real URL — skeleton becomes actual image
               setPendingImage({ url: parsed.imageUrl, prompt: parsed.imagePrompt || '' });
             }
 
@@ -242,14 +242,13 @@ export function useChat(
         }
       }
 
-      // Drain render queue before finalizing
       await drainQueue();
 
       setStreamModel(model);
       setStreamDisclaimer(disclaimer);
       setStreamDone(true);
 
-      // Save AI message — keep isStreaming true until AFTER save so bubble stays visible
+      // Save AI message to Firestore
       const aiMsg: Message = {
         role: 'assistant',
         content: imageUrlRef.current || fullText,
@@ -261,13 +260,23 @@ export function useChat(
       };
       await updateDoc(convRef, { messages: arrayUnion(aiMsg), updatedAt: new Date() });
 
-      // Release streaming — Firestore snapshot will render the saved message
-      // Clear pendingImage only after a short delay to avoid flash
+      // ── Force-update messages from Firestore before clearing streaming ──
+      // This eliminates the blank gap — messages are ready before StreamingBubble disappears
+      try {
+        const freshSnap = await getDoc(convRef);
+        if (freshSnap.exists()) {
+          const freshData = freshSnap.data();
+          setMessages(freshData.messages || []);
+          setConvTitle(freshData.title || '');
+        }
+      } catch { /* fallback to snapshot */ }
+
+      // Now safe to release streaming — messages already updated above
       isStreamingRef.current = false;
       setIsStreaming(false);
+      setStreamDone(false);
       streamController.current = null;
-      // Small delay before clearing pendingImage so Firestore snapshot has time to arrive
-      setTimeout(() => setPendingImage(null), 1500);
+      setPendingImage(null);
 
     } catch (err: any) {
       clearTimeout(timer);
@@ -275,6 +284,7 @@ export function useChat(
       isStreamingRef.current = false;
       setIsStreaming(false);
       streamController.current = null;
+      setPendingImage(null);
 
       if (err.name === 'AbortError') { setIsSending(false); return; }
 
@@ -291,7 +301,7 @@ export function useChat(
       setIsSending(false);
     }
   }, [isSending, currentUser, convId, conversations, createNewChat, setConvId, setConvTitle,
-      isStreamingRef, checkAndIncrementDailyCount, showToast, getConvDocRef, enqueue]);
+      isStreamingRef, setMessages, checkAndIncrementDailyCount, showToast, getConvDocRef, enqueue]);
 
   const stopStreaming = useCallback(() => {
     streamController.current?.abort();
