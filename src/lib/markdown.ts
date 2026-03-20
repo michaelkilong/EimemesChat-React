@@ -3,7 +3,7 @@ import katex from 'katex';
 import hljs from 'highlight.js';
 
 // Configure marked
-marked.setOptions({ breaks: true, gfm: true } as marked.MarkedOptions);
+marked.setOptions({ breaks: true, gfm: true });
 
 export function renderMarkdown(text: string): string {
   try {
