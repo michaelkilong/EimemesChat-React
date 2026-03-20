@@ -6,5 +6,6 @@
     "api/title.js": {
       "maxDuration": 15
     }
-  }
+  },
+  "alias": ["eimemes-chat-ai.vercel.app"]
 }
