@@ -1,6 +1,7 @@
 // api/chat.js
-// v3.3 — Increased max_tokens; structured response formatting in system prompt
+// v3.4 — AI image generation via Pollinations.AI on auto-detected image requests
 // Changelog:
+//   v3.4 — Image intent detection; Pollinations.AI 1024x1024 generation; imageUrl SSE event
 //   v3.3 — Higher token limits; prompt instructs well-structured complete responses
 //   v3.2 — Title generation via same SSE stream on first message
 //   v3.1 — Real-time per-token system prompt leak detection via n-gram fingerprinting
@@ -86,6 +87,30 @@ function adaptiveMaxTokens(message) {
 
 const CRITICAL_PATTERNS = /\b(health|medical|medicine|doctor|diagnosis|symptom|disease|drug|medication|dosage|treatment|therapy|mental health|depression|anxiety|suicide|cancer|infection|pain|legal|law|lawsuit|attorney|lawyer|court|rights|contract|financial|invest|stock|crypto|tax|loan|debt|insurance|news|current event|politics|election|war|conflict|rumour|rumor|fact|source)\b/i;
 
+/* ── Image intent detection ───────────────────────────────────────
+   Matches requests like "generate an image of...", "draw me...",
+   "create a picture of...", "show me a photo of..." etc.
+─────────────────────────────────────────────────────────────────── */
+const IMAGE_PATTERNS = /\b(generate|create|make|draw|design|paint|produce|show|give me|can you make|i want)\b.{0,40}\b(image|photo|picture|illustration|artwork|painting|drawing|portrait|wallpaper|logo|icon|poster|banner|sketch|render|scene|landscape|avatar)\b|\b(image|photo|picture|illustration|artwork|painting|drawing|portrait)\b.{0,20}\b(of|for|showing|depicting|with)\b/i;
+
+async function generateImage(prompt) {
+  const encoded = encodeURIComponent(prompt);
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&enhance=true`;
+  // Pollinations generates on GET — we just verify it's reachable
+  const res = await fetch(url, { method: "HEAD" });
+  if (!res.ok) throw new Error(`Pollinations returned ${res.status}`);
+  return url;
+}
+
+/* ── Extract clean image prompt from user message ─────────────── */
+function extractImagePrompt(message) {
+  // Strip trigger words, keep the descriptive part
+  return message
+    .replace(/^(please\s+)?(generate|create|make|draw|design|paint|produce|show me|give me|can you make|i want)\s+(an?\s+)?(image|photo|picture|illustration|artwork|painting|drawing|portrait|wallpaper|logo|icon|poster|banner|sketch|render|scene|landscape|avatar)\s+(of\s+|for\s+|showing\s+|depicting\s+)?/i, '')
+    .replace(/^(an?\s+)?(image|photo|picture|illustration|artwork|painting|drawing)\s+(of\s+)?/i, '')
+    .trim() || message;
+}
+
 /* ── SSE helpers ──────────────────────────────────────────────── */
 function sseEvent(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
@@ -157,6 +182,50 @@ export default async function handler(req, res) {
     : [];
 
   setSSEHeaders(res);
+
+  /* ── Image generation — short-circuit if image request ───────── */
+  if (IMAGE_PATTERNS.test(safeMessage)) {
+    try {
+      console.log(`[image] uid=${uid} generating image for: "${safeMessage.slice(0, 80)}"`);
+      const imagePrompt = extractImagePrompt(safeMessage);
+      const imageUrl    = await generateImage(imagePrompt);
+
+      sseEvent(res, { imageUrl, imagePrompt });
+      sseEvent(res, { done: true, model: "pollinations", reply: imageUrl });
+
+      // Generate title if first message
+      if (isFirstMessage) {
+        const GROQ_API_KEY_LOCAL = process.env.GROQ_API_KEY;
+        if (GROQ_API_KEY_LOCAL) {
+          try {
+            const titleRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${GROQ_API_KEY_LOCAL}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: "llama-3.1-8b-instant", max_tokens: 10, temperature: 0.4,
+                messages: [
+                  { role: "system", content: "Generate a 2-4 word title for this image request. Output ONLY the title, no punctuation." },
+                  { role: "user", content: safeMessage },
+                ],
+              }),
+            });
+            if (titleRes.ok) {
+              const td = await titleRes.json();
+              const title = td.choices?.[0]?.message?.content?.trim().slice(0, 60);
+              if (title) sseEvent(res, { title });
+            }
+          } catch { /* ignore title errors */ }
+        }
+      }
+
+      res.end();
+      return;
+    } catch (err) {
+      console.error("[image] generation failed:", err.message);
+      // Fall through to normal text response
+      sseEvent(res, { token: "Sorry, I couldn't generate that image right now. Let me describe it instead!\n\n" });
+    }
+  }
 
   const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -312,5 +381,4 @@ export default async function handler(req, res) {
   res.end();
 }
 
-
-  
+    
