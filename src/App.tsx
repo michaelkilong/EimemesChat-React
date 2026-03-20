@@ -55,6 +55,7 @@ export default function App() {
     currentConvId, setCurrentConvId,
     conversations, createNewChat,
     setConvTitle, isStreamingRef,
+    setMessages,
   );
 
   // Check daily limit on mount / user change
