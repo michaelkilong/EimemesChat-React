@@ -28,6 +28,11 @@ export function useChat(
   const [streamDone,  setStreamDone]   = useState(false);
   const [streamModel, setStreamModel]  = useState('');
   const [streamDisclaimer, setStreamDisclaimer] = useState(false);
+  const [streamImageUrl,    setStreamImageUrl]    = useState('');
+  const [streamImagePrompt, setStreamImagePrompt] = useState('');
+
+  const imageUrlRef    = useRef('');
+  const imagePromptRef = useRef('');
 
   const streamController = useRef<AbortController | null>(null);
   // Render queue
@@ -139,6 +144,10 @@ export function useChat(
     setStreamDone(false);
     setStreamModel('');
     setStreamDisclaimer(false);
+    setStreamImageUrl('');
+    setStreamImagePrompt('');
+    imageUrlRef.current    = '';
+    imagePromptRef.current = '';
 
     streamController.current = new AbortController();
     const controller = streamController.current;
@@ -195,6 +204,14 @@ export function useChat(
             if (parsed.error)  { enqueue(parsed.error); }
             if (parsed.token)  { fullText += parsed.token; enqueue(parsed.token); }
 
+            // Image generation response
+            if (parsed.imageUrl) {
+              imageUrlRef.current   = parsed.imageUrl;
+              imagePromptRef.current = parsed.imagePrompt || '';
+              setStreamImageUrl(parsed.imageUrl);
+              setStreamImagePrompt(parsed.imagePrompt || '');
+            }
+
             if (parsed.outputBlocked && parsed.safeReply) {
               fullText = parsed.safeReply;
               renderQueueRef.current = [];
@@ -226,8 +243,13 @@ export function useChat(
 
       // Save AI message
       const aiMsg: Message = {
-        role: 'assistant', content: fullText,
+        role: 'assistant',
+        content: imageUrlRef.current || fullText,
         time: getTime(), model, disclaimer,
+        ...(imageUrlRef.current && {
+          imageUrl:    imageUrlRef.current,
+          imagePrompt: imagePromptRef.current,
+        }),
       };
       isStreamingRef.current = false;
       setIsStreaming(false);
@@ -266,6 +288,7 @@ export function useChat(
   return {
     isSending, isStreaming, isTyping,
     streamText, streamDone, streamModel, streamDisclaimer,
+    streamImageUrl, streamImagePrompt,
     sendMessage, stopStreaming,
     setStreamDone,
   };
