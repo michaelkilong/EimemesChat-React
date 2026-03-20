@@ -6,6 +6,8 @@ export interface Message {
   time: string;
   model?: string;
   disclaimer?: boolean;
+  imageUrl?: string;
+  imagePrompt?: string;
 }
 
 export interface Conversation {
