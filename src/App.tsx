@@ -1,9 +1,10 @@
 // App.tsx
-// v1.0 — Initial React migration from index.html v3.4
+// v1.1 — Fixed Android Chrome keyboard layout using visualViewport API
 // Changelog:
+//   v1.1 — visualViewport listener fixes header dimming when keyboard opens on mobile
 //   v1.0 — Full React + TypeScript + Tailwind rewrite; feature-parity with HTML v3.4
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import { useApp } from './context/AppContext';
@@ -25,9 +26,34 @@ const DAILY_LIMIT = 150;
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
+// Hook: keeps the app container exactly as tall as the visible viewport
+// so the keyboard never pushes or clips the topbar on Android Chrome
+function useVisualViewportHeight() {
+  const [height, setHeight] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => setHeight(vv.height);
+    update();
+
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
+  return height;
+}
+
 export default function App() {
   useAuth();
   useTheme();
+
+  const vpHeight = useVisualViewportHeight();
 
   const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen } = useApp();
 
@@ -101,7 +127,13 @@ export default function App() {
   if (!authReady) return <LoadingScreen visible />;
 
   return (
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
+    <div style={{
+      display: 'flex',
+      height: vpHeight ? `${vpHeight}px` : '100dvh',
+      overflow: 'hidden',
+      position: 'fixed',
+      top: 0, left: 0, right: 0,
+    }}>
 
       <LoadingScreen visible={false} />
 
