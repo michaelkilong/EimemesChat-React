@@ -20,7 +20,7 @@ export default function SignOutModal({ visible, onClose }: Props) {
   };
 
   const btnStyle = (red: boolean): React.CSSProperties => ({
-    width: '100%', padding: '14px', borderRadius: '40px', border: 'none',
+    width: '100%', padding: '14px', borderRadius: '40px',
     background: red ? 'linear-gradient(145deg,#ff4f4f,#cc2c2c)' : 'var(--glass-3)',
     color: red ? 'white' : 'var(--text-2)',
     border: red ? 'none' : '1px solid var(--border)',
@@ -30,7 +30,7 @@ export default function SignOutModal({ visible, onClose }: Props) {
     marginBottom: '10px', fontFamily: 'inherit',
     boxShadow: red ? '0 4px 14px rgba(255,50,50,0.25)' : 'none',
     transition: 'opacity 0.15s',
-  } as React.CSSProperties);
+  });
 
   return (
     <div className={`modal-overlay ${visible ? 'show' : ''}`}>
