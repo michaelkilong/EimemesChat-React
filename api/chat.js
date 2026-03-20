@@ -95,8 +95,22 @@ const IMAGE_PATTERNS = /\b(generate|create|make|draw|design|paint|produce|show|g
 
 async function generateImage(prompt) {
   const encoded = encodeURIComponent(prompt);
-  // Pollinations generates on GET — return the URL directly, browser fetches it
-  return `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 999999)}`;
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 999999)}`;
+
+  // Pollinations generates synchronously on GET — the request blocks until the image is ready
+  // We fetch with a 60s timeout, then send the URL to the client once it's confirmed ready
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`Pollinations returned ${res.status}`);
+    return url;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
 }
 
 /* ── Extract clean image prompt from user message ─────────────── */
