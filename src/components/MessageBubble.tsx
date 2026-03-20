@@ -65,15 +65,6 @@ export default function MessageBubble({ message, isLast, convId, onRegen }: Prop
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px' }}>
           <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{message.time}</span>
-          {message.model && (
-            <span style={{
-              fontSize: '10px', fontWeight: 600, letterSpacing: '0.4px',
-              color: 'var(--accent)', background: 'var(--accent-dim)',
-              padding: '2px 8px', borderRadius: '20px',
-            }}>
-              {message.model}
-            </span>
-          )}
         </div>
 
         {message.disclaimer && (

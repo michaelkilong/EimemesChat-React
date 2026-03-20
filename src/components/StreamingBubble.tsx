@@ -36,15 +36,6 @@ export default function StreamingBubble({ text, done, model, disclaimer, time }:
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{time}</span>
-              {model && (
-                <span style={{
-                  fontSize: '10px', fontWeight: 600, letterSpacing: '0.4px',
-                  color: 'var(--accent)', background: 'var(--accent-dim)',
-                  padding: '2px 8px', borderRadius: '20px',
-                }}>
-                  {model}
-                </span>
-              )}
             </div>
             {disclaimer && (
               <div style={{
