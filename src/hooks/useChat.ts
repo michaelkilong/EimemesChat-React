@@ -241,7 +241,7 @@ export function useChat(
       setStreamDisclaimer(disclaimer);
       setStreamDone(true);
 
-      // Save AI message
+      // Save AI message — keep isStreaming true until AFTER save so bubble stays visible
       const aiMsg: Message = {
         role: 'assistant',
         content: imageUrlRef.current || fullText,
@@ -251,10 +251,12 @@ export function useChat(
           imagePrompt: imagePromptRef.current,
         }),
       };
+      await updateDoc(convRef, { messages: arrayUnion(aiMsg), updatedAt: new Date() });
+
+      // Now release streaming lock — Firestore snapshot will render the saved message
       isStreamingRef.current = false;
       setIsStreaming(false);
       streamController.current = null;
-      await updateDoc(convRef, { messages: arrayUnion(aiMsg), updatedAt: new Date() });
 
     } catch (err: any) {
       clearTimeout(timer);
