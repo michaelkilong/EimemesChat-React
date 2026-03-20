@@ -31,23 +31,19 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
 
   if (isUser) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 0' }}>
-        <div style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 0 12px' }}>
+        <div style={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <div style={{
-            background: 'var(--bubble-u)',
-            backdropFilter: 'blur(15px)',
-            WebkitBackdropFilter: 'blur(15px)',
-            border: '1px solid var(--bubble-ub)',
-            borderRadius: '22px', borderBottomRightRadius: '5px',
-            padding: '12px 16px',
-            color: 'var(--text-1)', fontSize: '15.5px', lineHeight: 1.55,
-            wordBreak: 'break-word', whiteSpace: 'pre-wrap',
-            boxShadow: 'var(--sh-sm)',
+            background: '#2f2f2f',
+            borderRadius: '18px',
+            padding: '12px 18px',
+            color: 'rgba(255,255,255,0.92)',
+            fontSize: '16px',
+            lineHeight: 1.6,
+            wordBreak: 'break-word',
+            whiteSpace: 'pre-wrap',
           }}>
             {message.content}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{message.time}</span>
           </div>
         </div>
       </div>
@@ -56,17 +52,15 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
 
   // AI message
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '8px 0' }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '4px 0 12px' }}>
       <div style={{ width: '100%' }}>
         <div
           ref={bodyRef}
           className="msg-body"
-          style={{ color: 'var(--text-1)', fontSize: '15.5px', lineHeight: 1.72, padding: '2px 0' }}
+          style={{ color: 'var(--text-1)', fontSize: '16px', lineHeight: 1.75, padding: '2px 0' }}
         />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{message.time}</span>
-        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginTop: '6px' }}>
 
         {message.disclaimer && (
           <div style={{
@@ -125,4 +119,5 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
       </div>
     </div>
   );
-}
+      }
+      
