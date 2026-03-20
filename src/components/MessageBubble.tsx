@@ -8,11 +8,12 @@ import type { Message } from '../types';
 interface Props {
   message: Message;
   isLast: boolean;
+  lastUserMsg: string;
   convId: string;
   onRegen: (originalMsg: string) => void;
 }
 
-export default function MessageBubble({ message, isLast, convId, onRegen }: Props) {
+export default function MessageBubble({ message, isLast, lastUserMsg, convId, onRegen }: Props) {
   const { currentUser, showToast } = useApp();
   const bodyRef = useRef<HTMLDivElement>(null);
   const [thumbUp,   setThumbUp]   = useState(false);
@@ -82,7 +83,7 @@ export default function MessageBubble({ message, isLast, convId, onRegen }: Prop
             <button
               className="msg-action-btn regen-btn"
               title="Regenerate"
-              onClick={() => onRegen(message.content)}
+              onClick={() => onRegen(lastUserMsg)}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="1 4 1 10 7 10"/>
