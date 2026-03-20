@@ -49,7 +49,7 @@ export default function App() {
   const {
     isSending, isStreaming, isTyping,
     streamText, streamDone, streamModel, streamDisclaimer,
-    streamImageUrl, streamImagePrompt,
+    pendingImage,
     sendMessage, stopStreaming,
   } = useChat(
     currentConvId, setCurrentConvId,
@@ -168,8 +168,7 @@ export default function App() {
               streamDone={streamDone}
               streamModel={streamModel}
               streamDisclaimer={streamDisclaimer}
-              streamImageUrl={streamImageUrl}
-              streamImagePrompt={streamImagePrompt}
+              pendingImage={pendingImage}
               convId={currentConvId}
               chipsUsed={chipsUsed}
               onChipClick={handleSend}
