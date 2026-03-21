@@ -27,7 +27,7 @@ interface Props {
   streamText: string;
   streamDone: boolean;
   streamModel: string;
-  streamDisclaimer: boolean;
+  streamDisclaimer: 'critical' | 'web' | false;
   streamSources: { title: string; url: string }[];
   convId: string | null;
   chipsUsed: boolean;
