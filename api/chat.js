@@ -125,6 +125,23 @@ export default async function handler(req, res) {
   const { message, history, isFirstMessage, attachment } = req.body;
   if (!message) return res.status(400).json({ error: "Message required" });
 
+  /* ── Load user preferences ────────────────────────────────────── */
+  let userPrefsPrompt = '';
+  try {
+    const userSnap = await db.collection('users').doc(uid).get();
+    if (userSnap.exists) {
+      const prefs = userSnap.data().preferences || {};
+      const parts = [];
+      if (prefs.tone)               parts.push(`Respond in a ${prefs.tone.toLowerCase()} tone.`);
+      if (prefs.nickname)           parts.push(`Address the user as "${prefs.nickname}".`);
+      if (prefs.occupation)         parts.push(`The user is a ${prefs.occupation}.`);
+      if (prefs.customInstructions) parts.push(prefs.customInstructions);
+      if (parts.length) userPrefsPrompt = '\n\nUSER PREFERENCES:\n' + parts.join(' ');
+    }
+  } catch { /* ignore — fail open */ }
+
+  const FULL_SYSTEM_PROMPT = SYSTEM_PROMPT + userPrefsPrompt;
+
   /* ── Input shield ─────────────────────────────────────────────── */
   const inputCheck = shieldInput(message);
   if (inputCheck.blocked) {
@@ -199,7 +216,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model,
           messages: [
-            { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: FULL_SYSTEM_PROMPT },
             ...trimmedHistory,
             { role: "user", content: userMessageContent },
           ],
