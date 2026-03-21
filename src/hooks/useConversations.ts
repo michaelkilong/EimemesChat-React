@@ -7,8 +7,6 @@ import { db } from '../firebase';
 import type { Conversation } from '../types';
 import { useApp } from '../context/AppContext';
 
-const MAX_CONVS = 50;
-
 export function useConversations() {
   const { currentUser, showToast } = useApp();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -24,7 +22,7 @@ export function useConversations() {
     const ref = getUserConvsRef();
     if (!ref) return;
 
-    const q = query(ref, orderBy('updatedAt', 'desc'), limit(MAX_CONVS));
+    const q = query(ref, orderBy('updatedAt', 'desc'), limit(200));
     const unsub = onSnapshot(q, snap => {
       setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() } as Conversation)));
     }, err => console.error('Conversations snapshot error:', err));
@@ -34,10 +32,6 @@ export function useConversations() {
 
   const createNewChat = useCallback(async (): Promise<string | null> => {
     if (!currentUser) return null;
-    if (conversations.length >= MAX_CONVS) {
-      showToast(`Maximum ${MAX_CONVS} conversations reached.`);
-      return null;
-    }
     try {
       const ref = await addDoc(getUserConvsRef()!, {
         title: 'New conversation',
@@ -49,7 +43,7 @@ export function useConversations() {
       showToast('Could not create conversation. Try again.');
       return null;
     }
-  }, [currentUser, conversations.length, getUserConvsRef, showToast]);
+  }, [currentUser, getUserConvsRef, showToast]);
 
   const clearAllChats = useCallback(async () => {
     if (!currentUser) return;
