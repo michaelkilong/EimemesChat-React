@@ -175,9 +175,9 @@ export function useChat(
       });
 
       clearTimeout(timer);
-      setIsTyping(false);
 
       if (!res.ok) {
+        setIsTyping(false);
         const errBody = await res.json().catch(() => ({}));
         const errMsg  = errBody.error || `Server error (${res.status}). Please try again.`;
         await updateDoc(convRef, {
@@ -211,9 +211,9 @@ export function useChat(
           const raw = line.slice(6).trim();
           try {
             const parsed = JSON.parse(raw);
-            if (parsed.searching)     { setIsSearching(true); }
-            if (parsed.error)         { enqueue(parsed.error); }
-            if (parsed.token)         { setIsSearching(false); fullText += parsed.token; enqueue(parsed.token); }
+            if (parsed.searching)     { setIsTyping(false); setIsSearching(true); }
+            if (parsed.error)         { setIsTyping(false); enqueue(parsed.error); }
+            if (parsed.token)         { setIsTyping(false); setIsSearching(false); fullText += parsed.token; enqueue(parsed.token); }
 
             if (parsed.outputBlocked && parsed.safeReply) {
               fullText = parsed.safeReply;
