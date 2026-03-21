@@ -1,4 +1,4 @@
-export type View = 'chat' | 'settings' | 'profile';
+export type View = 'chat' | 'settings' | 'profile' | 'personalization';
 
 export interface Attachment {
   name: string;

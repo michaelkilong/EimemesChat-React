@@ -10,14 +10,15 @@ import { useConversations } from './hooks/useConversations';
 import { useMessages } from './hooks/useMessages';
 import { useChat } from './hooks/useChat';
 
-import LoadingScreen  from './components/LoadingScreen';
-import Sidebar        from './components/Sidebar';
-import MessageList    from './components/MessageList';
-import InputArea      from './components/InputArea';
-import SettingsView   from './components/SettingsView';
-import ProfileView    from './components/ProfileView';
-import LoginModal     from './components/modals/LoginModal';
-import type { Attachment } from './types';
+import LoadingScreen         from './components/LoadingScreen';
+import Sidebar               from './components/Sidebar';
+import MessageList           from './components/MessageList';
+import InputArea             from './components/InputArea';
+import SettingsView          from './components/SettingsView';
+import ProfileView           from './components/ProfileView';
+import PersonalizationView   from './components/PersonalizationView';
+import LoginModal            from './components/modals/LoginModal';
+import type { Attachment }   from './types';
 
 const DAILY_LIMIT = 150;
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -202,6 +203,7 @@ export default function App() {
           <SettingsView
             onBack={() => setView('chat')}
             onOpenProfile={() => setView('profile')}
+            onOpenPersonalization={() => setView('personalization')}
             onClearChats={handleClearChats}
             conversations={conversations}
           />
@@ -211,6 +213,12 @@ export default function App() {
           <ProfileView
             onBack={() => setView('settings')}
             getUserConvsRef={getUserConvsRef}
+          />
+        )}
+
+        {view === 'personalization' && (
+          <PersonalizationView
+            onBack={() => setView('settings')}
           />
         )}
       </div>
