@@ -18,7 +18,7 @@ const TONES = ['Friendly', 'Professional', 'Concise', 'Funny'];
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '14px 16px',
   borderRadius: '16px', border: '1px solid var(--border)',
-  background: 'rgba(255,255,255,0.05)',
+  background: 'var(--input-bg)',
   color: 'var(--text-1)', fontSize: '15px',
   outline: 'none', fontFamily: 'inherit',
   transition: 'border-color 0.2s',
@@ -84,7 +84,7 @@ export default function PersonalizationView({ onBack }: Props) {
       }}>
         <button
           onClick={onBack}
-          style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-1)' }}
+          style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.22)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-1)' }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6"/>
