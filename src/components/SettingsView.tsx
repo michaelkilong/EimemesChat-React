@@ -51,7 +51,6 @@ function SettingsCard({
         background: pressed ? 'var(--glass-1)' : 'var(--glass-2)',
         borderRadius: '16px',
         marginBottom: '10px',
-        border: '1px solid var(--border)',
         cursor: 'pointer',
         transition: 'background 0.12s',
         WebkitTapHighlightColor: 'transparent',
@@ -238,4 +237,3 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
     </div>
   );
 }
-          
