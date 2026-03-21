@@ -107,21 +107,34 @@ async function searchWeb(query) {
       body: JSON.stringify({
         api_key: TAVILY_API_KEY,
         query,
-        search_depth: "basic",
-        max_results: 5,
+        search_depth: "advanced",      // deeper, more relevant results
+        max_results: 6,                // more candidates to pick from
         include_answer: false,
         include_raw_content: false,
+        include_domains: [],           // no domain restrictions
+        exclude_domains: [             // exclude low quality sources
+          "pinterest.com", "quora.com", "reddit.com",
+          "facebook.com", "twitter.com", "instagram.com",
+          "tiktok.com", "youtube.com",
+        ],
       }),
     });
 
     if (!res.ok) { console.warn("[search] Tavily error:", res.status); return null; }
 
     const data = await res.json();
-    return data.results?.map(r => ({
-      title:   r.title,
-      url:     r.url,
-      content: r.content?.slice(0, 400),
-    })) || null;
+    // Only return results with a meaningful content snippet
+    const results = (data.results || [])
+      .filter(r => r.content && r.content.length > 80)
+      .slice(0, 5)
+      .map(r => ({
+        title:   r.title,
+        url:     r.url,
+        content: r.content?.slice(0, 500),
+        score:   r.score,
+      }));
+
+    return results.length ? results : null;
   } catch (err) {
     console.warn("[search] Failed:", err.message);
     return null;
@@ -191,7 +204,7 @@ export default async function handler(req, res) {
 
   const safeMessage     = inputCheck.sanitized;
   const needsDisclaimer = CRITICAL_PATTERNS.test(safeMessage);
-  const maxTokens       = adaptiveMaxTokens(safeMessage, !!attachment);
+  const maxTokens = adaptiveMaxTokens(safeMessage, !!attachment) + (shouldSearch ? 400 : 0);
 
   const trimmedHistory = Array.isArray(history)
     ? history.slice(-8).map(({ role, content }) => ({ role, content }))
