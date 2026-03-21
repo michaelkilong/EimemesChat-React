@@ -143,9 +143,16 @@ export default function MessageList({
           {isTyping && !isSearching && <TypingIndicator />}
 
           {isSearching && (
-            <div className="search-indicator">
-              <div className="search-indicator-dot" />
-              Searching the web…
+            <div className="search-skeleton">
+              <div className="search-skeleton-label">
+                <div className="search-skeleton-label-dot" />
+                Searching the web…
+              </div>
+              {/* Skeleton lines — simulate incoming content */}
+              <div className="skeleton-line" style={{ height: '14px', width: '92%' }} />
+              <div className="skeleton-line" style={{ height: '14px', width: '78%' }} />
+              <div className="skeleton-line" style={{ height: '14px', width: '85%' }} />
+              <div className="skeleton-line" style={{ height: '14px', width: '60%' }} />
             </div>
           )}
 
