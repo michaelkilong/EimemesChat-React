@@ -507,3 +507,32 @@ a:hover { text-decoration: underline; }
   font-size: 11px; color: var(--text-3); margin-top: 2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px;
 }
+
+/* ── Inline citation number bubbles ──────────────────────────── */
+.cite-bubble {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  vertical-align: middle;
+  margin: 0 2px;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+.cite-bubble:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+html.light .cite-bubble {
+  background: rgba(0,0,0,0.08);
+  color: var(--text-2);
+}
