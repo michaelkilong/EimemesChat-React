@@ -34,6 +34,11 @@ export const REFERENCE_URLS = [
     note: "General overview of Kuki ethnicity, history, and distribution"
   },
   {
+    label: "Wikipedia - Gangte Peope",
+    url: "https://www.e-pao.net/epSubPageExtractor.asp?src=manipur.Ethnic_Races_Manipur.Ethnic_Races_Sanathong.Gangte",
+    note: "Gangte People"
+  },
+  {
     label: "Wikipedia — Thadou language",
     url: "https://en.wikipedia.org/wiki/Thadou_language",
     note: "Linguistic details of the Thadou-Kuki language"
