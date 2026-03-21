@@ -7,6 +7,7 @@ import type { Conversation } from '../types';
 interface Props {
   onBack: () => void;
   onOpenProfile: () => void;
+  onOpenPersonalization: () => void;
   onClearChats: () => void;
   conversations: Conversation[];
 }
@@ -96,7 +97,7 @@ function SettingsCard({
   );
 }
 
-export default function SettingsView({ onBack, onOpenProfile, onClearChats }: Props) {
+export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalization, onClearChats }: Props) {
   const { currentUser, showToast, showConfirm } = useApp();
   const { isDark, toggleTheme } = useTheme();
   const [signOutVisible, setSignOutVisible] = useState(false);
@@ -150,6 +151,17 @@ export default function SettingsView({ onBack, onOpenProfile, onClearChats }: Pr
             desc={currentUser.email || ''}
           />
         )}
+
+        {/* Section label */}
+        <div style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'var(--text-3)', padding: '4px 4px 8px' }}>Personalization</div>
+
+        <SettingsCard
+          onClick={onOpenPersonalization}
+          iconColor="var(--accent-dim)"
+          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M17 11l1.5 1.5L21 10"/></svg>}
+          label="Personalization"
+          desc="Tone, nickname, custom instructions"
+        />
 
         {/* Section label */}
         <div style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'var(--text-3)', padding: '4px 4px 8px' }}>Account</div>
@@ -219,4 +231,4 @@ export default function SettingsView({ onBack, onOpenProfile, onClearChats }: Pr
       <SignOutModal visible={signOutVisible} onClose={() => setSignOutVisible(false)} />
     </div>
   );
-                                                                                                                                                                  }
+}
