@@ -204,6 +204,9 @@ export default async function handler(req, res) {
 
   const safeMessage     = inputCheck.sanitized;
   const needsDisclaimer = CRITICAL_PATTERNS.test(safeMessage);
+
+  /* ── Web search — ONLY when user explicitly toggles the globe button ── */
+  const shouldSearch = useWebSearch === true;
   const maxTokens = adaptiveMaxTokens(safeMessage, !!attachment) + (shouldSearch ? 400 : 0);
 
   const trimmedHistory = Array.isArray(history)
@@ -227,8 +230,6 @@ export default async function handler(req, res) {
     }
   } catch { /* fail open */ }
 
-  /* ── Web search — ONLY when user explicitly toggles the globe button ── */
-  const shouldSearch = useWebSearch === true;
   let searchResults  = null;
   let searchContext  = '';
 
