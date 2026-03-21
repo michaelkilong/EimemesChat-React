@@ -436,11 +436,38 @@ a:hover { text-decoration: underline; }
 /* ═══════════════════════════════════════════
    CITATIONS & WEB SEARCH
 ═══════════════════════════════════════════ */
-.search-indicator {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 0 6px; color: var(--text-3); font-size: 13px;
+
+/* Skeleton wave animation */
+@keyframes wave {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
 }
-.search-indicator-dot {
+
+.skeleton-line {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--glass-2) 25%,
+    var(--glass-3) 50%,
+    var(--glass-2) 75%
+  );
+  background-size: 800px 100%;
+  animation: wave 1.6s ease-in-out infinite;
+}
+
+/* Search skeleton container */
+.search-skeleton {
+  padding: 8px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.search-skeleton-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-3); font-weight: 500;
+  margin-bottom: 2px;
+}
+.search-skeleton-label-dot {
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent);
   animation: breathe 1.2s infinite ease-in-out;
