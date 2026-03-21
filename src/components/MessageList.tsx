@@ -22,11 +22,13 @@ const CHIP_ROWS = [
 interface Props {
   messages: Message[];
   isTyping: boolean;
+  isSearching: boolean;
   isStreaming: boolean;
   streamText: string;
   streamDone: boolean;
   streamModel: string;
   streamDisclaimer: boolean;
+  streamSources: { title: string; url: string }[];
   convId: string | null;
   chipsUsed: boolean;
   onChipClick: (prompt: string) => void;
@@ -34,8 +36,8 @@ interface Props {
 }
 
 export default function MessageList({
-  messages, isTyping, isStreaming,
-  streamText, streamDone, streamModel, streamDisclaimer,
+  messages, isTyping, isSearching, isStreaming,
+  streamText, streamDone, streamModel, streamDisclaimer, streamSources,
   convId, chipsUsed, onChipClick, onRegen,
 }: Props) {
   const bottomRef    = useRef<HTMLDivElement>(null);
@@ -138,7 +140,14 @@ export default function MessageList({
             );
           })}
 
-          {isTyping && <TypingIndicator />}
+          {isTyping && !isSearching && <TypingIndicator />}
+
+          {isSearching && (
+            <div className="search-indicator">
+              <div className="search-indicator-dot" />
+              Searching the web…
+            </div>
+          )}
 
           {isStreaming && (
             <StreamingBubble
@@ -147,6 +156,7 @@ export default function MessageList({
               model={streamModel}
               disclaimer={streamDisclaimer}
               time={getTime()}
+              sources={streamSources}
             />
           )}
 

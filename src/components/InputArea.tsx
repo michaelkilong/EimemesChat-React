@@ -7,7 +7,7 @@ const ACCEPTED = '.pdf,.txt,.md,.csv,.docx,.jpg,.jpeg,.png,.gif,.webp,image/*';
 const MAX_SIZE  = 20 * 1024 * 1024; // 20MB
 
 interface Props {
-  onSend: (text: string, attachment?: Attachment) => void;
+  onSend: (text: string, attachment?: Attachment, useWebSearch?: boolean) => void;
   onStop: () => void;
   isSending: boolean;
   isStreaming: boolean;
@@ -15,10 +15,11 @@ interface Props {
 }
 
 export default function InputArea({ onSend, onStop, isSending, isStreaming, dailyLimitReached }: Props) {
-  const [value,      setValue]      = useState('');
-  const [attachment, setAttachment] = useState<Attachment | null>(null);
-  const [processing, setProcessing] = useState(false);
-  const [fileError,  setFileError]  = useState('');
+  const [value,        setValue]        = useState('');
+  const [attachment,   setAttachment]   = useState<Attachment | null>(null);
+  const [processing,   setProcessing]   = useState(false);
+  const [fileError,    setFileError]    = useState('');
+  const [webSearch,    setWebSearch]    = useState(false);
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -38,10 +39,12 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
     haptic.medium();
     const text = value.trim();
     const att  = attachment ?? undefined;
+    const ws   = webSearch;
     setValue('');
     setAttachment(null);
     setFileError('');
-    onSend(text || 'Please analyze this file.', att);
+    setWebSearch(false);
+    onSend(text || 'Please analyze this file.', att, ws);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -149,6 +152,29 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </button>
+
+          {/* Web search toggle */}
+          <button
+            onClick={() => { haptic.light(); setWebSearch(w => !w); }}
+            disabled={isSending || isStreaming}
+            title={webSearch ? 'Web search on' : 'Web search off'}
+            style={{
+              width: '34px', height: '52px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: webSearch ? 'var(--accent)' : 'var(--text-3)',
+              background: 'transparent', border: 'none',
+              cursor: 'pointer', flexShrink: 0,
+              transition: 'color 0.15s',
+              opacity: (isSending || isStreaming) ? 0.4 : 1,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <line x1="11" y1="8" x2="11" y2="14"/>
+              <line x1="8" y1="11" x2="14" y2="11"/>
             </svg>
           </button>
 

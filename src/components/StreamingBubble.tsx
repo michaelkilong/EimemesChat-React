@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
+import SourcesList from './SourcesList';
+import type { Source } from '../types';
 
 interface Props {
   text: string;
@@ -8,9 +10,10 @@ interface Props {
   model: string;
   disclaimer: boolean;
   time: string;
+  sources?: Source[];
 }
 
-export default function StreamingBubble({ text, done, model, disclaimer, time }: Props) {
+export default function StreamingBubble({ text, done, model, disclaimer, time, sources }: Props) {
   const { showToast } = useApp();
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -34,17 +37,15 @@ export default function StreamingBubble({ text, done, model, disclaimer, time }:
         />
         {done && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{time}</span>
-            </div>
             {disclaimer && (
               <div style={{
                 fontSize: '11.5px', color: 'var(--text-3)', marginTop: '8px',
                 padding: '6px 10px', borderLeft: '2px solid var(--border)', lineHeight: 1.5,
               }}>
-                ⚠️ For reference only. This is AI-generated content — always verify with a qualified professional or trusted source.
+                ⚠️ For reference only. Always verify with a qualified professional or trusted source.
               </div>
             )}
+            {sources?.length ? <SourcesList sources={sources} /> : null}
           </>
         )}
       </div>

@@ -3,6 +3,7 @@ import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
 import { getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
+import SourcesList from './SourcesList';
 import type { Message } from '../types';
 
 interface Props {
@@ -121,6 +122,9 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
           </div>
         )}
 
+        {/* Web search sources */}
+        {message.sources?.length ? <SourcesList sources={message.sources} /> : null}
+
         {/* Action icons — ChatGPT style, always visible on last, hover on others */}
         {isLast && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0px', marginTop: '6px' }}>
@@ -172,4 +176,3 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
     </div>
   );
 }
-              
