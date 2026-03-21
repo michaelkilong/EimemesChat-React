@@ -29,7 +29,7 @@ export function useChat(
   const [streamText,       setStreamText]        = useState('');
   const [streamDone,       setStreamDone]        = useState(false);
   const [streamModel,      setStreamModel]       = useState('');
-  const [streamDisclaimer, setStreamDisclaimer]  = useState(false);
+  const [streamDisclaimer, setStreamDisclaimer]  = useState<'critical' | 'web' | false>(false);
   const [isSearching,      setIsSearching]        = useState(false);
   const [streamSources,    setStreamSources]      = useState<{ title: string; url: string }[]>([]);
 
@@ -138,7 +138,7 @@ export function useChat(
     setStreamText('');
     setStreamDone(false);
     setStreamModel('');
-    setStreamDisclaimer(false);
+    setStreamDisclaimer(false as const);
     setIsSearching(false);
     setStreamSources([]);
 
@@ -223,10 +223,9 @@ export function useChat(
             }
 
             if (parsed.done) {
-              model         = parsed.model         || '';
-              disclaimer    = parsed.disclaimer    || false;
-              webSearchUsed = parsed.webSearchUsed || false;
-              sources       = parsed.sources       || [];
+              model      = parsed.model      || '';
+              disclaimer = parsed.disclaimer || false;
+              sources    = parsed.sources    || [];
               if (sources.length) setStreamSources(sources);
               if (parsed.outputBlocked && parsed.reply) fullText = parsed.reply;
             }
