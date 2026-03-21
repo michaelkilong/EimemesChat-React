@@ -432,3 +432,51 @@ a:hover { text-decoration: underline; }
   .topbar-newchat  { display: flex !important; }
   .sidebar-mask    { display: none !important; }
 }
+
+/* ═══════════════════════════════════════════
+   CITATIONS & WEB SEARCH
+═══════════════════════════════════════════ */
+.search-indicator {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 0 6px; color: var(--text-3); font-size: 13px;
+}
+.search-indicator-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  animation: breathe 1.2s infinite ease-in-out;
+}
+.citation-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin: 0 2px; padding: 1px 7px; border-radius: 999px;
+  background: var(--accent-dim); color: var(--accent);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  border: none; font-family: inherit; vertical-align: middle;
+  transition: background 0.15s; white-space: nowrap;
+}
+.citation-badge:hover { background: rgba(10,132,255,0.25); }
+.sources-list {
+  margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid var(--border-b);
+}
+.sources-list-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+  text-transform: uppercase; color: var(--text-3); margin-bottom: 8px;
+}
+.source-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid var(--border-b);
+  cursor: pointer; text-decoration: none;
+}
+.source-item:last-child { border-bottom: none; }
+.source-num {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent-dim); color: var(--accent);
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+.source-title { font-size: 13px; color: var(--accent); line-height: 1.4; flex: 1; }
+.source-url {
+  font-size: 11px; color: var(--text-3); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px;
+}
