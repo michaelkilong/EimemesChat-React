@@ -8,6 +8,7 @@ interface Props {
   onBack: () => void;
   onOpenProfile: () => void;
   onOpenPersonalization: () => void;
+  onOpenAbout: () => void;
   onClearChats: () => void;
   conversations: Conversation[];
 }
@@ -100,7 +101,7 @@ function SettingsCard({
   );
 }
 
-export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalization, onClearChats }: Props) {
+export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalization, onOpenAbout, onClearChats }: Props) {
   const { currentUser, showToast, showConfirm } = useApp();
   const { isDark, toggleTheme } = useTheme();
   const [signOutVisible, setSignOutVisible] = useState(false);
@@ -123,7 +124,10 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
           onClick={onBack}
           style={{
             width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0,
-            background: 'rgba(255,255,255,0.08)', border: 'none',
+            background: 'rgba(255,255,255,0.22)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.35)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', color: 'var(--text-1)',
             WebkitTapHighlightColor: 'transparent',
@@ -221,11 +225,11 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
         />
 
         <SettingsCard
-          onClick={() => window.open('https://app-eimemeschat.vercel.app/about.html', '_blank')}
+          onClick={onOpenAbout}
           iconColor="var(--accent-dim)"
           icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}
           label="About"
-          desc="EimemesChat AI · v3.4"
+          desc="EimemesChat AI · v4.0"
         />
 
         <div style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: '12px', padding: '24px 0 10px' }}>
