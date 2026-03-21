@@ -25,8 +25,8 @@ function ActionBtn({ title, onClick, active, activeColor, children }: {
       onMouseLeave={() => setHovered(false)}
       style={{
         width: '32px', height: '32px', borderRadius: '6px', border: 'none',
-        background: hovered ? 'rgba(255,255,255,0.07)' : 'transparent',
-        color: active ? (activeColor || 'var(--accent)') : 'rgba(255,255,255,0.4)',
+        background: hovered ? 'var(--glass-3)' : 'transparent',
+        color: active ? (activeColor || 'var(--accent)') : 'var(--text-3)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', transition: 'background 0.12s, color 0.12s',
       }}
@@ -172,3 +172,4 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
     </div>
   );
 }
+              
