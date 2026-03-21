@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
 import { getFileIcon } from '../lib/fileReader';
+import { haptic } from '../lib/haptic';
 import type { Message } from '../types';
 
 interface Props {
@@ -52,11 +53,12 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content)
-      .then(() => { setCopied(true); showToast('Copied!'); setTimeout(() => setCopied(false), 2000); })
+      .then(() => { haptic.success(); setCopied(true); showToast('Copied!'); setTimeout(() => setCopied(false), 2000); })
       .catch(() => showToast('Could not copy'));
   };
 
   const handleShare = () => {
+    haptic.light();
     if (navigator.share) navigator.share({ text: message.content }).catch(() => {});
     else handleCopy();
   };
@@ -132,7 +134,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
             </ActionBtn>
 
             {/* Regenerate */}
-            <ActionBtn title="Regenerate" onClick={() => onRegen(lastUserMsg)}>
+            <ActionBtn title="Regenerate" onClick={() => { haptic.medium(); onRegen(lastUserMsg); }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="1 4 1 10 7 10"/>
                 <path d="M3.51 15a9 9 0 1 0 .49-3.54"/>
@@ -140,7 +142,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
             </ActionBtn>
 
             {/* Thumb up */}
-            <ActionBtn title="Good response" onClick={() => { const was = thumbUp; setThumbUp(!was); setThumbDown(false); if (!was) showToast('Thanks! 👍'); }} active={thumbUp} activeColor="#30d158">
+            <ActionBtn title="Good response" onClick={() => { const was = thumbUp; haptic.success(); setThumbUp(!was); setThumbDown(false); if (!was) showToast('Thanks! 👍'); }} active={thumbUp} activeColor="#30d158">
               <svg width="15" height="15" viewBox="0 0 24 24" fill={thumbUp ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
                 <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
@@ -148,7 +150,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
             </ActionBtn>
 
             {/* Thumb down */}
-            <ActionBtn title="Bad response" onClick={() => { const was = thumbDown; setThumbDown(!was); setThumbUp(false); if (!was) showToast('Thanks for the feedback!'); }} active={thumbDown} activeColor="#ff6b6b">
+            <ActionBtn title="Bad response" onClick={() => { const was = thumbDown; haptic.medium(); setThumbDown(!was); setThumbUp(false); if (!was) showToast('Thanks for the feedback!'); }} active={thumbDown} activeColor="#ff6b6b">
               <svg width="15" height="15" viewBox="0 0 24 24" fill={thumbDown ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/>
                 <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
@@ -170,4 +172,3 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
     </div>
   );
 }
-              

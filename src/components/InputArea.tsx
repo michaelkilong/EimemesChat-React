@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon, formatFileSize } from '../lib/fileReader';
+import { haptic } from '../lib/haptic';
 import type { Attachment } from '../types';
 
 const ACCEPTED = '.pdf,.txt,.md,.csv,.docx,.jpg,.jpeg,.png,.gif,.webp,image/*';
@@ -34,6 +35,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
 
   const handleSend = () => {
     if (!canSend) return;
+    haptic.medium();
     const text = value.trim();
     const att  = attachment ?? undefined;
     setValue('');

@@ -1,5 +1,6 @@
 import React, { useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
+import { haptic } from '../lib/haptic';
 import type { Conversation } from '../types';
 
 interface Props {
@@ -22,12 +23,13 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
     didLongPress.current = false;
     pressTimer.current = setTimeout(async () => {
       didLongPress.current = true;
+      haptic.heavy(); // buzz on long press trigger
       const yes = await showConfirm(
         `"${(title || 'This conversation').slice(0, 40)}" will be permanently deleted.`,
         'Delete',
         'Delete conversation?'
       );
-      if (yes) onDeleteConv(convId);
+      if (yes) { haptic.heavy(); onDeleteConv(convId); }
     }, 500);
   }, [showConfirm, onDeleteConv]);
 
@@ -185,4 +187,3 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
     </>
   );
 }
-        
