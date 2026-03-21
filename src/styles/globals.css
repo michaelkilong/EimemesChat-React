@@ -126,16 +126,17 @@ body {
   font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
   font-size: 17px;
   background: linear-gradient(145deg, var(--bg-a) 0%, var(--bg-b) 100%);
+  background-attachment: fixed;
   color: var(--text-1);
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
-  overflow: hidden;
 }
 
 #root {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* ── OS-specific fonts ───────────────────────────────────────────── */
@@ -149,8 +150,6 @@ html.os-mac body {
 html.os-other body {
   font-family: system-ui, -apple-system, sans-serif;
 }
-
-#root { height: 100%; display: flex; flex-direction: column; }
 
 button { cursor: pointer; border: none; background: none; font-family: inherit; }
 input, textarea { font-family: inherit; }
