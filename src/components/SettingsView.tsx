@@ -15,8 +15,8 @@ interface Props {
 function RoundIcon({ color, children }: { color?: string; children: React.ReactNode }) {
   return (
     <div style={{
-      width: '42px', height: '42px', borderRadius: '50%', flexShrink: 0,
-      background: color || '#1a6cff',
+      width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
+      background: color || 'var(--accent-dim)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {children}
@@ -140,7 +140,7 @@ export default function SettingsView({ onBack, onOpenProfile, onClearChats }: Pr
         {currentUser && (
           <SettingsCard
             onClick={onOpenProfile}
-            iconColor="#1a6cff"
+            iconColor="var(--accent-dim)"
             icon={
               currentUser.photoURL
                 ? <img src={currentUser.photoURL} alt="" style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }} />
@@ -156,8 +156,8 @@ export default function SettingsView({ onBack, onOpenProfile, onClearChats }: Pr
 
         <SettingsCard
           onClick={() => setSignOutVisible(true)}
-          iconColor="#1a6cff"
-          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>}
+          iconColor="var(--accent-dim)"
+          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>}
           label="Sign out"
           desc="End your session"
         />
@@ -176,8 +176,8 @@ export default function SettingsView({ onBack, onOpenProfile, onClearChats }: Pr
         <div style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', color: 'var(--text-3)', padding: '4px 4px 8px' }}>Appearance</div>
 
         <SettingsCard
-          iconColor="#636366"
-          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>}
+          iconColor="rgba(255,255,255,0.1)"
+          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>}
           label="Dark Mode"
           desc="Override system preference"
           toggle
@@ -189,24 +189,24 @@ export default function SettingsView({ onBack, onOpenProfile, onClearChats }: Pr
 
         <SettingsCard
           onClick={() => window.open('https://app-eimemeschat.vercel.app/privacy.html', '_blank')}
-          iconColor="#1a6cff"
-          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
+          iconColor="var(--accent-dim)"
+          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
           label="Privacy Policy"
           desc="How we handle your data"
         />
 
         <SettingsCard
           onClick={() => window.open('https://app-eimemeschat.vercel.app/support.html', '_blank')}
-          iconColor="#1a6cff"
-          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}
+          iconColor="var(--accent-dim)"
+          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}
           label="Help & Support"
           desc="FAQ and contact"
         />
 
         <SettingsCard
           onClick={() => window.open('https://app-eimemeschat.vercel.app/about.html', '_blank')}
-          iconColor="#1a6cff"
-          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}
+          iconColor="var(--accent-dim)"
+          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}
           label="About"
           desc="EimemesChat AI · v3.4"
         />
@@ -219,4 +219,4 @@ export default function SettingsView({ onBack, onOpenProfile, onClearChats }: Pr
       <SignOutModal visible={signOutVisible} onClose={() => setSignOutVisible(false)} />
     </div>
   );
-}
+                                                                                                                                                                  }
