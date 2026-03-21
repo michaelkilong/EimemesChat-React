@@ -13,12 +13,15 @@ interface Props {
 }
 
 // Circular icon container — matches proposed design
-function RoundIcon({ color, children }: { color?: string; children: React.ReactNode }) {
+function RoundIcon({ color, circle, children }: { color?: string; circle?: boolean; children: React.ReactNode }) {
   return (
     <div style={{
-      width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
+      width: '36px', height: '36px',
+      borderRadius: circle ? '50%' : '10px',
+      flexShrink: 0,
       background: color || 'var(--accent-dim)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
+      overflow: 'hidden',
     }}>
       {children}
     </div>
@@ -144,8 +147,10 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
             iconColor="var(--accent-dim)"
             icon={
               currentUser.photoURL
-                ? <img src={currentUser.photoURL} alt="" style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }} />
-                : <svg width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="none"><circle cx="12" cy="8" r="4"/><path d="M12 14c-4.42 0-8 2.69-8 6h16c0-3.31-3.58-6-8-6z"/></svg>
+                ? <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+                    <img src={currentUser.photoURL} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  </div>
+                : <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--accent)" stroke="none"><circle cx="12" cy="8" r="4"/><path d="M12 14c-4.42 0-8 2.69-8 6h16c0-3.31-3.58-6-8-6z"/></svg>
             }
             label={currentUser.displayName || 'User'}
             desc={currentUser.email || ''}
