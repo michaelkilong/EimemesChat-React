@@ -1,54 +1,45 @@
 // sw.js — EimemesChat AI Service Worker
-// v1.0 — App shell caching; network-first for API; cache-first for assets
+// v3 — Immediate update on every deploy via network-first for HTML
 
-const CACHE_NAME = 'eimemeschat-v1';
+const CACHE_NAME = 'eimemeschat-v3';
 
-// App shell — these get cached on install
 const SHELL_ASSETS = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
   '/apple-touch-icon.png',
 ];
 
-// ── Install: cache the app shell ──────────────────────────────────
+// ── Install ───────────────────────────────────────────────────────
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(SHELL_ASSETS);
-    })
-  );
+  // Skip waiting — activate immediately, don't wait for old SW to die
   self.skipWaiting();
-});
-
-// ── Activate: clean up old caches ─────────────────────────────────
-self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      )
-    )
+    caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_ASSETS))
   );
-  self.clients.claim();
 });
 
-// ── Fetch: routing strategy ────────────────────────────────────────
+// ── Activate ──────────────────────────────────────────────────────
+self.addEventListener('activate', event => {
+  // Claim all clients immediately — new SW takes over right away
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      // Delete ALL old caches
+      caches.keys().then(keys =>
+        Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      ),
+    ])
+  );
+});
+
+// ── Fetch ─────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // API calls — always network, never cache
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-
-  // Firebase / external — always network
+  // API, Firebase, external — always network, never cache
   if (
+    url.pathname.startsWith('/api/') ||
     url.hostname.includes('firebase') ||
     url.hostname.includes('google') ||
     url.hostname.includes('gstatic') ||
@@ -61,34 +52,39 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // App shell & static assets — cache first, fall back to network
+  // HTML navigation — NETWORK FIRST, always get latest
+  // This is the key fix: index.html always comes from network
+  // so new deployments are reflected immediately
+  if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          // Cache the fresh response
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() => caches.match('/index.html')) // offline fallback
+    );
+    return;
+  }
+
+  // JS/CSS/images — cache first (they have hashed filenames from Vite so safe)
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
-
       return fetch(event.request).then(response => {
-        // Cache successful GET responses for static assets
-        if (
-          event.request.method === 'GET' &&
-          response.status === 200 &&
-          (url.pathname.endsWith('.js') ||
-           url.pathname.endsWith('.css') ||
-           url.pathname.endsWith('.png') ||
-           url.pathname.endsWith('.svg') ||
-           url.pathname.endsWith('.woff2') ||
-           url.pathname === '/' ||
-           url.pathname === '/index.html')
-        ) {
+        if (event.request.method === 'GET' && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => {
-        // Offline fallback — serve index.html for navigation requests
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
       });
     })
   );
+});
+
+// ── Tell all open tabs to reload when new SW activates ────────────
+self.addEventListener('message', event => {
+  if (event.data === 'skipWaiting') self.skipWaiting();
 });
