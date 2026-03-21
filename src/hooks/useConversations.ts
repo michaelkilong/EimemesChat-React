@@ -69,5 +69,16 @@ export function useConversations() {
     [currentUser]
   );
 
-  return { conversations, createNewChat, clearAllChats, getConvRef, getUserConvsRef };
+  const deleteConv = useCallback(async (convId: string) => {
+    if (!currentUser) return;
+    try {
+      const { deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(db, 'users', currentUser.uid, 'conversations', convId));
+    } catch (err) {
+      console.error('deleteConv:', err);
+      showToast('Failed to delete. Try again.');
+    }
+  }, [currentUser, showToast]);
+
+  return { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef };
 }
