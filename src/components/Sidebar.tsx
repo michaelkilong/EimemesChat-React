@@ -138,10 +138,9 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
                 onClick={() => handleClick(conv.id)}
                 onMouseDown={() => startPress(conv.id, conv.title)}
                 onMouseUp={() => endPress(conv.id)}
-                onMouseLeave={() => endPress(conv.id)}
                 onTouchStart={() => startPress(conv.id, conv.title)}
                 onTouchEnd={() => endPress(conv.id)}
-                onContextMenu={e => e.preventDefault()} // prevent browser context menu on long press
+                onContextMenu={e => e.preventDefault()}
                 style={{
                   padding: '9px 12px', borderRadius: '10px',
                   color: conv.id === currentConvId ? 'var(--accent)' : 'var(--text-2)',
@@ -153,7 +152,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
                   userSelect: 'none', WebkitUserSelect: 'none',
                 }}
                 onMouseEnter={e => { if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-3)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-1)'; } }}
-                onMouseLeave={e => { if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-2)'; } }}
+                onMouseLeave={e => { endPress(conv.id); if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-2)'; } }}
               >
                 {conv.title || 'New conversation'}
               </div>
@@ -186,3 +185,4 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
     </>
   );
 }
+        
