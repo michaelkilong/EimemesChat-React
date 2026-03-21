@@ -71,6 +71,34 @@ function adaptiveMaxTokens(message, hasAttachment) {
 }
 
 /* ── Tavily web search ────────────────────────────────────────── */
+async function optimizeSearchQuery(message, groqApiKey) {
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${groqApiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        max_tokens: 40,
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content: "Convert the user message into an optimal web search query. Output ONLY the search query — no explanation, no quotes, no punctuation at the end. Make it specific, factual and searchable. Examples: 'Tell me about kuki people' → 'Kuki people history culture Northeast India'. 'What happened in Manipur' → 'Manipur conflict 2023 2024 latest news'. 'Who is the PM of India' → 'Prime Minister of India 2025'.",
+          },
+          { role: "user", content: message },
+        ],
+      }),
+    });
+    if (!res.ok) return message;
+    const data = await res.json();
+    const query = data.choices?.[0]?.message?.content?.trim();
+    console.log(`[search] Optimized query: "${query}"`);
+    return query || message;
+  } catch {
+    return message;
+  }
+}
+
 async function searchWeb(query) {
   const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
   if (!TAVILY_API_KEY) return null;
@@ -196,12 +224,12 @@ export default async function handler(req, res) {
   let searchContext  = '';
 
   if (shouldSearch) {
-    console.log(`[search] uid=${uid} query="${safeMessage.slice(0, 80)}"`);
-    searchResults = await searchWeb(safeMessage);
+    const optimizedQuery = await optimizeSearchQuery(safeMessage, GROQ_API_KEY);
+    console.log(`[search] uid=${uid} original="${safeMessage.slice(0, 60)}" optimized="${optimizedQuery}"`);
+    searchResults = await searchWeb(optimizedQuery);
     if (searchResults?.length) {
       searchContext = buildSearchContext(searchResults);
       console.log(`[search] Got ${searchResults.length} results`);
-      // Notify frontend that search was used
       sseEvent(res, { searching: true, resultCount: searchResults.length });
     }
   }
