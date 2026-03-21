@@ -17,6 +17,8 @@ import InputArea             from './components/InputArea';
 import SettingsView          from './components/SettingsView';
 import ProfileView           from './components/ProfileView';
 import PersonalizationView   from './components/PersonalizationView';
+import AboutView             from './components/AboutView';
+import LicensesView          from './components/LicensesView';
 import LoginModal            from './components/modals/LoginModal';
 import type { Attachment }   from './types';
 
@@ -37,8 +39,11 @@ function CircleBtn({ onClick, children, className }: { onClick: () => void; chil
       onTouchEnd={() => setPressed(false)}
       style={{
         width: '40px', height: '40px', borderRadius: '50%',
-        background: pressed ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)',
-        border: 'none', cursor: 'pointer', flexShrink: 0,
+        background: pressed ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.22)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.35)',
+        cursor: 'pointer', flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: 'var(--text-1)',
         transition: 'background 0.12s',
@@ -210,6 +215,7 @@ export default function App() {
             onBack={() => setView('chat')}
             onOpenProfile={() => setView('profile')}
             onOpenPersonalization={() => setView('personalization')}
+            onOpenAbout={() => setView('about')}
             onClearChats={handleClearChats}
             conversations={conversations}
           />
@@ -225,6 +231,19 @@ export default function App() {
         {view === 'personalization' && (
           <PersonalizationView
             onBack={() => setView('settings')}
+          />
+        )}
+
+        {view === 'about' && (
+          <AboutView
+            onBack={() => setView('settings')}
+            onOpenLicenses={() => setView('licenses')}
+          />
+        )}
+
+        {view === 'licenses' && (
+          <LicensesView
+            onBack={() => setView('about')}
           />
         )}
       </div>
