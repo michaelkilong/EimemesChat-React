@@ -19,7 +19,8 @@ export interface Message {
   content: string;
   time: string;
   model?: string;
-  disclaimer?: boolean;
+  disclaimer?: 'critical' | 'web' | false;
+  webSearchUsed?: boolean;
   sources?: Source[];
   attachment?: {
     name: string;
