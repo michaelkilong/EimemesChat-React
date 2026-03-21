@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Conversation } from '../types';
 
@@ -8,14 +8,41 @@ interface Props {
   onNewChat: () => void;
   onSelectConv: (id: string) => void;
   onOpenSettings: () => void;
+  onDeleteConv: (id: string) => void;
 }
 
-export default function Sidebar({ conversations, currentConvId, onNewChat, onSelectConv, onOpenSettings }: Props) {
-  const { sidebarOpen, setSidebarOpen } = useApp();
+export default function Sidebar({ conversations, currentConvId, onNewChat, onSelectConv, onOpenSettings, onDeleteConv }: Props) {
+  const { sidebarOpen, setSidebarOpen, showConfirm } = useApp();
+
+  // Long press logic — 500ms hold triggers delete confirm
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPress = useRef(false);
+
+  const startPress = useCallback((convId: string, title: string) => {
+    didLongPress.current = false;
+    pressTimer.current = setTimeout(async () => {
+      didLongPress.current = true;
+      const yes = await showConfirm(
+        `"${(title || 'This conversation').slice(0, 40)}" will be permanently deleted.`,
+        'Delete',
+        'Delete conversation?'
+      );
+      if (yes) onDeleteConv(convId);
+    }, 500);
+  }, [showConfirm, onDeleteConv]);
+
+  const endPress = useCallback((convId: string) => {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
+  }, []);
+
+  const handleClick = useCallback((convId: string) => {
+    if (didLongPress.current) { didLongPress.current = false; return; }
+    onSelectConv(convId);
+    setSidebarOpen(false);
+  }, [onSelectConv, setSidebarOpen]);
 
   return (
     <>
-      {/* Mobile mask */}
       {sidebarOpen && (
         <div
           className="sidebar-mask show"
@@ -35,13 +62,13 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
         transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
-        // Mobile: fixed + slide in
         ...(typeof window !== 'undefined' && window.innerWidth <= 768 ? {
           position: 'fixed' as const, top: 0, left: 0, bottom: 0,
           zIndex: 30,
           transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
         } : {}),
       }}>
+
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -64,7 +91,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
               width: '34px', height: '34px', borderRadius: '10px',
               display: 'none', alignItems: 'center', justifyContent: 'center',
               color: 'var(--text-2)', background: 'var(--glass-3)',
-              border: '1px solid var(--border-b)',
+              border: '1px solid var(--border-b)', cursor: 'pointer',
             }}
           >
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -73,7 +100,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
           </button>
         </div>
 
-        {/* New chat button */}
+        {/* New chat */}
         <button
           onClick={onNewChat}
           style={{
@@ -84,18 +111,8 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
             cursor: 'pointer', flexShrink: 0,
             transition: 'background 0.15s, border-color 0.15s, color 0.15s',
           }}
-          onMouseEnter={e => {
-            const b = e.currentTarget;
-            b.style.background = 'var(--accent-dim)';
-            b.style.borderColor = 'var(--accent)';
-            b.style.color = 'var(--accent)';
-          }}
-          onMouseLeave={e => {
-            const b = e.currentTarget;
-            b.style.background = 'var(--glass-3)';
-            b.style.borderColor = 'var(--border)';
-            b.style.color = 'var(--text-2)';
-          }}
+          onMouseEnter={e => { const b = e.currentTarget; b.style.background = 'var(--accent-dim)'; b.style.borderColor = 'var(--accent)'; b.style.color = 'var(--accent)'; }}
+          onMouseLeave={e => { const b = e.currentTarget; b.style.background = 'var(--glass-3)'; b.style.borderColor = 'var(--border)'; b.style.color = 'var(--text-2)'; }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -103,8 +120,13 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
           New chat
         </button>
 
+        {/* Hint */}
+        <div style={{ padding: '8px 16px 2px', fontSize: '11px', color: 'var(--text-3)', fontStyle: 'italic' }}>
+          Hold to delete a conversation
+        </div>
+
         {/* History */}
-        <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
+        <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
           <div style={{ fontSize: '10.5px', fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'var(--text-3)', padding: '6px 10px 4px' }}>
             Recents
           </div>
@@ -113,7 +135,13 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
             : conversations.map(conv => (
               <div
                 key={conv.id}
-                onClick={() => { onSelectConv(conv.id); setSidebarOpen(false); }}
+                onClick={() => handleClick(conv.id)}
+                onMouseDown={() => startPress(conv.id, conv.title)}
+                onMouseUp={() => endPress(conv.id)}
+                onMouseLeave={() => endPress(conv.id)}
+                onTouchStart={() => startPress(conv.id, conv.title)}
+                onTouchEnd={() => endPress(conv.id)}
+                onContextMenu={e => e.preventDefault()} // prevent browser context menu on long press
                 style={{
                   padding: '9px 12px', borderRadius: '10px',
                   color: conv.id === currentConvId ? 'var(--accent)' : 'var(--text-2)',
@@ -122,19 +150,10 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
                   fontSize: '14.5px', cursor: 'pointer',
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   transition: 'background 0.12s, color 0.12s',
+                  userSelect: 'none', WebkitUserSelect: 'none',
                 }}
-                onMouseEnter={e => {
-                  if (conv.id !== currentConvId) {
-                    (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-3)';
-                    (e.currentTarget as HTMLDivElement).style.color = 'var(--text-1)';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (conv.id !== currentConvId) {
-                    (e.currentTarget as HTMLDivElement).style.background = 'transparent';
-                    (e.currentTarget as HTMLDivElement).style.color = 'var(--text-2)';
-                  }
-                }}
+                onMouseEnter={e => { if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-3)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-1)'; } }}
+                onMouseLeave={e => { if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-2)'; } }}
               >
                 {conv.title || 'New conversation'}
               </div>
@@ -142,7 +161,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
           }
         </div>
 
-        {/* Footer — Settings button */}
+        {/* Footer — Settings */}
         <div style={{ borderTop: '1px solid var(--border-b)', padding: '10px', paddingBottom: 'calc(10px + var(--sab))', flexShrink: 0 }}>
           <button
             onClick={onOpenSettings}
@@ -153,18 +172,8 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
               background: 'var(--glass-3)', border: '1px solid transparent',
               cursor: 'pointer', transition: 'background 0.12s, border-color 0.12s, color 0.12s',
             }}
-            onMouseEnter={e => {
-              const b = e.currentTarget;
-              b.style.background = 'var(--glass-2)';
-              b.style.color = 'var(--text-1)';
-              b.style.borderColor = 'var(--border-b)';
-            }}
-            onMouseLeave={e => {
-              const b = e.currentTarget;
-              b.style.background = 'var(--glass-3)';
-              b.style.color = 'var(--text-2)';
-              b.style.borderColor = 'transparent';
-            }}
+            onMouseEnter={e => { const b = e.currentTarget; b.style.background = 'var(--glass-2)'; b.style.color = 'var(--text-1)'; b.style.borderColor = 'var(--border-b)'; }}
+            onMouseLeave={e => { const b = e.currentTarget; b.style.background = 'var(--glass-3)'; b.style.color = 'var(--text-2)'; b.style.borderColor = 'transparent'; }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
               <circle cx="12" cy="12" r="3"/>
