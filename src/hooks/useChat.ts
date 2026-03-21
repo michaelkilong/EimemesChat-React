@@ -30,6 +30,8 @@ export function useChat(
   const [streamDone,       setStreamDone]        = useState(false);
   const [streamModel,      setStreamModel]       = useState('');
   const [streamDisclaimer, setStreamDisclaimer]  = useState(false);
+  const [isSearching,      setIsSearching]        = useState(false);
+  const [streamSources,    setStreamSources]      = useState<{ title: string; url: string }[]>([]);
 
   const streamController = useRef<AbortController | null>(null);
   const renderQueueRef   = useRef<string[]>([]);
@@ -79,7 +81,7 @@ export function useChat(
     currentUser ? doc(db, 'users', currentUser.uid, 'conversations', id) : null,
   [currentUser]);
 
-  const sendMessage = useCallback(async (text: string, chipsUsedSetter: () => void, attachment?: Attachment) => {
+  const sendMessage = useCallback(async (text: string, chipsUsedSetter: () => void, attachment?: Attachment, useWebSearch?: boolean) => {
     if (!text.trim() || isSending || !currentUser) return;
 
     const allowed = await checkAndIncrementDailyCount();
@@ -137,6 +139,8 @@ export function useChat(
     setStreamDone(false);
     setStreamModel('');
     setStreamDisclaimer(false);
+    setIsSearching(false);
+    setStreamSources([]);
 
     setIsTyping(true);
 
@@ -149,7 +153,7 @@ export function useChat(
       const history = snap.exists() ? (snap.data().messages || []).slice(-20) : [];
 
       // Build request body — include attachment content for backend processing
-      const body: Record<string, unknown> = { message: text, history, isFirstMessage };
+      const body: Record<string, unknown> = { message: text, history, isFirstMessage, useWebSearch: !!useWebSearch };
       if (attachment) {
         // For images send full base64, for docs send extracted text
         body.attachment = {
@@ -192,6 +196,7 @@ export function useChat(
       let fullText   = '';
       let model      = '';
       let disclaimer = false;
+      let sources: { title: string; url: string }[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -206,8 +211,9 @@ export function useChat(
           const raw = line.slice(6).trim();
           try {
             const parsed = JSON.parse(raw);
-            if (parsed.error)  { enqueue(parsed.error); }
-            if (parsed.token)  { fullText += parsed.token; enqueue(parsed.token); }
+            if (parsed.searching)     { setIsSearching(true); }
+            if (parsed.error)         { enqueue(parsed.error); }
+            if (parsed.token)         { setIsSearching(false); fullText += parsed.token; enqueue(parsed.token); }
 
             if (parsed.outputBlocked && parsed.safeReply) {
               fullText = parsed.safeReply;
@@ -219,6 +225,8 @@ export function useChat(
             if (parsed.done) {
               model      = parsed.model      || '';
               disclaimer = parsed.disclaimer || false;
+              sources    = parsed.sources    || [];
+              if (sources.length) setStreamSources(sources);
               if (parsed.outputBlocked && parsed.reply) fullText = parsed.reply;
             }
 
@@ -237,7 +245,11 @@ export function useChat(
       setStreamDone(true);
 
       // Save AI message
-      const aiMsg: Message = { role: 'assistant', content: fullText, time: getTime(), model, disclaimer };
+      const aiMsg: Message = {
+        role: 'assistant', content: fullText,
+        time: getTime(), model, disclaimer,
+        ...(sources.length && { sources }),
+      };
       await updateDoc(convRef, { messages: arrayUnion(aiMsg), updatedAt: new Date() });
 
       // Force-fetch latest messages before clearing streaming to prevent blank gap
@@ -285,8 +297,8 @@ export function useChat(
   }, []);
 
   return {
-    isSending, isStreaming, isTyping,
-    streamText, streamDone, streamModel, streamDisclaimer,
+    isSending, isStreaming, isTyping, isSearching,
+    streamText, streamDone, streamModel, streamDisclaimer, streamSources,
     sendMessage, stopStreaming,
     setStreamDone,
   };
