@@ -114,6 +114,8 @@ export default function App() {
     await deleteConv(id);
     if (currentConvId === id) setCurrentConvId(null);
   }, [deleteConv, currentConvId]);
+
+  const handleClearChats = useCallback(async () => {
     await clearAllChats();
     setCurrentConvId(null);
   }, [clearAllChats]);
