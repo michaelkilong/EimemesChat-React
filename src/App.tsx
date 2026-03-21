@@ -59,7 +59,7 @@ export default function App() {
   const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
 
-  const { conversations, createNewChat, clearAllChats, getConvRef, getUserConvsRef } = useConversations();
+  const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
 
   const handleNewChat = useCallback(async () => {
@@ -110,7 +110,10 @@ export default function App() {
     handleSend(originalMsg);
   }, [currentConvId, isSending, isStreaming, getConvRef, handleSend]);
 
-  const handleClearChats = useCallback(async () => {
+  const handleDeleteConv = useCallback(async (id: string) => {
+    await deleteConv(id);
+    if (currentConvId === id) setCurrentConvId(null);
+  }, [deleteConv, currentConvId]);
     await clearAllChats();
     setCurrentConvId(null);
   }, [clearAllChats]);
@@ -131,6 +134,7 @@ export default function App() {
         onNewChat={handleNewChat}
         onSelectConv={id => { setCurrentConvId(id); setView('chat'); }}
         onOpenSettings={() => { setView('settings'); setSidebarOpen(false); }}
+        onDeleteConv={handleDeleteConv}
       />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
