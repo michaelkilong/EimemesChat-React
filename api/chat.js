@@ -350,7 +350,7 @@ export default async function handler(req, res) {
 
       sseEvent(res, {
         done: true, model, reply: fullText,
-        ...(needsDisclaimer && { disclaimer: true }),
+        ...((needsDisclaimer || shouldSearch) && { disclaimer: true }),
         ...(searchResults?.length && { sources: searchResults }),
       });
 
