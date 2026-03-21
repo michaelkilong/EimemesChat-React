@@ -130,7 +130,7 @@ async function searchWeb(query) {
       .map(r => ({
         title:   r.title,
         url:     r.url,
-        content: r.content?.slice(0, 500),
+        content: r.content?.slice(0, 800),
         score:   r.score,
       }));
 
@@ -263,7 +263,12 @@ export default async function handler(req, res) {
   }
 
   /* ── Model selection ──────────────────────────────────────────── */
-  const modelsToTry = attachment?.type === 'image' ? [VISION_MODEL, ...MODELS] : MODELS;
+  // Use smarter model for web search — needs to synthesize sources accurately
+  const modelsToTry = attachment?.type === 'image'
+    ? [VISION_MODEL, ...MODELS]
+    : shouldSearch
+      ? ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", ...MODELS]
+      : MODELS;
 
   /* ── Model retry loop ─────────────────────────────────────────── */
   for (const model of modelsToTry) {
