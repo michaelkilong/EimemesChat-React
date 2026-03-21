@@ -18,8 +18,32 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [processing, setProcessing] = useState(false);
   const [fileError,  setFileError]  = useState('');
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // iOS keyboard fix — visualViewport API pushes input above keyboard
+  useEffect(() => {
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (!isIOS || !window.visualViewport) return;
+
+    const vv = window.visualViewport;
+
+    const handleResize = () => {
+      const windowHeight = window.innerHeight;
+      const viewportHeight = vv.height;
+      const offset = Math.max(0, windowHeight - viewportHeight - vv.offsetTop);
+      setKeyboardOffset(offset);
+    };
+
+    vv.addEventListener('resize', handleResize);
+    vv.addEventListener('scroll', handleResize);
+
+    return () => {
+      vv.removeEventListener('resize', handleResize);
+      vv.removeEventListener('scroll', handleResize);
+    };
+  }, []);
 
   const autoResize = () => {
     const el = textareaRef.current;
@@ -71,7 +95,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   }, []);
 
   return (
-    <div style={{ flexShrink: 0, padding: '10px 18px', paddingBottom: 'calc(12px + var(--sab))', background: 'transparent' }}>
+    <div style={{ flexShrink: 0, padding: '10px 18px', paddingBottom: 'calc(12px + var(--sab))', background: 'transparent', transform: `translateY(-${keyboardOffset}px)`, transition: 'transform 0.15s ease-out' }}>
       <div style={{ maxWidth: '740px', margin: '0 auto', position: 'relative' }}>
 
         {/* File attachment preview */}
