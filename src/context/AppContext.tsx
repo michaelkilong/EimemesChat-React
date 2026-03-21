@@ -1,29 +1,18 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import type { User } from 'firebase/auth';
 import type { View } from '../types';
 
 interface AppContextType {
-  // Auth
   currentUser: User | null;
   setCurrentUser: (u: User | null) => void;
   authReady: boolean;
   setAuthReady: (r: boolean) => void;
-
-  // View
   view: View;
   setView: (v: View) => void;
-
-  // Toast
   showToast: (msg: string, dur?: number) => void;
-
-  // Confirm dialog
   showConfirm: (msg: string, yesLabel?: string, title?: string) => Promise<boolean>;
-
-  // Sidebar
   sidebarOpen: boolean;
   setSidebarOpen: (o: boolean) => void;
-
-  // Theme
   isDark: boolean;
   setIsDark: (d: boolean) => void;
 }
@@ -34,9 +23,35 @@ export const useApp = () => useContext(AppContext);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady,   setAuthReady]   = useState(false);
-  const [view,        setView]        = useState<View>('chat');
+  const [view,        setView_]       = useState<View>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark,      setIsDark]      = useState(true);
+
+  // Wrap setView to push browser history entries
+  const setView = useCallback((v: View) => {
+    setView_(v);
+    if (v === 'chat') {
+      // Going back to chat — don't push, let back button handle it
+      history.replaceState({ view: 'chat' }, '', '/');
+    } else {
+      // Push a new history entry so back button returns here
+      history.pushState({ view: v }, '', '/');
+    }
+  }, []);
+
+  // Listen to browser back/forward button
+  useEffect(() => {
+    // Set initial state
+    history.replaceState({ view: 'chat' }, '', '/');
+
+    const handlePop = (e: PopStateEvent) => {
+      const v = (e.state?.view as View) || 'chat';
+      setView_(v); // use internal setter to avoid pushing another history entry
+    };
+
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, []);
 
   // Toast
   const [toastMsg,     setToastMsg]     = useState('');
