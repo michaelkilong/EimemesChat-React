@@ -9,12 +9,18 @@ export interface Attachment {
   content: string;
 }
 
+export interface Source {
+  title: string;
+  url: string;
+}
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
   time: string;
   model?: string;
   disclaimer?: boolean;
+  sources?: Source[];
   attachment?: {
     name: string;
     type: string;

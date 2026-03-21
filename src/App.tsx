@@ -73,8 +73,8 @@ export default function App() {
   }, [createNewChat, setView]);
 
   const {
-    isSending, isStreaming, isTyping,
-    streamText, streamDone, streamModel, streamDisclaimer,
+    isSending, isStreaming, isTyping, isSearching,
+    streamText, streamDone, streamModel, streamDisclaimer, streamSources,
     sendMessage, stopStreaming,
   } = useChat(
     currentConvId, setCurrentConvId,
@@ -94,11 +94,11 @@ export default function App() {
     });
   }, [currentUser]);
 
-  const handleSend = useCallback((text: string, attachment?: Attachment) => {
+  const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean) => {
     sendMessage(text, () => {
       setChipsUsed(true);
       localStorage.setItem('ec_chips_used', 'true');
-    }, attachment);
+    }, attachment, useWebSearch);
   }, [sendMessage]);
 
   const handleRegen = useCallback(async (originalMsg: string) => {
@@ -189,11 +189,13 @@ export default function App() {
             <MessageList
               messages={messages}
               isTyping={isTyping}
+              isSearching={isSearching}
               isStreaming={isStreaming}
               streamText={streamText}
               streamDone={streamDone}
               streamModel={streamModel}
               streamDisclaimer={streamDisclaimer}
+              streamSources={streamSources}
               convId={currentConvId}
               chipsUsed={chipsUsed}
               onChipClick={handleSend}
