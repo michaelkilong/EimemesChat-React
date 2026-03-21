@@ -135,7 +135,6 @@ git push origin main
 - [ ] Voice input (Web Speech API)
 - [ ] Conversation search
 - [ ] Landing page (on custom domain)
-- [ ] Thadou Kuki language support (fine-tuned model)
 - [ ] Native Android app
 
 ---
