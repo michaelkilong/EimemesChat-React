@@ -195,7 +195,7 @@ export function useChat(
       let buf        = '';
       let fullText   = '';
       let model      = '';
-      let disclaimer = false;
+      let disclaimer: 'critical' | 'web' | false = false;
       let sources: { title: string; url: string }[] = [];
 
       while (true) {
@@ -223,9 +223,10 @@ export function useChat(
             }
 
             if (parsed.done) {
-              model      = parsed.model      || '';
-              disclaimer = parsed.disclaimer || false;
-              sources    = parsed.sources    || [];
+              model         = parsed.model         || '';
+              disclaimer    = parsed.disclaimer    || false;
+              webSearchUsed = parsed.webSearchUsed || false;
+              sources       = parsed.sources       || [];
               if (sources.length) setStreamSources(sources);
               if (parsed.outputBlocked && parsed.reply) fullText = parsed.reply;
             }
