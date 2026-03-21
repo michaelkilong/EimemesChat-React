@@ -13,6 +13,19 @@ export default function SourcesList({ sources }: Props) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
 
+  // Register global handler so inline cite-bubble buttons can expand sources
+  React.useEffect(() => {
+    (window as any).__expandSource = (index: number) => {
+      setOpen(true);
+      setExpanded(index);
+      // Scroll to sources list
+      setTimeout(() => {
+        document.querySelector('.sources-pill')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    };
+    return () => { delete (window as any).__expandSource; };
+  }, []);
+
   if (!sources?.length) return null;
 
   return (
@@ -20,6 +33,7 @@ export default function SourcesList({ sources }: Props) {
       {/* Collapsed pill — tap to expand, like ChatGPT */}
       <button
         onClick={() => setOpen(o => !o)}
+        className="sources-pill"
         style={{
           display: 'inline-flex', alignItems: 'center', gap: '6px',
           padding: '6px 14px', borderRadius: '999px',
