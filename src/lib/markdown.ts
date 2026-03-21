@@ -33,6 +33,11 @@ export function renderMarkdown(text: string): string {
         } catch { return mathBlocks[Number(i)].eq; }
       });
 
+    // Convert [1] [2] [3] citation numbers into tappable bubble buttons
+    html = html.replace(/\[(\d+)\]/g, (_, n: string) =>
+      `<button class="cite-bubble" onclick="window.__expandSource(${Number(n) - 1})">${n}</button>`
+    );
+
     return html;
   } catch {
     return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
