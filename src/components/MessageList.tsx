@@ -85,8 +85,8 @@ export default function MessageList({
                         style={{
                           padding: '12px 22px',
                           borderRadius: '999px',
-                          border: 'none',
-                          background: 'rgba(255,255,255,0.07)',
+                          border: '1px solid var(--border)',
+                          background: 'var(--glass-2)',
                           color: 'var(--text-1)',
                           fontSize: '15px', fontWeight: 500,
                           cursor: 'pointer',
