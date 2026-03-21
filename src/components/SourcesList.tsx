@@ -1,11 +1,8 @@
-// SourcesList.tsx — v1.0
-// Renders web search sources at bottom of AI message, like ChatGPT
+// SourcesList.tsx — v1.1 — Bubble style like ChatGPT, collapsible
 import React, { useState } from 'react';
 import type { Source } from '../types';
 
-interface Props {
-  sources: Source[];
-}
+interface Props { sources: Source[]; }
 
 function getDomain(url: string): string {
   try { return new URL(url).hostname.replace('www.', ''); }
@@ -13,64 +10,120 @@ function getDomain(url: string): string {
 }
 
 export default function SourcesList({ sources }: Props) {
+  const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
 
   if (!sources?.length) return null;
 
   return (
-    <div className="sources-list">
-      <div className="sources-list-title">Sources</div>
-      {sources.map((src, i) => (
-        <div key={i}>
-          <div
-            className="source-item"
-            onClick={() => setExpanded(expanded === i ? null : i)}
-          >
-            <span className="source-num">{i + 1}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="source-title">{src.title}</div>
-              <div className="source-url">{getDomain(src.url)}</div>
-            </div>
-            <svg
-              width="12" height="12" viewBox="0 0 24 24" fill="none"
-              stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              style={{ flexShrink: 0, transform: expanded === i ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
-            >
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </div>
+    <div style={{ marginTop: '14px' }}>
+      {/* Collapsed pill — tap to expand, like ChatGPT */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: '6px',
+          padding: '6px 14px', borderRadius: '999px',
+          background: 'var(--glass-2)',
+          border: '1px solid var(--border)',
+          color: 'var(--text-2)', fontSize: '13px', fontWeight: 500,
+          cursor: 'pointer', fontFamily: 'inherit',
+          transition: 'background 0.15s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-dim)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'var(--glass-2)')}
+      >
+        {/* Globe icon */}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="2" y1="12" x2="22" y2="12"/>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        {sources.length} {sources.length === 1 ? 'source' : 'sources'}
+        <svg
+          width="12" height="12" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+        >
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
 
-          {/* Expanded — show full URL with open link */}
-          {expanded === i && (
-            <div style={{
-              padding: '8px 12px 10px 26px',
-              background: 'var(--glass-3)',
-              borderRadius: '10px',
-              marginBottom: '4px',
-            }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-3)', wordBreak: 'break-all', lineHeight: 1.5 }}>
-                {src.url}
-              </div>
-              <a
-                href={src.url}
-                target="_blank"
-                rel="noreferrer"
+      {/* Expanded bubble — sources list inside a card */}
+      {open && (
+        <div style={{
+          marginTop: '8px',
+          background: 'var(--glass-2)',
+          border: '1px solid var(--border)',
+          borderRadius: '16px',
+          overflow: 'hidden',
+        }}>
+          {sources.map((src, i) => (
+            <div key={i}>
+              <div
+                onClick={() => setExpanded(expanded === i ? null : i)}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '4px',
-                  marginTop: '6px', fontSize: '12px', color: 'var(--accent)',
-                  fontWeight: 500,
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '12px 14px', cursor: 'pointer',
+                  borderBottom: i < sources.length - 1 ? '1px solid var(--border-b)' : 'none',
+                  transition: 'background 0.12s',
                 }}
+                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-3)'}
+                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
               >
-                Open link
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                  <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                {/* Number badge */}
+                <div style={{
+                  width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0,
+                  background: 'var(--accent-dim)', color: 'var(--accent)',
+                  fontSize: '10px', fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {i + 1}
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {src.title}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '1px' }}>
+                    {getDomain(src.url)}
+                  </div>
+                </div>
+
+                <svg
+                  width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ flexShrink: 0, transform: expanded === i ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+                >
+                  <polyline points="6 9 12 15 18 9"/>
                 </svg>
-              </a>
+              </div>
+
+              {/* Expanded URL + open link */}
+              {expanded === i && (
+                <div style={{
+                  padding: '10px 14px 12px 44px',
+                  background: 'var(--glass-3)',
+                  borderBottom: i < sources.length - 1 ? '1px solid var(--border-b)' : 'none',
+                }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-3)', wordBreak: 'break-all', lineHeight: 1.5 }}>
+                    {src.url}
+                  </div>
+                  <a
+                    href={src.url} target="_blank" rel="noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontSize: '12px', color: 'var(--accent)', fontWeight: 500 }}
+                  >
+                    Open link
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </a>
+                </div>
+              )}
             </div>
-          )}
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }
