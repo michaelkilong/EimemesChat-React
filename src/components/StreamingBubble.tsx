@@ -8,7 +8,7 @@ interface Props {
   text: string;
   done: boolean;
   model: string;
-  disclaimer: boolean;
+  disclaimer: 'critical' | 'web' | false;
   time: string;
   sources?: Source[];
 }
