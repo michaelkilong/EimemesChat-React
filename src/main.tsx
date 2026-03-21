@@ -4,6 +4,19 @@ import App from './App';
 import { AppProvider } from './context/AppContext';
 import './styles/globals.css';
 
+// ── OS Font Detection ─────────────────────────────────────────────
+// Apply font class to html element so CSS can target it
+const ua = navigator.userAgent;
+if (/android/i.test(ua)) {
+  document.documentElement.classList.add('os-android');
+} else if (/iphone|ipad|ipod/i.test(ua)) {
+  document.documentElement.classList.add('os-ios');
+} else if (/macintosh|mac os/i.test(ua)) {
+  document.documentElement.classList.add('os-mac');
+} else {
+  document.documentElement.classList.add('os-other');
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppProvider>
