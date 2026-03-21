@@ -138,15 +138,6 @@ export default function SourcesList({ sources }: Props) {
           ))}
         </div>
       )}
-      {/* UI disclaimer — hardcoded, not from AI */}
-      <div style={{
-        marginTop: '8px',
-        fontSize: '11px',
-        color: 'var(--text-3)',
-        lineHeight: 1.5,
-      }}>
-        ⚠️ Information sourced from the web. Always verify with trusted sources.
-      </div>
     </div>
   );
 }

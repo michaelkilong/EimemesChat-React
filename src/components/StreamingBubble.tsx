@@ -42,7 +42,7 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
                 fontSize: '11.5px', color: 'var(--text-3)', marginTop: '8px',
                 padding: '6px 10px', borderLeft: '2px solid var(--border)', lineHeight: 1.5,
               }}>
-                ⚠️ For reference only. Always verify with a qualified professional or trusted source.
+                ⚠️ For reference only. AI can make mistakes — always verify with a qualified professional or trusted source.
               </div>
             )}
             {sources?.length ? <SourcesList sources={sources} /> : null}

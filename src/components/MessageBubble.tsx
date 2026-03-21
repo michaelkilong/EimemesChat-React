@@ -118,7 +118,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
             fontSize: '11.5px', color: 'var(--text-3)', marginTop: '8px',
             padding: '6px 10px', borderLeft: '2px solid var(--border)', lineHeight: 1.5,
           }}>
-            ⚠️ For reference only — always verify with a qualified professional.
+            ⚠️ For reference only. AI can make mistakes — always verify with a qualified professional or trusted source.
           </div>
         )}
 
