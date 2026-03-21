@@ -6,20 +6,17 @@ import { getTime } from '../lib/markdown';
 import type { Message } from '../types';
 
 const CHIPS = [
-  { label: 'Design an iOS app',        prompt: 'Help me design an iOS app' },
-  { label: 'Explain quantum computing', prompt: 'Explain quantum computing simply' },
   { label: 'Write a poem',             prompt: 'Write me a creative poem' },
+  { label: 'Explain quantum computing', prompt: 'Explain quantum computing simply' },
   { label: 'Plan a trip',              prompt: 'Help me plan a trip' },
-  { label: 'Code a website',           prompt: 'Help me code a website' },
   { label: 'Debug my code',            prompt: 'Help me debug my code' },
 ];
 
-// Staggered chip layout — rows of [1, 2, 2, 1] like proposed design
+// Staggered [1, 2, 1]
 const CHIP_ROWS = [
   [CHIPS[0]],
   [CHIPS[1], CHIPS[2]],
-  [CHIPS[3], CHIPS[4]],
-  [CHIPS[5]],
+  [CHIPS[3]],
 ];
 
 interface Props {
@@ -150,3 +147,4 @@ export default function MessageList({
     </div>
   );
 }
+            
