@@ -113,12 +113,21 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
           style={{ color: 'var(--text-1)', fontSize: '16px', lineHeight: 1.75, padding: '2px 0' }}
         />
 
-        {message.disclaimer && (
+        {message.disclaimer === 'critical' && (
           <div style={{
             fontSize: '11.5px', color: 'var(--text-3)', marginTop: '8px',
             padding: '6px 10px', borderLeft: '2px solid var(--border)', lineHeight: 1.5,
           }}>
-            ⚠️ For reference only. AI can make mistakes — always verify with a qualified professional or trusted source.
+            For informational purposes only. Consult a qualified professional before making decisions.
+          </div>
+        )}
+
+        {message.disclaimer === 'web' && (
+          <div style={{
+            fontSize: '11.5px', color: 'var(--text-3)', marginTop: '8px',
+            padding: '6px 10px', borderLeft: '2px solid var(--border)', lineHeight: 1.5,
+          }}>
+            Web sources may be outdated or inaccurate. Verify from authoritative sources.
           </div>
         )}
 

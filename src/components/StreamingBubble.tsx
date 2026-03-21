@@ -37,12 +37,20 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
         />
         {done && (
           <>
-            {disclaimer && (
+            {disclaimer === 'critical' && (
               <div style={{
                 fontSize: '11.5px', color: 'var(--text-3)', marginTop: '8px',
                 padding: '6px 10px', borderLeft: '2px solid var(--border)', lineHeight: 1.5,
               }}>
-                ⚠️ For reference only. AI can make mistakes — always verify with a qualified professional or trusted source.
+                For informational purposes only. Consult a qualified professional before making decisions.
+              </div>
+            )}
+            {disclaimer === 'web' && (
+              <div style={{
+                fontSize: '11.5px', color: 'var(--text-3)', marginTop: '8px',
+                padding: '6px 10px', borderLeft: '2px solid var(--border)', lineHeight: 1.5,
+              }}>
+                Web sources may be outdated or inaccurate. Verify from authoritative sources.
               </div>
             )}
             {sources?.length ? <SourcesList sources={sources} /> : null}
