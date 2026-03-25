@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
 import type { Conversation } from '../types';
@@ -14,6 +14,14 @@ interface Props {
 
 export default function Sidebar({ conversations, currentConvId, onNewChat, onSelectConv, onOpenSettings, onDeleteConv }: Props) {
   const { sidebarOpen, setSidebarOpen, showConfirm } = useApp();
+
+  // Track window width reactively for mobile/desktop layout switch
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Long press logic — 500ms hold triggers delete confirm
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,7 +72,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
         transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
-        ...(typeof window !== 'undefined' && window.innerWidth <= 768 ? {
+        ...(isMobile ? {
           position: 'fixed' as const, top: 0, left: 0, bottom: 0,
           zIndex: 30,
           transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',

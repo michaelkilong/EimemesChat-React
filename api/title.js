@@ -15,8 +15,17 @@ if (!admin.apps.length) {
   });
 }
 
+const ALLOWED_ORIGINS = [
+  "https://eimemes-chat-ai.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin",  "*");
+  const origin = req.headers.origin || "";
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.status(200).end();

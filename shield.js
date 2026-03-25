@@ -147,7 +147,8 @@ const INJECTION_PATTERNS = [
   /base64\s*(decode|encode|:)/i,
 
   // Jailbreak techniques
-  /\bDAN\b/,
+  // Note: standalone /\bDAN\b/ removed — false-positives on the name "Dan".
+  // The actual jailbreak phrase is caught by the pattern below.
   /do\s+anything\s+now/i,
   /jailbreak/i,
   /\bdev(eloper)?\s+mode\b/i,

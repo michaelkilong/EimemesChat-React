@@ -5,7 +5,7 @@ import hljs from 'highlight.js';
 // Configure marked
 marked.setOptions({ breaks: true, gfm: true });
 
-export function renderMarkdown(text: string): string {
+export function renderMarkdown(text: string, msgKey?: string): string {
   try {
     const mathBlocks: Array<{ type: 'display' | 'inline'; eq: string }> = [];
 
@@ -34,8 +34,10 @@ export function renderMarkdown(text: string): string {
       });
 
     // Convert [1] [2] [3] citation numbers into tappable bubble buttons
+    // Pass msgKey so the registry dispatches to the correct SourcesList instance
+    const keyArg = msgKey ? `,'${msgKey.replace(/'/g, "\\'")}'` : '';
     html = html.replace(/\[(\d+)\]/g, (_, n: string) =>
-      `<button class="cite-bubble" onclick="window.__expandSource(${Number(n) - 1})">${n}</button>`
+      `<button class="cite-bubble" onclick="if(typeof window.__expandSource==='function')window.__expandSource(${Number(n) - 1}${keyArg})">${n}</button>`
     );
 
     return html;
