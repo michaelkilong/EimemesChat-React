@@ -1,7 +1,7 @@
 // App.tsx
 // v2.1 — Apple-standard UI: circular topbar buttons, clean layout
 import React, { useState, useCallback, useEffect } from 'react';
-import { doc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
@@ -85,13 +85,11 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     const ref = doc(db, 'users', currentUser.uid);
-    import('firebase/firestore').then(({ getDoc }) => {
-      getDoc(ref).then(snap => {
-        if (!snap.exists()) return;
-        const data = snap.data() as { dailyCount?: number; lastDate?: string };
-        if (data.lastDate === todayStr() && (data.dailyCount || 0) >= DAILY_LIMIT) setDailyLimitReached(true);
-      }).catch(() => {});
-    });
+    getDoc(ref).then(snap => {
+      if (!snap.exists()) return;
+      const data = snap.data() as { dailyCount?: number; lastDate?: string };
+      if (data.lastDate === todayStr() && (data.dailyCount || 0) >= DAILY_LIMIT) setDailyLimitReached(true);
+    }).catch(() => {});
   }, [currentUser]);
 
   const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean) => {
@@ -103,7 +101,6 @@ export default function App() {
 
   const handleRegen = useCallback(async (originalMsg: string) => {
     if (!currentConvId || isSending || isStreaming) return;
-    const { getDoc, updateDoc } = await import('firebase/firestore');
     const convRef = getConvRef(currentConvId);
     if (!convRef) return;
     const snap = await getDoc(convRef);

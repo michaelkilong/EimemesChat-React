@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
+import { renderMarkdown, highlightCodeBlocks, escHtml } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
+import Disclaimer from './Disclaimer';
 import SourcesList from './SourcesList';
 import type { Source } from '../types';
 
@@ -20,10 +21,13 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
   useEffect(() => {
     if (!bodyRef.current) return;
     if (done) {
-      bodyRef.current.innerHTML = renderMarkdown(text);
+      // Full markdown parse only once when streaming finishes
+      bodyRef.current.innerHTML = renderMarkdown(text, '__streaming');
       highlightCodeBlocks(bodyRef.current, showToast);
     } else {
-      bodyRef.current.innerHTML = renderMarkdown(text) + '<span class="stream-cursor"></span>';
+      // During streaming: lightweight render — escape HTML, preserve line breaks.
+      // Avoids calling the full marked parser + KaTeX + regex 55x/sec.
+      bodyRef.current.innerHTML = escHtml(text).replace(/\n/g, '<br>') + '<span class="stream-cursor"></span>';
     }
   }, [text, done, showToast]);
 
@@ -37,23 +41,8 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
         />
         {done && (
           <>
-            {disclaimer === 'critical' && (
-              <div style={{
-                fontSize: '11.5px', color: 'var(--text-3)', marginTop: '8px',
-                padding: '6px 10px', borderLeft: '2px solid var(--border)', lineHeight: 1.5,
-              }}>
-                For informational purposes only. Consult a qualified professional before making decisions.
-              </div>
-            )}
-            {disclaimer === 'web' && (
-              <div style={{
-                fontSize: '11.5px', color: 'var(--text-3)', marginTop: '8px',
-                padding: '6px 10px', borderLeft: '2px solid var(--border)', lineHeight: 1.5,
-              }}>
-                Web sources may be outdated or inaccurate. Verify from authoritative sources.
-              </div>
-            )}
-            {sources?.length ? <SourcesList sources={sources} /> : null}
+            <Disclaimer type={disclaimer} />
+            {sources?.length ? <SourcesList sources={sources} msgKey="__streaming" /> : null}
           </>
         )}
       </div>
