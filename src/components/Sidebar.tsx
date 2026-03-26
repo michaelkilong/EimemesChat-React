@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
 import type { Conversation } from '../types';
@@ -10,10 +10,29 @@ interface Props {
   onSelectConv: (id: string) => void;
   onOpenSettings: () => void;
   onDeleteConv: (id: string) => void;
+  dailyCount?: number;
+  dailyLimit?: number;
 }
 
-export default function Sidebar({ conversations, currentConvId, onNewChat, onSelectConv, onOpenSettings, onDeleteConv }: Props) {
+export default function Sidebar({ conversations, currentConvId, onNewChat, onSelectConv, onOpenSettings, onDeleteConv, dailyCount = 0, dailyLimit = 150 }: Props) {
   const { sidebarOpen, setSidebarOpen, showConfirm } = useApp();
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Track window width reactively for mobile/desktop layout switch
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Listen for Cmd+K focus-search event from App
+  useEffect(() => {
+    const onFocus = () => setTimeout(() => searchRef.current?.focus(), 100);
+    window.addEventListener('focus-search', onFocus);
+    return () => window.removeEventListener('focus-search', onFocus);
+  }, []);
 
   // Long press logic — 500ms hold triggers delete confirm
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,7 +83,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
         transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
-        ...(typeof window !== 'undefined' && window.innerWidth <= 768 ? {
+        ...(isMobile ? {
           position: 'fixed' as const, top: 0, left: 0, bottom: 0,
           zIndex: 30,
           transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
@@ -122,6 +141,40 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
           New chat
         </button>
 
+        {/* Search */}
+        <div style={{ padding: '10px 12px 0' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            padding: '8px 12px', borderRadius: '12px',
+            background: 'var(--glass-3)', border: '1px solid var(--border-b)',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              ref={searchRef}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search conversations..."
+              style={{
+                flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                fontSize: '13px', color: 'var(--text-1)', fontFamily: 'inherit',
+              }}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} style={{
+                width: '16px', height: '16px', borderRadius: '50%', background: 'var(--glass-2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-3)', cursor: 'pointer', flexShrink: 0, border: 'none',
+              }}>
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Hint */}
         <div style={{ padding: '8px 16px 2px', fontSize: '11px', color: 'var(--text-3)', fontStyle: 'italic' }}>
           Hold to delete a conversation
@@ -130,11 +183,14 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
         {/* History */}
         <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
           <div style={{ fontSize: '10.5px', fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'var(--text-3)', padding: '6px 10px 4px' }}>
-            Recents
+            {searchQuery ? 'Results' : 'Recents'}
           </div>
-          {conversations.length === 0
-            ? <div style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--text-3)' }}>No conversations yet</div>
-            : conversations.map(conv => (
+          {(() => {
+            const filtered = searchQuery
+              ? conversations.filter(c => (c.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
+              : conversations;
+            if (filtered.length === 0) return <div style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--text-3)' }}>{searchQuery ? 'No matches' : 'No conversations yet'}</div>;
+            return filtered.map(conv => (
               <div
                 key={conv.id}
                 onClick={() => handleClick(conv.id)}
@@ -158,12 +214,25 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
               >
                 {conv.title || 'New conversation'}
               </div>
-            ))
-          }
+            ));
+          })()}
         </div>
 
-        {/* Footer — Settings */}
+        {/* Footer — Usage + Settings */}
         <div style={{ borderTop: '1px solid var(--border-b)', padding: '10px', paddingBottom: 'calc(10px + var(--sab))', flexShrink: 0 }}>
+          {/* Usage counter */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '6px 12px 10px', fontSize: '12px', color: 'var(--text-3)',
+          }}>
+            <span>Today's usage</span>
+            <span style={{
+              fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+              color: dailyCount >= dailyLimit ? '#ff6b6b' : dailyCount >= dailyLimit * 0.8 ? '#ffb340' : 'var(--text-2)',
+            }}>
+              {dailyCount}/{dailyLimit}
+            </span>
+          </div>
           <button
             onClick={onOpenSettings}
             style={{

@@ -44,10 +44,17 @@ export default function MessageList({
   const scrollRef    = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  // Auto scroll to bottom when new messages arrive
+  // Smooth scroll for discrete events (new message, typing starts)
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, isTyping, streamText]);
+  }, [messages.length, isTyping]);
+
+  // Instant scroll during streaming — no smooth animation at 55 updates/sec
+  useEffect(() => {
+    if (!isStreaming || !scrollRef.current) return;
+    const el = scrollRef.current;
+    el.scrollTop = el.scrollHeight;
+  }, [streamText, isStreaming]);
 
   // Show scroll-to-bottom button when user scrolls up
   const handleScroll = useCallback(() => {
@@ -128,9 +135,11 @@ export default function MessageList({
                 if (messages[j].role === 'user') { lastUserMsg = messages[j].content; break; }
               }
             }
+            // Stable key: role + time + content prefix avoids reconciliation bugs
+            const msgKey = `${msg.role}-${msg.time}-${msg.content.slice(0, 32)}`;
             return (
               <MessageBubble
-                key={i}
+                key={msgKey}
                 message={msg}
                 isLast={isLast}
                 lastUserMsg={lastUserMsg}

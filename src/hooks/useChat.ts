@@ -1,16 +1,13 @@
 // useChat.ts — v2.0 — Clean rewrite: removed image gen, added file attachment support
 import { useState, useRef, useCallback } from 'react';
-import { arrayUnion, updateDoc, getDoc, setDoc, doc } from 'firebase/firestore';
+import { arrayUnion, updateDoc, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useApp } from '../context/AppContext';
 import { getTime } from '../lib/markdown';
 import type { Message, Attachment } from '../types';
 
-const MAX_MSGS    = 100;
-const DAILY_LIMIT = 150;
-const AI_TIMEOUT  = 30000;
-
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+const MAX_MSGS   = 100;
+const AI_TIMEOUT = 30000;
 
 export function useChat(
   convId: string | null,
@@ -58,37 +55,15 @@ export function useChat(
     check();
   });
 
-  const getUserMetaRef = useCallback(() =>
-    currentUser ? doc(db, 'users', currentUser.uid) : null,
-  [currentUser]);
-
-  const checkAndIncrementDailyCount = useCallback(async (): Promise<boolean> => {
-    if (!currentUser) return false;
-    try {
-      const ref  = getUserMetaRef()!;
-      const snap = await getDoc(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const today      = todayStr();
-      const lastDate   = data.lastDate || '';
-      const dailyCount = lastDate === today ? (data.dailyCount || 0) : 0;
-      if (dailyCount >= DAILY_LIMIT) return false;
-      await setDoc(ref, { dailyCount: dailyCount + 1, lastDate: today }, { merge: true });
-      return true;
-    } catch { return true; }
-  }, [currentUser, getUserMetaRef]);
-
   const getConvDocRef = useCallback((id: string) =>
     currentUser ? doc(db, 'users', currentUser.uid, 'conversations', id) : null,
   [currentUser]);
 
-  const sendMessage = useCallback(async (text: string, chipsUsedSetter: () => void, attachment?: Attachment, useWebSearch?: boolean) => {
+  const sendMessage = useCallback(async (text: string, chipsUsedSetter: () => void, attachment?: Attachment, useWebSearch?: boolean, modelMode?: string) => {
     if (!text.trim() || isSending || !currentUser) return;
 
-    const allowed = await checkAndIncrementDailyCount();
-    if (!allowed) {
-      showToast(`Daily limit of ${DAILY_LIMIT} messages reached. Resets tomorrow!`);
-      return;
-    }
+    // Rate limiting is enforced server-side (api/chat.js) with Firestore transactions.
+    // The server returns 429 when the daily limit is hit, which is handled below.
 
     setIsSending(true);
     chipsUsedSetter();
@@ -149,11 +124,13 @@ export function useChat(
     const timer = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
     try {
-      const snap    = await getDoc(convRef);
-      const history = snap.exists() ? (snap.data().messages || []).slice(-20) : [];
+      // Build history from local state — avoids an extra Firestore read per message.
+      // Include the user message we just saved (it may not be in `conversations` state yet).
+      const convMsgs = conversations.find(c => c.id === activeConvId)?.messages || [];
+      const history = [...convMsgs, userMsg].slice(-20);
 
       // Build request body — include attachment content for backend processing
-      const body: Record<string, unknown> = { message: text, history, isFirstMessage, useWebSearch: !!useWebSearch };
+      const body: Record<string, unknown> = { message: text, history, isFirstMessage, useWebSearch: !!useWebSearch, modelMode: modelMode || 'smart' };
       if (attachment) {
         // For images send full base64, for docs send extracted text
         body.attachment = {
@@ -289,7 +266,7 @@ export function useChat(
       setIsSending(false);
     }
   }, [isSending, currentUser, convId, conversations, createNewChat, setConvId, setConvTitle,
-      isStreamingRef, setMessages, checkAndIncrementDailyCount, showToast, getConvDocRef, enqueue]);
+      isStreamingRef, setMessages, showToast, getConvDocRef, enqueue]);
 
   const stopStreaming = useCallback(() => {
     streamController.current?.abort();

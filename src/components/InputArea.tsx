@@ -6,8 +6,10 @@ import type { Attachment } from '../types';
 const ACCEPTED = '.pdf,.txt,.md,.csv,.docx,.jpg,.jpeg,.png,.gif,.webp,image/*';
 const MAX_SIZE  = 20 * 1024 * 1024; // 20MB
 
+type ModelMode = 'fast' | 'smart';
+
 interface Props {
-  onSend: (text: string, attachment?: Attachment, useWebSearch?: boolean) => void;
+  onSend: (text: string, attachment?: Attachment, useWebSearch?: boolean, modelMode?: ModelMode) => void;
   onStop: () => void;
   isSending: boolean;
   isStreaming: boolean;
@@ -20,6 +22,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const [processing,   setProcessing]   = useState(false);
   const [fileError,    setFileError]    = useState('');
   const [webSearch,    setWebSearch]    = useState(false);
+  const [modelMode,    setModelMode]    = useState<ModelMode>('smart');
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,11 +43,12 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
     const text = value.trim();
     const att  = attachment ?? undefined;
     const ws   = webSearch;
+    const mm   = modelMode;
     setValue('');
     setAttachment(null);
     setFileError('');
     setWebSearch(false);
-    onSend(text || 'Please analyze this file.', att, ws);
+    onSend(text || 'Please analyze this file.', att, ws, mm);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -175,6 +179,32 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
               <line x1="2" y1="12" x2="22" y2="12"/>
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
             </svg>
+          </button>
+
+          {/* Model selector toggle */}
+          <button
+            onClick={() => { haptic.light(); setModelMode(m => m === 'fast' ? 'smart' : 'fast'); }}
+            disabled={isSending || isStreaming}
+            title={modelMode === 'smart' ? 'Smart mode (70B) — tap for Fast' : 'Fast mode (8B) — tap for Smart'}
+            style={{
+              height: '52px', paddingInline: '6px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none',
+              cursor: 'pointer', flexShrink: 0,
+              transition: 'opacity 0.15s',
+              opacity: (isSending || isStreaming) ? 0.4 : 1,
+            }}
+          >
+            <span style={{
+              fontSize: '10px', fontWeight: 700, letterSpacing: '0.3px',
+              padding: '3px 7px', borderRadius: '6px',
+              background: modelMode === 'smart' ? 'var(--accent-dim)' : 'var(--glass-3)',
+              color: modelMode === 'smart' ? 'var(--accent)' : 'var(--text-3)',
+              transition: 'background 0.15s, color 0.15s',
+              textTransform: 'uppercase',
+            }}>
+              {modelMode === 'smart' ? '70B' : '8B'}
+            </span>
           </button>
 
           <input

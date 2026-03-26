@@ -34,7 +34,8 @@ const PROMPT_FINGERPRINT = buildFingerprint(FINGERPRINT_PROMPT);
 
 /* ── Constants ────────────────────────────────────────────────── */
 const DAILY_LIMIT      = 150;
-const MODEL_TIMEOUT_MS = 20000;
+// Budget: 4 models × 12s = 48s max, within the 60s vercel.json maxDuration
+const MODEL_TIMEOUT_MS = 12000;
 
 /* ── Models ───────────────────────────────────────────────────── */
 const MODELS       = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.3-70b-versatile", "gemma2-9b-it"];
@@ -46,15 +47,17 @@ const CRITICAL_PATTERNS = /\b(health|medical|medicine|doctor|diagnosis|symptom|d
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 async function checkAndIncrementDailyCount(uid) {
-  const ref  = db.collection("users").doc(uid);
-  const snap = await ref.get();
-  const data = snap.exists ? snap.data() : {};
-  const today      = todayStr();
-  const lastDate   = data.lastDate || "";
-  const dailyCount = lastDate === today ? (data.dailyCount || 0) : 0;
-  if (dailyCount >= DAILY_LIMIT) return false;
-  await ref.set({ dailyCount: dailyCount + 1, lastDate: today }, { merge: true });
-  return true;
+  const ref = db.collection("users").doc(uid);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists ? snap.data() : {};
+    const today      = todayStr();
+    const lastDate   = data.lastDate || "";
+    const dailyCount = lastDate === today ? (data.dailyCount || 0) : 0;
+    if (dailyCount >= DAILY_LIMIT) return false;
+    tx.set(ref, { dailyCount: dailyCount + 1, lastDate: today }, { merge: true });
+    return true;
+  });
 }
 
 function adaptiveMaxTokens(message, hasAttachment) {
@@ -158,11 +161,25 @@ function setSSEHeaders(res) {
   res.setHeader("X-Accel-Buffering", "no");
 }
 
-/* ── Handler ──────────────────────────────────────────────────── */
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin",  "*");
+/* ── CORS ─────────────────────────────────────────────────────── */
+const ALLOWED_ORIGINS = [
+  "https://eimemes-chat-ai.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin || "";
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
+/* ── Handler ──────────────────────────────────────────────────── */
+export default async function handler(req, res) {
+  setCorsHeaders(req, res);
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST")   return res.status(405).json({ error: "Method not allowed" });
 
@@ -189,7 +206,7 @@ export default async function handler(req, res) {
   if (!GROQ_API_KEY) return res.status(500).json({ error: "GROQ_API_KEY not configured." });
 
   /* ── Parse request ────────────────────────────────────────────── */
-  const { message, history, isFirstMessage, attachment, useWebSearch } = req.body;
+  const { message, history, isFirstMessage, attachment, useWebSearch, modelMode } = req.body;
   if (!message) return res.status(400).json({ error: "Message required" });
 
   /* ── Input shield ─────────────────────────────────────────────── */
@@ -263,12 +280,17 @@ export default async function handler(req, res) {
   }
 
   /* ── Model selection ──────────────────────────────────────────── */
-  // Use smarter model for web search — needs to synthesize sources accurately
+  // User can choose "fast" (8B) or "smart" (70B) via the model toggle
+  const FAST_MODELS  = ["llama-3.1-8b-instant", "llama3-8b-8192", "gemma2-9b-it"];
+  const SMART_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", ...MODELS];
+
   const modelsToTry = attachment?.type === 'image'
     ? [VISION_MODEL, ...MODELS]
     : shouldSearch
-      ? ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", ...MODELS]
-      : MODELS;
+      ? SMART_MODELS
+      : modelMode === 'fast'
+        ? FAST_MODELS
+        : SMART_MODELS;
 
   /* ── Model retry loop ─────────────────────────────────────────── */
   for (const model of modelsToTry) {

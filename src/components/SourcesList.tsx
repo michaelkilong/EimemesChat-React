@@ -2,34 +2,52 @@
 import React, { useState } from 'react';
 import type { Source } from '../types';
 
-interface Props { sources: Source[]; }
+interface Props { sources: Source[]; msgKey?: string; }
 
 function getDomain(url: string): string {
   try { return new URL(url).hostname.replace('www.', ''); }
   catch { return url; }
 }
 
-export default function SourcesList({ sources }: Props) {
+// Registry of expand handlers keyed by msgKey — avoids the global overwrite race
+// when multiple SourcesLists are mounted simultaneously.
+const expandRegistry = new Map<string, (index: number) => void>();
+
+// Global dispatcher — citation buttons call this, it looks up the right handler
+if (!(window as any).__expandSource) {
+  (window as any).__expandSource = (index: number, msgKey?: string) => {
+    if (msgKey && expandRegistry.has(msgKey)) {
+      expandRegistry.get(msgKey)!(index);
+    } else {
+      // Fallback: expand the most recently registered (streaming bubble)
+      const last = [...expandRegistry.values()].pop();
+      last?.(index);
+    }
+  };
+}
+
+export default function SourcesList({ sources, msgKey }: Props) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const selfRef = React.useRef<HTMLDivElement>(null);
 
-  // Register global handler so inline cite-bubble buttons can expand sources
+  // Register this instance's expand handler in the registry
   React.useEffect(() => {
-    (window as any).__expandSource = (index: number) => {
+    const key = msgKey || '__default';
+    expandRegistry.set(key, (index: number) => {
       setOpen(true);
       setExpanded(index);
-      // Scroll to sources list
       setTimeout(() => {
-        document.querySelector('.sources-pill')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        selfRef.current?.querySelector('.sources-pill')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 100);
-    };
-    return () => { delete (window as any).__expandSource; };
-  }, []);
+    });
+    return () => { expandRegistry.delete(key); };
+  }, [msgKey]);
 
   if (!sources?.length) return null;
 
   return (
-    <div style={{ marginTop: '14px' }}>
+    <div ref={selfRef} style={{ marginTop: '14px' }}>
       {/* Collapsed pill — tap to expand, like ChatGPT */}
       <button
         onClick={() => setOpen(o => !o)}
