@@ -59,7 +59,7 @@ export function useChat(
     currentUser ? doc(db, 'users', currentUser.uid, 'conversations', id) : null,
   [currentUser]);
 
-  const sendMessage = useCallback(async (text: string, chipsUsedSetter: () => void, attachment?: Attachment, useWebSearch?: boolean) => {
+  const sendMessage = useCallback(async (text: string, chipsUsedSetter: () => void, attachment?: Attachment, useWebSearch?: boolean, modelMode?: string) => {
     if (!text.trim() || isSending || !currentUser) return;
 
     // Rate limiting is enforced server-side (api/chat.js) with Firestore transactions.
@@ -130,7 +130,7 @@ export function useChat(
       const history = [...convMsgs, userMsg].slice(-20);
 
       // Build request body — include attachment content for backend processing
-      const body: Record<string, unknown> = { message: text, history, isFirstMessage, useWebSearch: !!useWebSearch };
+      const body: Record<string, unknown> = { message: text, history, isFirstMessage, useWebSearch: !!useWebSearch, modelMode: modelMode || 'smart' };
       if (attachment) {
         // For images send full base64, for docs send extracted text
         body.attachment = {

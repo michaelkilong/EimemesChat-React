@@ -206,7 +206,7 @@ export default async function handler(req, res) {
   if (!GROQ_API_KEY) return res.status(500).json({ error: "GROQ_API_KEY not configured." });
 
   /* ── Parse request ────────────────────────────────────────────── */
-  const { message, history, isFirstMessage, attachment, useWebSearch } = req.body;
+  const { message, history, isFirstMessage, attachment, useWebSearch, modelMode } = req.body;
   if (!message) return res.status(400).json({ error: "Message required" });
 
   /* ── Input shield ─────────────────────────────────────────────── */
@@ -280,12 +280,17 @@ export default async function handler(req, res) {
   }
 
   /* ── Model selection ──────────────────────────────────────────── */
-  // Use smarter model for web search — needs to synthesize sources accurately
+  // User can choose "fast" (8B) or "smart" (70B) via the model toggle
+  const FAST_MODELS  = ["llama-3.1-8b-instant", "llama3-8b-8192", "gemma2-9b-it"];
+  const SMART_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", ...MODELS];
+
   const modelsToTry = attachment?.type === 'image'
     ? [VISION_MODEL, ...MODELS]
     : shouldSearch
-      ? ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", ...MODELS]
-      : MODELS;
+      ? SMART_MODELS
+      : modelMode === 'fast'
+        ? FAST_MODELS
+        : SMART_MODELS;
 
   /* ── Model retry loop ─────────────────────────────────────────── */
   for (const model of modelsToTry) {

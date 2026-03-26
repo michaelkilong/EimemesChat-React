@@ -63,6 +63,7 @@ export default function App() {
   const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
   const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
+  const [dailyCount,        setDailyCount]        = useState(0);
 
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
@@ -88,15 +89,17 @@ export default function App() {
     getDoc(ref).then(snap => {
       if (!snap.exists()) return;
       const data = snap.data() as { dailyCount?: number; lastDate?: string };
-      if (data.lastDate === todayStr() && (data.dailyCount || 0) >= DAILY_LIMIT) setDailyLimitReached(true);
+      const count = data.lastDate === todayStr() ? (data.dailyCount || 0) : 0;
+      setDailyCount(count);
+      if (count >= DAILY_LIMIT) setDailyLimitReached(true);
     }).catch(() => {});
   }, [currentUser]);
 
-  const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean) => {
+  const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean, modelMode?: string) => {
     sendMessage(text, () => {
       setChipsUsed(true);
       localStorage.setItem('ec_chips_used', 'true');
-    }, attachment, useWebSearch);
+    }, attachment, useWebSearch, modelMode);
   }, [sendMessage]);
 
   const handleRegen = useCallback(async (originalMsg: string) => {
@@ -122,6 +125,21 @@ export default function App() {
     setCurrentConvId(null);
   }, [clearAllChats]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      // Cmd/Ctrl+N — new chat
+      if (mod && e.key === 'n') { e.preventDefault(); handleNewChat(); }
+      // Cmd/Ctrl+K — focus search (dispatches custom event for Sidebar)
+      if (mod && e.key === 'k') { e.preventDefault(); setSidebarOpen(true); window.dispatchEvent(new CustomEvent('focus-search')); }
+      // Esc — close sidebar
+      if (e.key === 'Escape' && sidebarOpen) { setSidebarOpen(false); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleNewChat, sidebarOpen, setSidebarOpen]);
+
   const topbarTitle = currentConvId
     ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
     : '';
@@ -139,6 +157,8 @@ export default function App() {
         onSelectConv={id => { setCurrentConvId(id); setView('chat'); }}
         onOpenSettings={() => { setView('settings'); setSidebarOpen(false); }}
         onDeleteConv={handleDeleteConv}
+        dailyCount={dailyCount}
+        dailyLimit={DAILY_LIMIT}
       />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

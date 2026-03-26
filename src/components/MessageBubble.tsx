@@ -69,6 +69,9 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
   };
 
   const isUser = message.role === 'user';
+  // Error messages are saved with model: '' and contain error text
+  const isError = !isUser && message.model === '' && message.content.includes('error')
+    || (!isUser && message.model === '' && (message.content.includes('try again') || message.content.includes('Permission denied')));
 
   /* ── User bubble ── */
   if (isUser) {
@@ -116,6 +119,27 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
           className="msg-body"
           style={{ color: 'var(--text-1)', fontSize: '16px', lineHeight: 1.75, padding: '2px 0' }}
         />
+
+        {/* Retry button for failed messages */}
+        {isError && lastUserMsg && (
+          <button
+            onClick={() => { haptic.medium(); onRegen(lastUserMsg); }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              marginTop: '8px', padding: '7px 16px', borderRadius: '999px',
+              background: 'rgba(255,107,107,0.12)', border: '1px solid rgba(255,107,107,0.25)',
+              color: '#ff6b6b', fontSize: '13px', fontWeight: 500,
+              cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,107,107,0.2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,107,107,0.12)')}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.54"/>
+            </svg>
+            Retry
+          </button>
+        )}
 
         <Disclaimer type={message.disclaimer || false} />
 
