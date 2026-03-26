@@ -66,13 +66,13 @@ export default function AboutView({ onBack, onOpenLicenses }: Props) {
             EimemesChat AI
           </div>
           <div style={{ fontSize: '14px', color: 'var(--text-3)' }}>
-            Version 4.0 · Built by Eimemes AI Team
+            Version 4.0 
           </div>
         </div>
 
         {/* Info rows */}
         <div style={{ background: 'var(--glass-2)', borderRadius: '16px', overflow: 'hidden', marginBottom: '16px' }}>
-          <Row label="Developer" value="Michael Kilong" />
+          <Row label="Developer" value="EimemesChat Developers" />
           <Row label="Version" value="4.0.0" />
           <Row label="Platform" value="Web / PWA" />
           <Row label="AI Model" value="Llama 3 via Groq" />
