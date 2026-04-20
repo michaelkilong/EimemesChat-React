@@ -307,7 +307,7 @@ export default async function handler(req, res) {
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
       console.error(`[${GEMINI_MODEL}] HTTP ${geminiRes.status}: ${errText.slice(0, 200)}`);
-      sseEvent(res, { error: "Gemini is currently unavailable. Please try again shortly." });
+      sseEvent(res, { error: "EimemesChat is currently unavailable. Please try again shortly." });
       res.end(); return;
     }
 
