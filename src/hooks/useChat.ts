@@ -1,4 +1,4 @@
-// useChat.ts — v2.0 — Clean rewrite: removed image gen, added file attachment support
+// useChat.ts — v2.1 — Fix: SSE error events now persist to Firestore and show toast
 import { useState, useRef, useCallback } from 'react';
 import { arrayUnion, updateDoc, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -189,7 +189,7 @@ export function useChat(
           try {
             const parsed = JSON.parse(raw);
             if (parsed.searching)     { setIsTyping(false); setIsSearching(true); }
-            if (parsed.error)         { setIsTyping(false); enqueue(parsed.error); }
+            if (parsed.error)         { setIsTyping(false); setIsSearching(false); fullText = parsed.error; enqueue(parsed.error); showToast(parsed.error); }
             if (parsed.token)         { setIsTyping(false); setIsSearching(false); fullText += parsed.token; enqueue(parsed.token); }
 
             if (parsed.outputBlocked && parsed.safeReply) {
@@ -280,3 +280,4 @@ export function useChat(
     setStreamDone,
   };
 }
+    
