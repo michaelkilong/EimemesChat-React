@@ -6,10 +6,8 @@ import type { Attachment } from '../types';
 const ACCEPTED = '.pdf,.txt,.md,.csv,.docx,.jpg,.jpeg,.png,.gif,.webp,image/*';
 const MAX_SIZE  = 20 * 1024 * 1024; // 20MB
 
-type ModelMode = 'fast' | 'smart';
-
 interface Props {
-  onSend: (text: string, attachment?: Attachment, useWebSearch?: boolean, modelMode?: ModelMode) => void;
+  onSend: (text: string, attachment?: Attachment, useWebSearch?: boolean) => void;
   onStop: () => void;
   isSending: boolean;
   isStreaming: boolean;
@@ -22,7 +20,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const [processing,   setProcessing]   = useState(false);
   const [fileError,    setFileError]    = useState('');
   const [webSearch,    setWebSearch]    = useState(false);
-  const [modelMode,    setModelMode]    = useState<ModelMode>('smart');
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,12 +40,11 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
     const text = value.trim();
     const att  = attachment ?? undefined;
     const ws   = webSearch;
-    const mm   = modelMode;
     setValue('');
     setAttachment(null);
     setFileError('');
     setWebSearch(false);
-    onSend(text || 'Please analyze this file.', att, ws, mm);
+    onSend(text || 'Please analyze this file.', att, ws);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -181,31 +177,41 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
             </svg>
           </button>
 
-          {/* Model selector toggle */}
-          <button
-            onClick={() => { haptic.light(); setModelMode(m => m === 'fast' ? 'smart' : 'fast'); }}
-            disabled={isSending || isStreaming}
-            title={modelMode === 'smart' ? 'Smart mode (70B) — tap for Fast' : 'Fast mode (8B) — tap for Smart'}
+          {/* Gemini model indicator — non-interactive, shows current AI model */}
+          <div
+            title="Powered by Gemini 2.0 Flash"
             style={{
-              height: '52px', paddingInline: '6px',
+              height: '52px', paddingInline: '5px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'transparent', border: 'none',
-              cursor: 'pointer', flexShrink: 0,
+              flexShrink: 0, gap: '4px',
+              opacity: (isSending || isStreaming) ? 0.4 : 0.75,
               transition: 'opacity 0.15s',
-              opacity: (isSending || isStreaming) ? 0.4 : 1,
             }}
           >
+            {/* Gemini-style 4-pointed sparkle */}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <defs>
+                <linearGradient id="gemGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#8888DD" />
+                  <stop offset="100%" stopColor="#5500BB" />
+                </linearGradient>
+              </defs>
+              {/* 4-pointed star shape */}
+              <path
+                d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z"
+                fill="url(#gemGrad)"
+              />
+            </svg>
             <span style={{
-              fontSize: '10px', fontWeight: 700, letterSpacing: '0.3px',
-              padding: '3px 7px', borderRadius: '6px',
-              background: modelMode === 'smart' ? 'var(--accent-dim)' : 'var(--glass-3)',
-              color: modelMode === 'smart' ? 'var(--accent)' : 'var(--text-3)',
-              transition: 'background 0.15s, color 0.15s',
-              textTransform: 'uppercase',
+              fontSize: '10px', fontWeight: 600, letterSpacing: '0.2px',
+              background: 'linear-gradient(135deg, #8888DD, #5500BB)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
             }}>
-              {modelMode === 'smart' ? '70B' : '8B'}
+              Flash
             </span>
-          </button>
+          </div>
 
           <input
             ref={fileInputRef}
@@ -294,3 +300,4 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
     </div>
   );
 }
+            
