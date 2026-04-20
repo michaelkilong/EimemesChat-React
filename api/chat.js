@@ -1,6 +1,7 @@
 // api/chat.js
-// v5.0 — Live web search via Tavily; removed knowledge.js; inline source citations
+// v5.1 — Google Gemini 2.0 Flash as sole AI model; removed Groq; simplified model stack
 // Changelog:
+//   v5.1 — Switched to Google Gemini 2.0 Flash; removed Groq fallbacks; removed modelMode param
 //   v5.0 — Tavily web search; auto-detect sensitive topics; inline source citations
 //   v4.0 — File attachment support (vision + document context)
 //   v3.3 — Higher token limits; structured response formatting
@@ -34,12 +35,11 @@ const PROMPT_FINGERPRINT = buildFingerprint(FINGERPRINT_PROMPT);
 
 /* ── Constants ────────────────────────────────────────────────── */
 const DAILY_LIMIT      = 150;
-// Budget: 4 models × 12s = 48s max, within the 60s vercel.json maxDuration
-const MODEL_TIMEOUT_MS = 12000;
+const MODEL_TIMEOUT_MS = 15000; // slightly longer for Gemini
 
-/* ── Models ───────────────────────────────────────────────────── */
-const MODELS       = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.3-70b-versatile", "gemma2-9b-it"];
-const VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+/* ── Gemini config ────────────────────────────────────────────── */
+const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_URL   = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 
 const CRITICAL_PATTERNS = /\b(health|medical|medicine|doctor|diagnosis|symptom|disease|drug|medication|dosage|treatment|therapy|mental health|depression|anxiety|suicide|cancer|infection|pain|legal|law|lawsuit|attorney|lawyer|court|rights|contract|financial|invest|stock|crypto|tax|loan|debt|insurance)\b/i;
 
@@ -71,13 +71,13 @@ function adaptiveMaxTokens(message, hasAttachment) {
 }
 
 /* ── Tavily web search ────────────────────────────────────────── */
-async function optimizeSearchQuery(message, groqApiKey) {
+async function optimizeSearchQuery(message, geminiApiKey) {
   try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const res = await fetch(GEMINI_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${groqApiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${geminiApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: GEMINI_MODEL,
         max_tokens: 40,
         temperature: 0.2,
         messages: [
@@ -110,12 +110,12 @@ async function searchWeb(query) {
       body: JSON.stringify({
         api_key: TAVILY_API_KEY,
         query,
-        search_depth: "advanced",      // deeper, more relevant results
-        max_results: 6,                // more candidates to pick from
+        search_depth: "advanced",
+        max_results: 6,
         include_answer: false,
         include_raw_content: false,
-        include_domains: [],           // no domain restrictions
-        exclude_domains: [             // exclude low quality sources
+        include_domains: [],
+        exclude_domains: [
           "pinterest.com", "quora.com", "reddit.com",
           "facebook.com", "twitter.com", "instagram.com",
           "tiktok.com", "youtube.com",
@@ -126,7 +126,6 @@ async function searchWeb(query) {
     if (!res.ok) { console.warn("[search] Tavily error:", res.status); return null; }
 
     const data = await res.json();
-    // Only return results with a meaningful content snippet
     const results = (data.results || [])
       .filter(r => r.content && r.content.length > 80)
       .slice(0, 5)
@@ -202,11 +201,11 @@ export default async function handler(req, res) {
     if (!allowed) return res.status(429).json({ error: "Daily limit reached. Your quota resets tomorrow." });
   } catch (err) { console.error("Daily limit check failed:", err.message); }
 
-  const GROQ_API_KEY = process.env.GROQ_API_KEY;
-  if (!GROQ_API_KEY) return res.status(500).json({ error: "GROQ_API_KEY not configured." });
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: "GEMINI_API_KEY not configured." });
 
   /* ── Parse request ────────────────────────────────────────────── */
-  const { message, history, isFirstMessage, attachment, useWebSearch, modelMode } = req.body;
+  const { message, history, isFirstMessage, attachment, useWebSearch } = req.body;
   if (!message) return res.status(400).json({ error: "Message required" });
 
   /* ── Input shield ─────────────────────────────────────────────── */
@@ -251,7 +250,7 @@ export default async function handler(req, res) {
   let searchContext  = '';
 
   if (shouldSearch) {
-    const optimizedQuery = await optimizeSearchQuery(safeMessage, GROQ_API_KEY);
+    const optimizedQuery = await optimizeSearchQuery(safeMessage, GEMINI_API_KEY);
     console.log(`[search] uid=${uid} original="${safeMessage.slice(0, 60)}" optimized="${optimizedQuery}"`);
     searchResults = await searchWeb(optimizedQuery);
     if (searchResults?.length) {
@@ -262,12 +261,12 @@ export default async function handler(req, res) {
   }
 
   const FULL_SYSTEM_PROMPT = BEHAVIORAL_PROMPT + userPrefsPrompt;
-  const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
   /* ── Build user message ───────────────────────────────────────── */
   let userMessageContent;
 
   if (attachment?.type === 'image') {
+    // Gemini 2.0 Flash supports vision via OpenAI-compatible image_url format
     const base64 = attachment.content.split(',')[1] || attachment.content;
     userMessageContent = [
       { type: "image_url", image_url: { url: `data:${attachment.mimeType};base64,${base64}` } },
@@ -279,136 +278,124 @@ export default async function handler(req, res) {
     userMessageContent = safeMessage + searchContext;
   }
 
-  /* ── Model selection ──────────────────────────────────────────── */
-  // User can choose "fast" (8B) or "smart" (70B) via the model toggle
-  const FAST_MODELS  = ["llama-3.1-8b-instant", "llama3-8b-8192", "gemma2-9b-it"];
-  const SMART_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", ...MODELS];
+  /* ── Call Gemini ──────────────────────────────────────────────── */
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
 
-  const modelsToTry = attachment?.type === 'image'
-    ? [VISION_MODEL, ...MODELS]
-    : shouldSearch
-      ? SMART_MODELS
-      : modelMode === 'fast'
-        ? FAST_MODELS
-        : SMART_MODELS;
+  try {
+    console.log(`[chat] uid=${uid} model=${GEMINI_MODEL} search=${shouldSearch}`);
 
-  /* ── Model retry loop ─────────────────────────────────────────── */
-  for (const model of modelsToTry) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+    const geminiRes = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${GEMINI_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: GEMINI_MODEL,
+        messages: [
+          { role: "system", content: FULL_SYSTEM_PROMPT },
+          ...trimmedHistory,
+          { role: "user", content: userMessageContent },
+        ],
+        max_tokens: maxTokens,
+        temperature: 0.72,
+        stream: true,
+      }),
+      signal: controller.signal,
+    });
 
-    try {
-      console.log(`[chat] uid=${uid} model=${model} search=${shouldSearch}`);
+    clearTimeout(timer);
 
-      const groqRes = await fetch(GROQ_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: FULL_SYSTEM_PROMPT },
-            ...trimmedHistory,
-            { role: "user", content: userMessageContent },
-          ],
-          max_tokens: maxTokens,
-          temperature: 0.72,
-          stream: true,
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timer);
-
-      if (!groqRes.ok) {
-        const errText = await groqRes.text();
-        console.warn(`[${model}] HTTP ${groqRes.status}: ${errText.slice(0, 200)} — trying next`);
-        continue;
-      }
-
-      console.log(`✅ Streaming: ${model}`);
-
-      const scanner = createStreamScanner(PROMPT_FINGERPRINT);
-      const reader  = groqRes.body.getReader();
-      const decoder = new TextDecoder();
-      let buf      = "";
-      let fullText = "";
-      let leaked   = false;
-
-      streamLoop:
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop();
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
-          if (data === "[DONE]") break streamLoop;
-
-          try {
-            const parsed = JSON.parse(data);
-            const token  = parsed.choices?.[0]?.delta?.content || "";
-            if (!token) continue;
-
-            const leakGram = scanner.checkChunk(token);
-            if (leakGram) {
-              leaked = true;
-              const safeReply = getBlockMessage("system_leak");
-              sseEvent(res, { outputBlocked: true, safeReply });
-              sseEvent(res, { done: true, model, reply: safeReply });
-              res.end(); break streamLoop;
-            }
-
-            fullText += token;
-            sseEvent(res, { token });
-          } catch { /* malformed chunk */ }
-        }
-      }
-
-      if (leaked) return;
-
-      sseEvent(res, {
-        done: true, model, reply: fullText,
-        ...((needsDisclaimer || shouldSearch) && { disclaimer: true }),
-        ...(searchResults?.length && { sources: searchResults }),
-      });
-
-      // Title generation
-      if (isFirstMessage && fullText) {
-        try {
-          const titleRes = await fetch(GROQ_URL, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: "llama-3.1-8b-instant", max_tokens: 16, temperature: 0.4,
-              messages: [
-                { role: "system", content: "Generate an ultra-short chat title. Output ONLY the title, 2-5 words, no punctuation, no quotes." },
-                { role: "user",   content: `User: "${safeMessage.slice(0, 200)}"\nAI: "${fullText.slice(0, 200)}"\n\nTitle:` },
-              ],
-            }),
-          });
-          if (titleRes.ok) {
-            const td    = await titleRes.json();
-            const title = td.choices?.[0]?.message?.content?.trim().slice(0, 60);
-            if (title) sseEvent(res, { title });
-          }
-        } catch { /* ignore */ }
-      }
-
-      res.end();
-      return;
-
-    } catch (err) {
-      clearTimeout(timer);
-      if (err.name === "AbortError") { console.warn(`[${model}] Timed out`); continue; }
-      console.error(`[${model}] Error:`, err.message);
-      continue;
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error(`[${GEMINI_MODEL}] HTTP ${geminiRes.status}: ${errText.slice(0, 200)}`);
+      sseEvent(res, { error: "Gemini is currently unavailable. Please try again shortly." });
+      res.end(); return;
     }
-  }
 
-  sseEvent(res, { error: "All AI models are currently busy. Please try again." });
-  res.end();
+    console.log(`✅ Streaming: ${GEMINI_MODEL}`);
+
+    const scanner = createStreamScanner(PROMPT_FINGERPRINT);
+    const reader  = geminiRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buf      = "";
+    let fullText = "";
+    let leaked   = false;
+
+    streamLoop:
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") break streamLoop;
+
+        try {
+          const parsed = JSON.parse(data);
+          const token  = parsed.choices?.[0]?.delta?.content || "";
+          if (!token) continue;
+
+          const leakGram = scanner.checkChunk(token);
+          if (leakGram) {
+            leaked = true;
+            const safeReply = getBlockMessage("system_leak");
+            sseEvent(res, { outputBlocked: true, safeReply });
+            sseEvent(res, { done: true, model: GEMINI_MODEL, reply: safeReply });
+            res.end(); break streamLoop;
+          }
+
+          fullText += token;
+          sseEvent(res, { token });
+        } catch { /* malformed chunk */ }
+      }
+    }
+
+    if (leaked) return;
+
+    sseEvent(res, {
+      done: true, model: GEMINI_MODEL, reply: fullText,
+      ...((needsDisclaimer || shouldSearch) && { disclaimer: true }),
+      ...(searchResults?.length && { sources: searchResults }),
+    });
+
+    // Title generation
+    if (isFirstMessage && fullText) {
+      try {
+        const titleRes = await fetch(GEMINI_URL, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${GEMINI_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: GEMINI_MODEL, max_tokens: 16, temperature: 0.4,
+            messages: [
+              { role: "system", content: "Generate an ultra-short chat title. Output ONLY the title, 2-5 words, no punctuation, no quotes." },
+              { role: "user",   content: `User: "${safeMessage.slice(0, 200)}"\nAI: "${fullText.slice(0, 200)}"\n\nTitle:` },
+            ],
+          }),
+        });
+        if (titleRes.ok) {
+          const td    = await titleRes.json();
+          const title = td.choices?.[0]?.message?.content?.trim().slice(0, 60);
+          if (title) sseEvent(res, { title });
+        }
+      } catch { /* ignore */ }
+    }
+
+    res.end();
+
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") {
+      console.warn(`[${GEMINI_MODEL}] Timed out`);
+      sseEvent(res, { error: "Request timed out. Please try again." });
+    } else {
+      console.error(`[${GEMINI_MODEL}] Error:`, err.message);
+      sseEvent(res, { error: "Something went wrong. Please try again." });
+    }
+    res.end();
+  }
 }
+                                                             
