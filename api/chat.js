@@ -39,7 +39,7 @@ const DAILY_LIMIT      = 150;
 const MODEL_TIMEOUT_MS = 15000;
 
 /* ── Model config ─────────────────────────────────────────────── */
-const GEMINI_MODEL = "gemini-1.5-flash-lite";
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
 const GEMINI_URL   = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
