@@ -1,3 +1,4 @@
+// MessageList.tsx — v1.1 — paddingBottom + scroll button offset for floating InputArea
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import MessageBubble from './MessageBubble';
 import StreamingBubble from './StreamingBubble';
@@ -34,6 +35,9 @@ interface Props {
   onChipClick: (prompt: string) => void;
   onRegen: (originalMsg: string) => void;
 }
+
+// Height of the floating InputArea — used for scroll padding and button offset
+const INPUT_AREA_HEIGHT = 170;
 
 export default function MessageList({
   messages, isTyping, isSearching, isStreaming,
@@ -79,7 +83,8 @@ export default function MessageList({
         className="scroll-thin"
         style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any, overscrollBehavior: 'none', background: 'transparent' }}
       >
-        <div style={{ maxWidth: '740px', margin: '0 auto', padding: '24px 20px 20px', display: 'flex', flexDirection: 'column' }}>
+        {/* paddingBottom ensures last message is never hidden behind floating InputArea */}
+        <div style={{ maxWidth: '740px', margin: '0 auto', padding: `24px 20px ${INPUT_AREA_HEIGHT}px`, display: 'flex', flexDirection: 'column' }}>
 
           {showWelcome && (
             <div style={{
@@ -135,7 +140,6 @@ export default function MessageList({
                 if (messages[j].role === 'user') { lastUserMsg = messages[j].content; break; }
               }
             }
-            // Stable key: role + time + content prefix avoids reconciliation bugs
             const msgKey = `${msg.role}-${msg.time}-${msg.content.slice(0, 32)}`;
             return (
               <MessageBubble
@@ -157,7 +161,6 @@ export default function MessageList({
                 <div className="search-skeleton-label-dot" />
                 Searching the web…
               </div>
-              {/* Skeleton lines — simulate incoming content */}
               <div className="skeleton-line" style={{ height: '14px', width: '92%' }} />
               <div className="skeleton-line" style={{ height: '14px', width: '78%' }} />
               <div className="skeleton-line" style={{ height: '14px', width: '85%' }} />
@@ -180,12 +183,14 @@ export default function MessageList({
         </div>
       </div>
 
-      {/* Scroll to bottom button */}
+      {/* Scroll-to-bottom button — offset above InputArea */}
       {showScrollBtn && (
         <button
           onClick={scrollToBottom}
           style={{
-            position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
+            position: 'absolute',
+            bottom: `${INPUT_AREA_HEIGHT + 12}px`,
+            left: '50%', transform: 'translateX(-50%)',
             width: '38px', height: '38px', borderRadius: '50%',
             background: 'var(--glass-1)',
             backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
@@ -206,3 +211,4 @@ export default function MessageList({
     </div>
   );
 }
+              
