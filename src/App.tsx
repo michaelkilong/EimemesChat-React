@@ -1,5 +1,5 @@
 // App.tsx
-// v2.1 — Apple-standard UI: circular topbar buttons, clean layout
+// v2.2 — InputArea floats over MessageList via absolute positioning
 import React, { useState, useCallback, useEffect } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -129,11 +129,8 @@ export default function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      // Cmd/Ctrl+N — new chat
       if (mod && e.key === 'n') { e.preventDefault(); handleNewChat(); }
-      // Cmd/Ctrl+K — focus search (dispatches custom event for Sidebar)
       if (mod && e.key === 'k') { e.preventDefault(); setSidebarOpen(true); window.dispatchEvent(new CustomEvent('focus-search')); }
-      // Esc — close sidebar
       if (e.key === 'Escape' && sidebarOpen) { setSidebarOpen(false); }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -166,7 +163,7 @@ export default function App() {
         {/* ── CHAT VIEW ── */}
         {view === 'chat' && (
           <>
-            {/* Topbar — circular buttons, Apple style */}
+            {/* Topbar */}
             <header style={{
               flexShrink: 0, display: 'flex', alignItems: 'center',
               justifyContent: 'space-between',
@@ -175,7 +172,6 @@ export default function App() {
               background: `linear-gradient(to bottom, var(--fade-top) 0%, var(--fade-top) 55%, transparent 100%)`,
               position: 'relative', zIndex: 10,
             }}>
-              {/* Menu — always visible on mobile, hidden on desktop */}
               <CircleBtn onClick={() => setSidebarOpen(true)} className="menu-btn-mobile">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                   <line x1="3" y1="6" x2="21" y2="6"/>
@@ -184,7 +180,6 @@ export default function App() {
                 </svg>
               </CircleBtn>
 
-              {/* Title — centered */}
               <span style={{
                 position: 'absolute', left: '50%', transform: 'translateX(-50%)',
                 fontSize: '16px', fontWeight: 600, color: 'var(--text-1)',
@@ -194,7 +189,6 @@ export default function App() {
                 {topbarTitle}
               </span>
 
-              {/* New chat — always visible on mobile */}
               <CircleBtn onClick={handleNewChat} className="topbar-newchat">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>
@@ -203,29 +197,34 @@ export default function App() {
               </CircleBtn>
             </header>
 
-            <MessageList
-              messages={messages}
-              isTyping={isTyping}
-              isSearching={isSearching}
-              isStreaming={isStreaming}
-              streamText={streamText}
-              streamDone={streamDone}
-              streamModel={streamModel}
-              streamDisclaimer={streamDisclaimer}
-              streamSources={streamSources}
-              convId={currentConvId}
-              chipsUsed={chipsUsed}
-              onChipClick={handleSend}
-              onRegen={handleRegen}
-            />
-
-            <InputArea
-              onSend={handleSend}
-              onStop={stopStreaming}
-              isSending={isSending}
-              isStreaming={isStreaming}
-              dailyLimitReached={dailyLimitReached}
-            />
+            {/* MessageList fills remaining space; InputArea floats over it */}
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <MessageList
+                messages={messages}
+                isTyping={isTyping}
+                isSearching={isSearching}
+                isStreaming={isStreaming}
+                streamText={streamText}
+                streamDone={streamDone}
+                streamModel={streamModel}
+                streamDisclaimer={streamDisclaimer}
+                streamSources={streamSources}
+                convId={currentConvId}
+                chipsUsed={chipsUsed}
+                onChipClick={handleSend}
+                onRegen={handleRegen}
+              />
+              {/* InputArea positioned absolutely so messages scroll underneath it */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5 }}>
+                <InputArea
+                  onSend={handleSend}
+                  onStop={stopStreaming}
+                  isSending={isSending}
+                  isStreaming={isStreaming}
+                  dailyLimitReached={dailyLimitReached}
+                />
+              </div>
+            </div>
           </>
         )}
 
@@ -271,3 +270,4 @@ export default function App() {
     </div>
   );
 }
+  
