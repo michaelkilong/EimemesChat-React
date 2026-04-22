@@ -25,6 +25,7 @@ A fast, intelligent AI chat assistant built with React, TypeScript, and powered 
 |-------|-----------|
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS |
 | Backend | Vercel Serverless Functions (Node.js) |
+| AI | Google API - 'Gemini 2.5-flash-lite’ 
 | AI | Groq API — `llama-3.3-70b-versatile`, `llama-3.1-8b-instant` |
 | Auth | Firebase Authentication (Google Sign-In) |
 | Database | Firebase Firestore |
@@ -90,6 +91,7 @@ VITE_FIREBASE_APP_ID=your_app_id
 For Vercel serverless functions, add in Vercel dashboard:
 
 ```env
+GEMINI_API_KEY
 GROQ_API_KEY=your_groq_key
 FIREBASE_PROJECT_ID=your_project_id
 FIREBASE_CLIENT_EMAIL=your_service_account_email
@@ -133,7 +135,7 @@ git push origin main
 ## Roadmap
 
 - [ ] Voice input (Web Speech API)
-- [ ] Conversation search
+- [✓] Conversation search
 - [ ] Landing page (on custom domain)
 - [ ] Native Android app
 
