@@ -1,5 +1,4 @@
-
-// InputArea.tsx — v2.1 — Floating ChatGPT-style layout; gradient fade above; no model selector
+// InputArea.tsx — v2.2 — transparent floating input; gradient fade via background
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -74,16 +73,14 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const busy = isSending || isStreaming;
 
   return (
-    /* Floating wrapper — transparent bg, gradient fade masks messages above */
+    /* Floating wrapper — top fades transparent → page bg so messages dissolve behind input */
     <div style={{
       position: 'relative',
       flexShrink: 0,
-      paddingTop: '32px',
+      paddingTop: '40px',
       paddingInline: '16px',
       paddingBottom: 'calc(12px + var(--sab))',
-      background: 'transparent',
-      maskImage: 'linear-gradient(to bottom, transparent 0%, black 28px)',
-      WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 28px)',
+      background: 'linear-gradient(to bottom, transparent 0%, var(--fade-top) 40px)',
     }}>
       <div style={{ maxWidth: '740px', margin: '0 auto' }}>
 
@@ -135,11 +132,11 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
         {/* ── Floating input box ── */}
         <div style={{
           background: 'var(--input-bg)',
-          backdropFilter: 'blur(32px) saturate(200%)',
-          WebkitBackdropFilter: 'blur(32px) saturate(200%)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
           border: '1px solid var(--border)',
           borderRadius: '20px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 1px 0 rgba(255,255,255,0.06) inset',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
           padding: '12px 14px 10px',
           display: 'flex',
           flexDirection: 'column',
@@ -289,3 +286,4 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
     </div>
   );
 }
+                
