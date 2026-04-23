@@ -1,4 +1,5 @@
-// InputArea.tsx — v2.2 — transparent floating input; gradient fade via background
+// InputArea.tsx — v2.3 — Improved file processing indicator with progress bar; better error UX
+// v2.2 — Truly transparent floating input; gradient fade via background not mask
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -93,12 +94,20 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
             border: '1px solid var(--border)',
           }}>
             {processing ? (
-              <>
-                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--glass-3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: '16px', height: '16px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+              <div style={{ width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--accent-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '16px', height: '16px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-1)' }}>Reading file…</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>Please wait</div>
+                  </div>
                 </div>
-                <span style={{ fontSize: '13px', color: 'var(--text-3)' }}>Reading file…</span>
-              </>
+                <div style={{ height: '3px', borderRadius: '999px', background: 'var(--glass-3)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: '40%', borderRadius: '999px', background: 'var(--accent)', animation: 'progress-slide 1.4s ease-in-out infinite' }} />
+                </div>
+              </div>
             ) : attachment && (
               <>
                 {attachment.type === 'image'
@@ -282,8 +291,8 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
         <input ref={fileInputRef} type="file" accept={ACCEPTED} onChange={handleFileChange} style={{ display: 'none' }} />
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes progress-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }`}</style>
     </div>
   );
 }
-                
+                          
