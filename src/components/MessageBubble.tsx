@@ -1,3 +1,4 @@
+// MessageBubble.tsx — v1.1 — Error messages shown as styled bubble with icon + retry button
 import React, { useEffect, useRef, useState } from 'react';
 import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
@@ -113,32 +114,55 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '4px 0 4px' }}>
       <div style={{ width: '100%' }}>
-        {/* Plain text — no bubble */}
-        <div
-          ref={bodyRef}
-          className="msg-body"
-          style={{ color: 'var(--text-1)', fontSize: '16px', lineHeight: 1.75, padding: '2px 0' }}
-        />
 
-        {/* Retry button for failed messages */}
-        {isError && lastUserMsg && (
-          <button
-            onClick={() => { haptic.medium(); onRegen(lastUserMsg); }}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              marginTop: '8px', padding: '7px 16px', borderRadius: '999px',
-              background: 'rgba(255,107,107,0.12)', border: '1px solid rgba(255,107,107,0.25)',
-              color: '#ff6b6b', fontSize: '13px', fontWeight: 500,
-              cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,107,107,0.2)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,107,107,0.12)')}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.54"/>
-            </svg>
-            Retry
-          </button>
+        {/* Error bubble — shown instead of normal message body */}
+        {isError ? (
+          <div style={{
+            display: 'inline-flex', alignItems: 'flex-start', gap: '10px',
+            padding: '12px 16px', borderRadius: '16px',
+            background: 'rgba(255,75,75,0.08)', border: '1px solid rgba(255,75,75,0.2)',
+            maxWidth: '100%',
+          }}>
+            {/* Warning icon */}
+            <div style={{ flexShrink: 0, marginTop: '1px' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', color: '#ff6b6b', fontWeight: 500, marginBottom: lastUserMsg ? '8px' : '0' }}>
+                {message.content}
+              </div>
+              {lastUserMsg && (
+                <button
+                  onClick={() => { haptic.medium(); onRegen(lastUserMsg); }}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                    padding: '5px 12px', borderRadius: '999px',
+                    background: 'rgba(255,107,107,0.12)', border: '1px solid rgba(255,107,107,0.25)',
+                    color: '#ff6b6b', fontSize: '12px', fontWeight: 500,
+                    cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,107,107,0.22)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,107,107,0.12)')}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.54"/>
+                  </svg>
+                  Retry
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Normal message body */
+          <div
+            ref={bodyRef}
+            className="msg-body"
+            style={{ color: 'var(--text-1)', fontSize: '16px', lineHeight: 1.75, padding: '2px 0' }}
+          />
         )}
 
         <Disclaimer type={message.disclaimer || false} />
