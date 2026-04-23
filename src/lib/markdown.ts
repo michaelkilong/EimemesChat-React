@@ -10,6 +10,7 @@ export function renderMarkdown(text: string, msgKey?: string): string {
     const mathBlocks: Array<{ type: 'display' | 'inline'; eq: string }> = [];
 
     let protected_text = text
+      // Display math $$...$$ — replace before marked so it doesn't mangle it
       .replace(/\$\$([\s\S]+?)\$\$/g, (_, eq: string) => {
         mathBlocks.push({ type: 'display', eq });
         return `%%MATH_DISPLAY_${mathBlocks.length - 1}%%`;
@@ -21,20 +22,33 @@ export function renderMarkdown(text: string, msgKey?: string): string {
 
     let html = marked.parse(protected_text) as string;
 
+    // FIX 1: Display math placeholder ends up inside <p>...</p> after marked.
+    // Unwrap it so the KaTeX block element isn't nested inside <p> (invalid HTML).
+    html = html.replace(/<p>\s*(%%MATH_DISPLAY_\d+%%)\s*<\/p>/g, '$1');
+
+    // FIX 2: Replace placeholders with KaTeX output.
+    // Display mode: let KaTeX handle its own .katex-display class — no extra wrapper.
     html = html
       .replace(/%%MATH_DISPLAY_(\d+)%%/g, (_, i: string) => {
         try {
-          return `<span class="katex-display">${katex.renderToString(mathBlocks[Number(i)].eq, { displayMode: true, throwOnError: false })}</span>`;
+          return katex.renderToString(mathBlocks[Number(i)].eq, {
+            displayMode: true,
+            throwOnError: false,
+            output: 'html',
+          });
         } catch { return mathBlocks[Number(i)].eq; }
       })
       .replace(/%%MATH_INLINE_(\d+)%%/g, (_, i: string) => {
         try {
-          return katex.renderToString(mathBlocks[Number(i)].eq, { displayMode: false, throwOnError: false });
+          return katex.renderToString(mathBlocks[Number(i)].eq, {
+            displayMode: false,
+            throwOnError: false,
+            output: 'html',
+          });
         } catch { return mathBlocks[Number(i)].eq; }
       });
 
-    // Convert [1] [2] [3] citation numbers into tappable bubble buttons
-    // Pass msgKey so the registry dispatches to the correct SourcesList instance
+    // Citation bubbles
     const keyArg = msgKey ? `,'${msgKey.replace(/'/g, "\\'")}'` : '';
     html = html.replace(/\[(\d+)\]/g, (_, n: string) =>
       `<button class="cite-bubble" onclick="if(typeof window.__expandSource==='function')window.__expandSource(${Number(n) - 1}${keyArg})">${n}</button>`
@@ -90,3 +104,4 @@ export function syncHljsTheme(isDark: boolean) {
   if (light) light.media = isDark ? 'not all' : 'all';
   if (dark)  dark.media  = isDark ? 'all' : 'not all';
 }
+        
