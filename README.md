@@ -91,7 +91,7 @@ VITE_FIREBASE_APP_ID=your_app_id
 For Vercel serverless functions, add in Vercel dashboard:
 
 ```env
-GEMINI_API_KEY
+GEMINI_API_KEY=your_gemini_api_key
 GROQ_API_KEY=your_groq_key
 FIREBASE_PROJECT_ID=your_project_id
 FIREBASE_CLIENT_EMAIL=your_service_account_email
