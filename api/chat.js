@@ -1,6 +1,8 @@
 // api/chat.js
+// v5.5 — Regeneration fix: strip last user message from history to avoid doubling
 // v5.4 — Native Gemini REST API with proper thinkingConfig; Groq fallback stays OpenAI format
 // Changelog:
+//   v5.5 — When isRegeneration is true, remove trailing user message from history so AI sees fresh request
 //   v5.4 — Migrated Gemini to native REST API (/v1beta/models/...); thinking via thinkingConfig; parts-based response
 //   v5.3 — Thinking mode attempt via OpenAI-compat (failed — unknown field)
 //   v5.2 — gemini-2.5-flash primary; Groq llama-3.3-70b-versatile fallback
@@ -35,9 +37,7 @@ const MODEL_TIMEOUT_MS = 25000;
 
 /* ── Model config ─────────────────────────────────────────────── */
 const GEMINI_MODEL = "gemini-2.5-flash";
-// Native REST endpoint — streaming with SSE
 const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`;
-// Non-streaming for title/search optimization
 const GEMINI_GEN_URL    = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
@@ -84,7 +84,6 @@ function toGeminiHistory(history) {
 
 /* ── Tavily web search ────────────────────────────────────────── */
 async function optimizeSearchQuery(message, geminiApiKey, groqApiKey) {
-  // Use Gemini native for query optimization
   if (geminiApiKey) {
     try {
       const res = await fetch(GEMINI_GEN_URL, {
@@ -103,7 +102,6 @@ async function optimizeSearchQuery(message, geminiApiKey, groqApiKey) {
       }
     } catch { /* fall through */ }
   }
-  // Groq fallback for search optimization
   if (groqApiKey) {
     try {
       const res = await fetch(GROQ_URL, {
@@ -179,13 +177,10 @@ function setCorsHeaders(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
-
 /* ── Memory system ────────────────────────────────────────────── */
 const MEMORY_LIMIT = 30;
 const MEMORY_CATEGORIES = ['fact', 'preference', 'style', 'interest', 'context'];
 
-
-// Sanitize inputs before injecting into memory extraction prompt
 function sanitizeForMemory(text) {
   return text
     .slice(0, 600)
@@ -200,13 +195,13 @@ function sanitizeForMemory(text) {
     .trim();
 }
 
-// Validate extracted memory text before saving
 function isValidMemory(text) {
   return typeof text === 'string' &&
     text.length >= 5 &&
     text.length <= 120 &&
     !/ignore|instructions?|system prompt|admin|root|override/i.test(text);
 }
+
 const PERSONAL_SIGNAL = /\b(i am|i'm|i work|my name|i like|i love|i hate|i prefer|i study|i live|i want|i need|i always|i usually|i never|i enjoy|i use|my job|my hobby|my goal|i feel|i think|call me|we are|our team|i graduated|i'm a|i've been)\b/i;
 
 function shouldExtractMemory(userMsg, aiReply) {
@@ -224,7 +219,6 @@ async function loadMemories(uid) {
 }
 
 async function extractAndUpdateMemories(uid, userMsg, aiReply, geminiApiKey) {
-  // geminiApiKey may be null — Groq fallback is used automatically
   if (!shouldExtractMemory(userMsg, aiReply)) return;
 
   const safeUserMsg = sanitizeForMemory(userMsg);
@@ -264,7 +258,6 @@ OR {"action":"NONE"}`;
   try {
     let raw = null;
 
-    // Try Gemini first
     if (geminiApiKey) {
       const res = await fetch(GEMINI_GEN_URL, {
         method: 'POST',
@@ -280,7 +273,6 @@ OR {"action":"NONE"}`;
       }
     }
 
-    // Groq fallback if Gemini failed or unavailable
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
     if (!raw && GROQ_API_KEY) {
       const res = await fetch(GROQ_URL, {
@@ -410,14 +402,12 @@ async function streamGemini({ apiKey, systemPrompt, contents, maxTokens, enableT
         for (const part of parts) {
           if (!part.text) continue;
 
-          // Thinking part — has thought: true flag
           if (part.thought === true) {
             thinkingText += part.text;
             sseEvent(res, { thinking: part.text });
             continue;
           }
 
-          // Regular response token
           const leakGram = scanner.checkChunk(part.text);
           if (leakGram) {
             leaked = true;
@@ -570,7 +560,7 @@ export default async function handler(req, res) {
   const GROQ_API_KEY   = process.env.GROQ_API_KEY;
   if (!GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: "No AI API key configured." });
 
-  const { message, history, isFirstMessage, attachment, useWebSearch, useThinking } = req.body;
+  const { message, history, isFirstMessage, attachment, useWebSearch, useThinking, isRegeneration } = req.body;
   if (!message) return res.status(400).json({ error: "Message required" });
 
   const inputCheck = shieldInput(message);
@@ -585,12 +575,20 @@ export default async function handler(req, res) {
   const safeMessage     = inputCheck.sanitized;
   const needsDisclaimer = CRITICAL_PATTERNS.test(safeMessage);
   const shouldSearch    = useWebSearch === true;
-  const enableThinking  = useThinking === true && !!GEMINI_API_KEY; // only for Gemini
+  const enableThinking  = useThinking === true && !!GEMINI_API_KEY;
   const maxTokens       = adaptiveMaxTokens(safeMessage, !!attachment) + (shouldSearch ? 400 : 0);
 
-  const trimmedHistory = Array.isArray(history)
+  let trimmedHistory = Array.isArray(history)
     ? history.slice(-8).map(({ role, content }) => ({ role, content }))
     : [];
+
+  // If this is a regeneration request, remove the last user message from history
+  // (it's already being sent as the current message — avoids doubling)
+  if (isRegeneration && trimmedHistory.length) {
+    while (trimmedHistory.length && trimmedHistory[trimmedHistory.length - 1].role === 'user') {
+      trimmedHistory.pop();
+    }
+  }
 
   setSSEHeaders(res);
 
@@ -638,13 +636,11 @@ export default async function handler(req, res) {
     userParts = [{ text: safeMessage + searchContext }];
   }
 
-  // Gemini native contents array (history + current message)
   const geminiContents = [
     ...toGeminiHistory(trimmedHistory),
     { role: "user", parts: userParts },
   ];
 
-  // OpenAI-format messages for Groq fallback
   const openaiMessages = [
     { role: "system", content: FULL_SYSTEM_PROMPT },
     ...trimmedHistory,
@@ -660,7 +656,7 @@ export default async function handler(req, res) {
   let result = null;
 
   if (GEMINI_API_KEY) {
-    console.log(`[chat] uid=${uid} model=${GEMINI_MODEL} thinking=${enableThinking} search=${shouldSearch}`);
+    console.log(`[chat] uid=${uid} model=${GEMINI_MODEL} thinking=${enableThinking} search=${shouldSearch} regen=${!!isRegeneration}`);
     try {
       result = await streamGemini({
         apiKey: GEMINI_API_KEY,
@@ -712,7 +708,7 @@ export default async function handler(req, res) {
 
   res.end();
 
-  // ── Silent async memory extraction — runs after response, never blocks user ──
+  // ── Silent async memory extraction ──
   if (result.fullText && GEMINI_API_KEY) {
     extractAndUpdateMemories(uid, safeMessage, result.fullText, GEMINI_API_KEY)
       .catch(err => console.warn('[memory] Background extraction error:', err.message));
