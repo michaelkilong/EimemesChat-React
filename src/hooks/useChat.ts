@@ -1,4 +1,5 @@
-// useChat.ts — v2.3 — Added regenerate function to prevent duplicate user messages on regen
+// useChat.ts — v2.4 — Added isRegeneration flag to request body for backend deduplication
+// v2.3 — Added regenerate function to prevent duplicate user messages on regen
 import { useState, useRef, useCallback } from 'react';
 import { arrayUnion, updateDoc, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -272,6 +273,7 @@ export function useChat(
   }, []);
 
   // Regenerate — skips saving the user message (already in Firestore)
+  // Sends isRegeneration flag so backend strips duplicate from history
   const regenerate = useCallback(async (originalMsg: string) => {
     if (!originalMsg.trim() || isSending || !currentUser) return;
 
@@ -289,6 +291,14 @@ export function useChat(
     if (!conv?.messages?.length) {
       setIsSending(false); return;
     }
+
+    // Build history WITHOUT the last assistant message
+    const fullHistory = conv.messages || [];
+    const cleanedHistory = [...fullHistory];
+    while (cleanedHistory.length && cleanedHistory[cleanedHistory.length - 1].role === 'assistant') {
+      cleanedHistory.pop();
+    }
+    const history = cleanedHistory.slice(-20);
 
     // Reset stream state
     renderQueueRef.current = [];
@@ -310,11 +320,14 @@ export function useChat(
     const timer = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
     try {
-      // Use existing messages as history (user message already there)
-      const convMsgs = conv.messages || [];
-      const history = [...convMsgs].slice(-20);
-
-      const body: Record<string, unknown> = { message: originalMsg, history, isFirstMessage: false, useWebSearch: false, modelMode: 'smart' };
+      const body: Record<string, unknown> = {
+        message: originalMsg,
+        history,
+        isFirstMessage: false,
+        useWebSearch: false,
+        modelMode: 'smart',
+        isRegeneration: true, // tells backend to strip duplicate user message from history
+      };
 
       const res = await fetch('/api/chat', {
         method: 'POST',
