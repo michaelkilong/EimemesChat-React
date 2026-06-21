@@ -186,7 +186,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
             {/* Left: attach + web search */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
 
-              {/* + (Attach file) */}
+              {/* + (Attach {/* + (Attach file) – bold circle */}
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={busy || processing}
@@ -194,21 +194,34 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                 style={{
                   width: '34px', height: '34px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '10px', background: 'transparent', border: 'none',
+                  borderRadius: '50%',                               // circle shape
+                  background: attachment ? 'var(--accent-dim)' : 'var(--glass-3)',  // subtle circle even when empty
+                  border: attachment ? '1px solid var(--accent)' : '1px solid var(--border)',
                   color: attachment ? 'var(--accent)' : 'var(--text-3)',
                   cursor: (busy || processing) ? 'default' : 'pointer',
                   opacity: (busy || processing) ? 0.4 : 1,
-                  transition: 'color 0.15s, background 0.15s',
+                  transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => { if (!busy && !processing) (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-3)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                onMouseEnter={e => {
+                  if (!busy && !processing) {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.background = attachment ? 'var(--accent-dim)' : 'var(--glass-2)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!busy && !processing) {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.background = attachment ? 'var(--accent-dim)' : 'var(--glass-3)';
+                  }
+                }}
               >
-                {/* Plus icon */}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {/* Bold plus */}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               </button>
+              
 
               {/* Web search */}
               <button
