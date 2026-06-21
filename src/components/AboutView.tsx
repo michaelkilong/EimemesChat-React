@@ -1,5 +1,6 @@
-// AboutView.tsx — v2.0 (detects theme from body, localStorage, system, etc.)
-import React, { useState, useEffect, useCallback } from 'react';
+// AboutView.tsx — v2.1 (uses AppContext for theme, no DOM guessing)
+import React from 'react';
+import { useApp } from './AppContext'; // adjust the import path if needed
 
 interface Props {
   onBack: () => void;
@@ -23,104 +24,10 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * Tries every common method to decide if dark theme is active.
- */
-function getThemeIsDark(): boolean {
-  const html = document.documentElement;
-  const body = document.body;
-
-  // 1. data-theme on <html>
-  const dataTheme = html.getAttribute('data-theme');
-  if (dataTheme === 'dark') return true;
-  if (dataTheme === 'light') return false;
-
-  // 2. data-theme on <body> (some UI kits)
-  const bodyDataTheme = body?.getAttribute('data-theme');
-  if (bodyDataTheme === 'dark') return true;
-  if (bodyDataTheme === 'light') return false;
-
-  // 3. Class on <html>
-  if (
-    html.classList.contains('dark') ||
-    html.classList.contains('theme-dark') ||
-    html.classList.contains('dark-mode')
-  )
-    return true;
-
-  // 4. Class on <body>
-  if (
-    body?.classList.contains('dark') ||
-    body?.classList.contains('theme-dark') ||
-    body?.classList.contains('dark-mode')
-  )
-    return true;
-
-  // 5. localStorage (common key names)
-  try {
-    const stored = localStorage.getItem('theme');
-    if (stored === 'dark') return true;
-    if (stored === 'light') return false;
-  } catch (_) {}
-
-  // 6. Fallback to system preference
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
 export default function AboutView({ onBack, onOpenLicenses }: Props) {
-  const [isDark, setIsDark] = useState(getThemeIsDark);
+  const { isDark } = useApp();
 
-  // Re-check theme whenever something changes (using a stable callback)
-  const updateTheme = useCallback(() => {
-    setIsDark(getThemeIsDark());
-  }, []);
-
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-
-    // -------- Mutation observers (for attribute/class changes) --------
-    const attrObserver = new MutationObserver(updateTheme);
-    attrObserver.observe(html, {
-      attributes: true,
-      attributeFilter: ['data-theme', 'class'],
-    });
-    if (body) {
-      attrObserver.observe(body, {
-        attributes: true,
-        attributeFilter: ['data-theme', 'class'],
-      });
-    }
-
-    // -------- System preference change --------
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', updateTheme);
-
-    // -------- localStorage change (across tabs) --------
-    const storageHandler = (e: StorageEvent) => {
-      if (e.key === 'theme') updateTheme();
-    };
-    window.addEventListener('storage', storageHandler);
-
-    // -------- Manual polling for same‑tab localStorage changes --------
-    // (if the theme switcher only sets localStorage without an event)
-    let lastTheme = localStorage.getItem('theme');
-    const pollInterval = setInterval(() => {
-      const current = localStorage.getItem('theme');
-      if (current !== lastTheme) {
-        lastTheme = current;
-        updateTheme();
-      }
-    }, 500);
-
-    return () => {
-      attrObserver.disconnect();
-      mediaQuery.removeEventListener('change', updateTheme);
-      window.removeEventListener('storage', storageHandler);
-      clearInterval(pollInterval);
-    };
-  }, [updateTheme]);
-
+  // Dark theme → original logo, Light theme → new light logo
   const logoSrc = isDark ? '/chat-logo.png' : '/chat-logo-light.png';
 
   return (
