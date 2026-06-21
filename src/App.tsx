@@ -1,6 +1,5 @@
 // App.tsx
-// v2.3 — Prevent duplicate empty chats; handleNewChat checks for existing empty conv
-// v2.2 — InputArea floats over MessageList via absolute positioning
+// v2.4 — Fixed regen doubling bug by using regenerate from useChat instead of handleSend
 import React, { useState, useCallback, useEffect } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -26,7 +25,7 @@ import type { Attachment }   from './types';
 const DAILY_LIMIT = 150;
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
-// Circular icon button — Apple HIG standard 44pt touch target
+// Circular icon button
 function CircleBtn({ onClick, children, className }: { onClick: () => void; children: React.ReactNode; className?: string }) {
   const [pressed, setPressed] = useState(false);
   return (
@@ -70,7 +69,6 @@ export default function App() {
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
 
   const handleNewChat = useCallback(async () => {
-    // If already in an empty conversation, just ensure we're on chat view — don't create another
     if (currentConvId) {
       const currentConv = conversations.find(c => c.id === currentConvId);
       if (!currentConv?.messages?.length) {
@@ -78,7 +76,6 @@ export default function App() {
         return;
       }
     }
-    // If no current conv or current conv has messages, create a fresh one
     const id = await createNewChat();
     if (id) { setCurrentConvId(id); setView('chat'); }
   }, [createNewChat, setView, currentConvId, conversations]);
@@ -87,7 +84,7 @@ export default function App() {
     isSending, isStreaming, isTyping, isSearching,
     streamText, streamDone, streamModel, streamDisclaimer, streamSources,
     streamThinking, isThinking,
-    sendMessage, stopStreaming,
+    sendMessage, stopStreaming, regenerate,
   } = useChat(
     currentConvId, setCurrentConvId,
     conversations, createNewChat,
@@ -123,8 +120,9 @@ export default function App() {
     const trimmed = [...msgs];
     while (trimmed.length && trimmed[trimmed.length - 1].role === 'assistant') trimmed.pop();
     await updateDoc(convRef, { messages: trimmed, updatedAt: new Date() });
-    handleSend(originalMsg);
-  }, [currentConvId, isSending, isStreaming, getConvRef, handleSend]);
+    // Use regenerate to avoid duplicating the user message
+    regenerate(originalMsg);
+  }, [currentConvId, isSending, isStreaming, getConvRef, regenerate]);
 
   const handleDeleteConv = useCallback(async (id: string) => {
     await deleteConv(id);
@@ -283,5 +281,3 @@ export default function App() {
     </div>
   );
 }
-
-        
