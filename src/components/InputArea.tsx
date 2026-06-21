@@ -1,5 +1,4 @@
-// InputArea.tsx — v2.3 — Improved file processing indicator with progress bar; better error UX
-// v2.2 — Truly transparent floating input; gradient fade via background not mask
+// InputArea.tsx — v2.4 — Removed Think button; + icon for attach; fixed --bg and send shadow
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -22,7 +21,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const [processing, setProcessing] = useState(false);
   const [fileError,  setFileError]  = useState('');
   const [webSearch,  setWebSearch]  = useState(false);
-  const [useThinking, setUseThinking] = useState(false);
+  // Removed useThinking state
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,13 +43,12 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
     const text = value.trim();
     const att  = attachment ?? undefined;
     const ws   = webSearch;
-    const th   = useThinking;
     setValue('');
     setAttachment(null);
     setFileError('');
     setWebSearch(false);
-    setUseThinking(false);
-    onSend(text || 'Please analyze this file.', att, ws, th);
+    // Removed setUseThinking
+    onSend(text || 'Please analyze this file.', att, ws);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -77,14 +75,15 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const busy = isSending || isStreaming;
 
   return (
-    /* Floating wrapper — top fades transparent → page bg so messages dissolve behind input */
+    /* Floating wrapper — gradient fade from transparent to page bg */
     <div style={{
       position: 'relative',
       flexShrink: 0,
       paddingTop: '40px',
       paddingInline: '16px',
       paddingBottom: 'calc(12px + var(--sab))',
-      background: 'var(--bg)',
+      // Fixed: use a gradient that fades to page background
+      background: 'linear-gradient(to top, var(--bg-a), transparent)',
     }}>
       <div style={{ maxWidth: '740px', margin: '0 auto' }}>
 
@@ -187,7 +186,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
             {/* Left: attach + web search */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
 
-              {/* Paperclip */}
+              {/* + (Attach file) */}
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={busy || processing}
@@ -204,8 +203,10 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                 onMouseEnter={e => { if (!busy && !processing) (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-3)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
               >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                {/* Plus icon */}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               </button>
 
@@ -233,34 +234,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                   <line x1="2" y1="12" x2="22" y2="12"/>
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                 </svg>
-              </button>
-
-              {/* Think button */}
-              <button
-                onClick={() => { haptic.light(); setUseThinking(t => !t); }}
-                disabled={busy}
-                title={useThinking ? 'Think mode on' : 'Think mode off'}
-                style={{
-                  height: '30px', paddingInline: '10px',
-                  display: 'flex', alignItems: 'center', gap: '5px',
-                  borderRadius: '999px',
-                  background: useThinking ? 'rgba(180,120,255,0.15)' : 'transparent',
-                  border: useThinking ? '1px solid rgba(180,120,255,0.3)' : '1px solid transparent',
-                  color: useThinking ? '#c96eff' : 'var(--text-3)',
-                  cursor: busy ? 'default' : 'pointer',
-                  opacity: busy ? 0.4 : 1,
-                  fontSize: '12.5px', fontWeight: 500,
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { if (!busy && !useThinking) (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-3)'; }}
-                onMouseLeave={e => { if (!useThinking) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="9"/>
-                  <path d="M9.5 9.5 C9.5 7.5 14.5 7.5 14.5 10 C14.5 12 12 12 12 14"/>
-                  <circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none"/>
-                </svg>
-                <span>Think</span>
               </button>
 
             </div>
@@ -293,7 +266,8 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                   color: canSend ? 'var(--send-fg)' : 'var(--text-3)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: canSend ? 'pointer' : 'default',
-                  boxShadow: canSend ? '0 2px 12px rgba(0,122,255,0.4)' : 'none',
+                  // Fixed: use accent variable instead of hardcoded blue
+                  boxShadow: canSend ? '0 2px 12px var(--accent-dim)' : 'none',
                   flexShrink: 0,
                   transition: 'background 0.15s, box-shadow 0.15s, color 0.15s',
                 }}
