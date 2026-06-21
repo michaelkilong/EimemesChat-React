@@ -217,73 +217,75 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
 
         {message.sources?.length ? <SourcesList sources={message.sources} msgKey={msgKey} /> : null}
 
-        {/* Action bar */}
-        {isLast && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0px', marginTop: '6px' }}>
+        {/* Action bar — all actions except regenerate always visible */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0px', marginTop: '6px' }}>
 
-            {/* Copy */}
-            <ActionBtn title={copied ? 'Copied!' : 'Copy'} onClick={handleCopy} active={copied} activeColor="#30d158">
-              {copied
-                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              }
-            </ActionBtn>
+          {/* Copy */}
+          <ActionBtn
+            title={copied ? 'Copied!' : 'Copy'}
+            onClick={handleCopy}
+            active={copied}
+            activeColor="#30d158"
+          >
+            {copied
+              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            }
+          </ActionBtn>
 
-            {/* Regenerate */}
+          {/* Voice */}
+          <ActionBtn title={speaking ? 'Stop' : 'Read aloud'} onClick={handleSpeak} active={speaking} activeColor="var(--accent)">
+            {speaking ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="4" y1="6" x2="4" y2="18" style={{ animation: 'bar1 0.8s ease-in-out infinite alternate' }}/>
+                <line x1="9" y1="3" x2="9" y2="21" style={{ animation: 'bar2 0.8s ease-in-out infinite alternate' }}/>
+                <line x1="14" y1="8" x2="14" y2="16" style={{ animation: 'bar3 0.8s ease-in-out infinite alternate' }}/>
+                <line x1="19" y1="5" x2="19" y2="19" style={{ animation: 'bar4 0.8s ease-in-out infinite alternate' }}/>
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              </svg>
+            )}
+          </ActionBtn>
+
+          {/* Thumb up */}
+          <ActionBtn title="Good response" onClick={() => { const was = thumbUp; haptic.success(); setThumbUp(!was); setThumbDown(false); if (!was) showToast('Thanks! 👍'); }} active={thumbUp} activeColor="#30d158">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill={thumbUp ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+              <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+            </svg>
+          </ActionBtn>
+
+          {/* Thumb down */}
+          <ActionBtn title="Bad response" onClick={() => { const was = thumbDown; haptic.medium(); setThumbDown(!was); setThumbUp(false); if (!was) showToast('Thanks for the feedback!'); }} active={thumbDown} activeColor="#ff6b6b">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill={thumbDown ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/>
+              <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+            </svg>
+          </ActionBtn>
+
+          {/* Share */}
+          <ActionBtn title="Share" onClick={handleShare}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            </svg>
+          </ActionBtn>
+
+          {/* Regenerate (retry) — only on the latest assistant response */}
+          {isLast && (
             <ActionBtn title="Regenerate" onClick={() => { haptic.medium(); onRegen(lastUserMsg); }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="1 4 1 10 7 10"/>
                 <path d="M3.51 15a9 9 0 1 0 .49-3.54"/>
               </svg>
             </ActionBtn>
-
-            {/* Voice — play / stop */}
-            <ActionBtn title={speaking ? 'Stop' : 'Read aloud'} onClick={handleSpeak} active={speaking} activeColor="var(--accent)">
-              {speaking ? (
-                /* Animated sound bars while speaking */
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <line x1="4"  y1="6"  x2="4"  y2="18" style={{ animation: 'bar1 0.8s ease-in-out infinite alternate' }}/>
-                  <line x1="9"  y1="3"  x2="9"  y2="21" style={{ animation: 'bar2 0.8s ease-in-out infinite alternate' }}/>
-                  <line x1="14" y1="8"  x2="14" y2="16" style={{ animation: 'bar3 0.8s ease-in-out infinite alternate' }}/>
-                  <line x1="19" y1="5"  x2="19" y2="19" style={{ animation: 'bar4 0.8s ease-in-out infinite alternate' }}/>
-                </svg>
-              ) : (
-                /* Speaker icon */
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-                </svg>
-              )}
-            </ActionBtn>
-
-            {/* Thumb up */}
-            <ActionBtn title="Good response" onClick={() => { const was = thumbUp; haptic.success(); setThumbUp(!was); setThumbDown(false); if (!was) showToast('Thanks! 👍'); }} active={thumbUp} activeColor="#30d158">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill={thumbUp ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
-                <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
-              </svg>
-            </ActionBtn>
-
-            {/* Thumb down */}
-            <ActionBtn title="Bad response" onClick={() => { const was = thumbDown; haptic.medium(); setThumbDown(!was); setThumbUp(false); if (!was) showToast('Thanks for the feedback!'); }} active={thumbDown} activeColor="#ff6b6b">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill={thumbDown ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/>
-                <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
-              </svg>
-            </ActionBtn>
-
-            {/* Share */}
-            <ActionBtn title="Share" onClick={handleShare}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-              </svg>
-            </ActionBtn>
-
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <style>{`
@@ -295,4 +297,3 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
     </div>
   );
 }
-    
