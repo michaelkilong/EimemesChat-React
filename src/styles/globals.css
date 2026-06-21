@@ -1,4 +1,4 @@
-/* index.css — v2.0 — Black & Grey dark theme (true black background, grey UI components) */
+/* index.css — v2.1 — Muted accent to grey (hover effects), kept send button blue */
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&display=swap');
 
 @tailwind base;
@@ -16,7 +16,7 @@
   --sab: env(safe-area-inset-bottom, 0px);
 }
 
-/* ── Black & Grey Dark Theme ────────────────────────────────────── */
+/* ── Black & Grey Dark Theme (accent muted to grey) ───────────── */
 html.dark {
   --bg-a:      #000000;
   --bg-b:      #0d0d0d;
@@ -29,11 +29,11 @@ html.dark {
   --text-1:    rgba(255,255,255,0.93);
   --text-2:    rgba(255,255,255,0.58);
   --text-3:    rgba(255,255,255,0.34);
-  --accent:    #0a84ff;
-  --accent-dim:rgba(10,132,255,0.18);
+  --accent:    #b0b0b0;                     /* grey accent for hover states */
+  --accent-dim:rgba(255,255,255,0.08);      /* subtle highlight */
   --bubble-u:  #1c1c1e;
   --bubble-ub: #2c2c2e;
-  --send-bg:   linear-gradient(145deg,#0a84ff 0%,#0062d6 100%);
+  --send-bg:   linear-gradient(145deg,#0a84ff 0%,#0062d6 100%); /* keep send button blue */
   --send-fg:   #ffffff;
   --input-bg:  #1c1c1e;
   --code-bg:   rgba(255,255,255,0.06);
@@ -437,7 +437,7 @@ a:hover { text-decoration: underline; }
   border: none; font-family: inherit; vertical-align: middle;
   transition: background 0.15s; white-space: nowrap;
 }
-.citation-badge:hover { background: rgba(10,132,255,0.25); }
+.citation-badge:hover { background: rgba(255,255,255,0.1); }
 .sources-list {
   margin-top: 14px; padding-top: 12px;
   border-top: 1px solid var(--border-b);
