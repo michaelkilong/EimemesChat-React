@@ -15,32 +15,34 @@
   --sab: env(safe-area-inset-bottom, 0px);
 }
 
+/* ── ChatGPT-inspired black & grey ────────────────────────────── */
 html.dark {
-  --bg-a:      #141417;
-  --bg-b:      #23232d;
-  --glass-0:   rgba(16,16,20,0.97);
-  --glass-1:   rgba(28,28,36,0.88);
-  --glass-2:   rgba(44,44,56,0.65);
-  --glass-3:   rgba(255,255,255,0.04);
-  --border:    rgba(255,255,255,0.09);
-  --border-b:  rgba(255,255,255,0.05);
-  --text-1:    rgba(255,255,255,0.94);
-  --text-2:    rgba(255,255,255,0.58);
-  --text-3:    rgba(255,255,255,0.30);
-  --accent:    #4fa8ff;
+  --bg-a:      #202123;
+  --bg-b:      #343541;
+  --glass-0:   rgba(32,33,35,0.97);
+  --glass-1:   rgba(52,53,65,0.95);
+  --glass-2:   rgba(68,70,84,0.85);
+  --glass-3:   rgba(255,255,255,0.05);
+  --border:    rgba(255,255,255,0.10);
+  --border-b:  rgba(255,255,255,0.06);
+  --text-1:    rgba(255,255,255,0.92);
+  --text-2:    rgba(255,255,255,0.60);
+  --text-3:    rgba(255,255,255,0.38);
+  --accent:    #0a84ff;
   --accent-dim:rgba(10,132,255,0.18);
-  --bubble-u:  rgba(255,255,255,0.10);
-  --bubble-ub: rgba(255,255,255,0.07);
+  --bubble-u:  #343541;
+  --bubble-ub: #444654;
   --send-bg:   linear-gradient(145deg,#0a84ff 0%,#0062d6 100%);
   --send-fg:   #ffffff;
-  --input-bg:  rgba(32,32,42,0.85);
-  --code-bg:   rgba(0,0,0,0.32);
+  --input-bg:  #40414f;
+  --code-bg:   rgba(0,0,0,0.40);
   --sh-sm:     0 2px 10px rgba(0,0,0,0.35);
   --sh-md:     0 10px 40px rgba(0,0,0,0.55);
-  --sh-input:  0 2px 8px rgba(0,0,0,0.3);
-  --fade-top:  #141417;
+  --sh-input:  0 2px 8px rgba(0,0,0,0.30);
+  --fade-top:  #202123;
 }
 
+/* ── Light theme — unchanged ──────────────────────────────────── */
 html.light {
   --bg-a:      #e9eaf2;
   --bg-b:      #f0f1f8;
