@@ -40,7 +40,7 @@ function SettingsCard({
   const [pressed, setPressed] = useState(false);
   return (
     <div
-      onClick={toggle ? onToggle : onClick}
+      onClick={onClick}
       onMouseDown={() => setPressed(true)}
       onMouseUp={() => setPressed(false)}
       onMouseLeave={() => setPressed(false)}
