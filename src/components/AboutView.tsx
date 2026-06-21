@@ -1,6 +1,6 @@
-// AboutView.tsx — v2.1 (uses AppContext for theme, no DOM guessing)
+// AboutView.tsx — v2.2 (uses AppContext for theme, correct import)
 import React from 'react';
-import { useApp } from './AppContext'; // adjust the import path if needed
+import { useApp } from '../context/AppContext'; // adjust if your folder structure differs
 
 interface Props {
   onBack: () => void;
