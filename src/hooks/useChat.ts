@@ -1,5 +1,4 @@
-// useChat.ts — v2.2 — Thinking mode: stream reasoning tokens; isThinking + streamThinking state
-// v2.1 — Fix: SSE error events now persist to Firestore and show toast
+// useChat.ts — v2.3 — Added regenerate function to prevent duplicate user messages on regen
 import { useState, useRef, useCallback } from 'react';
 import { arrayUnion, updateDoc, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -65,9 +64,6 @@ export function useChat(
   const sendMessage = useCallback(async (text: string, chipsUsedSetter: () => void, attachment?: Attachment, useWebSearch?: boolean, modelMode?: string, useThinking?: boolean) => {
     if (!text.trim() || isSending || !currentUser) return;
 
-    // Rate limiting is enforced server-side (api/chat.js) with Firestore transactions.
-    // The server returns 429 when the daily limit is hit, which is handled below.
-
     setIsSending(true);
     chipsUsedSetter();
 
@@ -129,15 +125,11 @@ export function useChat(
     const timer = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
     try {
-      // Build history from local state — avoids an extra Firestore read per message.
-      // Include the user message we just saved (it may not be in `conversations` state yet).
       const convMsgs = conversations.find(c => c.id === activeConvId)?.messages || [];
       const history = [...convMsgs, userMsg].slice(-20);
 
-      // Build request body — include attachment content for backend processing
       const body: Record<string, unknown> = { message: text, history, isFirstMessage, useWebSearch: !!useWebSearch, modelMode: modelMode || 'smart' };
       if (attachment) {
-        // For images send full base64, for docs send extracted text
         body.attachment = {
           name:     attachment.name,
           type:     attachment.type,
@@ -279,12 +271,184 @@ export function useChat(
     streamController.current = null;
   }, []);
 
+  // Regenerate — skips saving the user message (already in Firestore)
+  const regenerate = useCallback(async (originalMsg: string) => {
+    if (!originalMsg.trim() || isSending || !currentUser) return;
+
+    setIsSending(true);
+
+    const activeConvId = convId;
+    if (!activeConvId) {
+      setIsSending(false);
+      return;
+    }
+
+    const convRef = getConvDocRef(activeConvId)!;
+    const conv    = conversations.find(c => c.id === activeConvId);
+
+    if (!conv?.messages?.length) {
+      setIsSending(false); return;
+    }
+
+    // Reset stream state
+    renderQueueRef.current = [];
+    displayedRef.current   = '';
+    if (renderTimerRef.current) { clearTimeout(renderTimerRef.current); renderTimerRef.current = null; }
+    setStreamText('');
+    setStreamDone(false);
+    setStreamModel('');
+    setStreamDisclaimer(false as const);
+    setIsSearching(false);
+    setStreamSources([]);
+    setStreamThinking('');
+    setIsThinking(false);
+
+    setIsTyping(true);
+
+    streamController.current = new AbortController();
+    const controller = streamController.current;
+    const timer = setTimeout(() => controller.abort(), AI_TIMEOUT);
+
+    try {
+      // Use existing messages as history (user message already there)
+      const convMsgs = conv.messages || [];
+      const history = [...convMsgs].slice(-20);
+
+      const body: Record<string, unknown> = { message: originalMsg, history, isFirstMessage: false, useWebSearch: false, modelMode: 'smart' };
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await currentUser.getIdToken()}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify(body),
+      });
+
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        setIsTyping(false);
+        const errBody = await res.json().catch(() => ({}));
+        const errMsg  = errBody.error || `Server error (${res.status}). Please try again.`;
+        await updateDoc(convRef, {
+          messages: arrayUnion({ role: 'assistant', content: errMsg, time: getTime(), model: '' }),
+          updatedAt: new Date(),
+        });
+        setIsSending(false); return;
+      }
+
+      isStreamingRef.current = true;
+      setIsStreaming(true);
+
+      const reader  = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buf        = '';
+      let fullText   = '';
+      let model      = '';
+      let disclaimer: 'critical' | 'web' | false = false;
+      let sources: { title: string; url: string }[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop()!;
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed.searching)     { setIsTyping(false); setIsSearching(true); }
+            if (parsed.thinking)      { setIsTyping(false); setIsThinking(true); setStreamThinking(t => t + parsed.thinking); }
+            if (parsed.error)         { setIsTyping(false); setIsSearching(false); fullText = parsed.error; enqueue(parsed.error); showToast(parsed.error); }
+            if (parsed.token)         { setIsTyping(false); setIsSearching(false); setIsThinking(false); fullText += parsed.token; enqueue(parsed.token); }
+
+            if (parsed.outputBlocked && parsed.safeReply) {
+              fullText = parsed.safeReply;
+              renderQueueRef.current = [];
+              displayedRef.current   = fullText;
+              setStreamText(fullText);
+            }
+
+            if (parsed.done) {
+              model      = parsed.model      || '';
+              disclaimer = parsed.disclaimer || false;
+              sources    = parsed.sources    || [];
+              if (sources.length) setStreamSources(sources);
+              if (parsed.outputBlocked && parsed.reply) fullText = parsed.reply;
+            }
+
+            if (parsed.title) {
+              const aiTitle = parsed.title as string;
+              updateDoc(convRef, { title: aiTitle }).catch(console.error);
+              setConvTitle(aiTitle);
+            }
+          } catch { /* malformed chunk */ }
+        }
+      }
+
+      await drainQueue();
+      setStreamModel(model);
+      setStreamDisclaimer(disclaimer);
+      setStreamDone(true);
+
+      // Save AI message
+      const aiMsg: Message = {
+        role: 'assistant', content: fullText,
+        time: getTime(), model, disclaimer,
+        ...(sources.length && { sources }),
+      };
+      await updateDoc(convRef, { messages: arrayUnion(aiMsg), updatedAt: new Date() });
+
+      // Force-fetch latest messages before clearing streaming
+      try {
+        const freshSnap = await getDoc(convRef);
+        if (freshSnap.exists()) {
+          const freshData = freshSnap.data();
+          setMessages(freshData.messages || []);
+          setConvTitle(freshData.title || '');
+        }
+      } catch { /* fallback */ }
+
+      isStreamingRef.current = false;
+      setIsStreaming(false);
+      setStreamDone(false);
+      streamController.current = null;
+
+    } catch (err: any) {
+      clearTimeout(timer);
+      setIsTyping(false);
+      isStreamingRef.current = false;
+      setIsStreaming(false);
+      streamController.current = null;
+
+      if (err.name === 'AbortError') { setIsSending(false); return; }
+
+      const errorMsg = err.code === 'permission-denied'
+        ? 'Permission denied. Please sign out and back in.'
+        : 'I\'m sorry, something went wrong. Please try again.';
+      try {
+        await updateDoc(getConvDocRef(activeConvId)!, {
+          messages: arrayUnion({ role: 'assistant', content: errorMsg, time: getTime(), model: '' }),
+          updatedAt: new Date(),
+        });
+      } catch { /* ignore */ }
+    } finally {
+      setIsSending(false);
+    }
+  }, [isSending, currentUser, convId, conversations, getConvDocRef, setConvTitle,
+      isStreamingRef, setMessages, showToast, enqueue]);
+
   return {
     isSending, isStreaming, isTyping, isSearching,
     streamText, streamDone, streamModel, streamDisclaimer, streamSources,
     streamThinking, isThinking,
-    sendMessage, stopStreaming,
+    sendMessage, stopStreaming, regenerate,
     setStreamDone,
   };
 }
-    
