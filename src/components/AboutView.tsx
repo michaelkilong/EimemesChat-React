@@ -1,4 +1,4 @@
-// AboutView.tsx — v1.4 (theme‑aware logo: dark = chat-logo.png, light = chat-logo-light.png)
+// AboutView.tsx — v1.5 (robust theme detection, multiple fallbacks)
 import React, { useState, useEffect } from 'react';
 
 interface Props {
@@ -23,12 +23,31 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Check if dark theme is active via data-theme attribute on <html> */
+/**
+ * Determine if dark theme is active.
+ * Checks (in order):
+ * 1. data-theme attribute on <html>
+ * 2. CSS class (common patterns: 'dark', 'theme-dark', 'dark-mode')
+ * 3. System preference via matchMedia
+ */
 function getThemeIsDark(): boolean {
-  const theme = document.documentElement.getAttribute('data-theme');
-  if (theme === 'dark') return true;
-  if (theme === 'light') return false;
-  // Fallback to system preference if no attribute set
+  const html = document.documentElement;
+
+  // Method 1: data-theme attribute
+  const themeAttr = html.getAttribute('data-theme');
+  if (themeAttr === 'dark') return true;
+  if (themeAttr === 'light') return false;
+
+  // Method 2: CSS class (cover many frameworks)
+  if (
+    html.classList.contains('dark') ||
+    html.classList.contains('theme-dark') ||
+    html.classList.contains('dark-mode')
+  ) {
+    return true;
+  }
+
+  // Method 3: system preference
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
@@ -37,11 +56,29 @@ export default function AboutView({ onBack, onOpenLicenses }: Props) {
 
   useEffect(() => {
     const html = document.documentElement;
-    const observer = new MutationObserver(() => {
+
+    // Watch for attribute changes (data-theme)
+    const attrObserver = new MutationObserver(() => {
       setIsDark(getThemeIsDark());
     });
-    observer.observe(html, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => observer.disconnect();
+    attrObserver.observe(html, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
+    // Watch for class changes (e.g., toggling 'dark' class)
+    const classObserver = new MutationObserver(() => {
+      setIsDark(getThemeIsDark());
+    });
+    classObserver.observe(html, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    return () => {
+      attrObserver.disconnect();
+      classObserver.disconnect();
+    };
   }, []);
 
   // Dark theme → original logo, Light theme → new light logo
