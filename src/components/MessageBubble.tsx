@@ -1,4 +1,6 @@
-// MessageBubble.tsx — v2.0 — Neural TTS via Edge (free, no key, human‑sounding)
+// MessageBubble.tsx — v2.1 — Edge TTS with browser fallback; never says "voice unavailable"
+// v2.0 — Neural TTS via Edge (free, no key, human‑sounding)
+// v1.4 — Improved TTS: realistic voices, no emojis/symbols, natural pacing
 import React, { useEffect, useRef, useState } from 'react';
 import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
@@ -93,11 +95,13 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
 
   const handleSpeak = () => {
     if (speaking) {
+      // Stop current playback
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
         audioRef.current = null;
       }
+      window.speechSynthesis.cancel();
       setSpeaking(false);
       return;
     }
@@ -108,6 +112,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
     haptic.light();
     setSpeaking(true);
 
+    // Try Edge TTS (neural, human‑sounding) first
     fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -122,13 +127,64 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
         const audio = new Audio(url);
         audioRef.current = audio;
         audio.onended = () => setSpeaking(false);
-        audio.onerror = () => { setSpeaking(false); showToast('Playback failed'); };
-        audio.play();
+        audio.onerror = () => {
+          setSpeaking(false);
+          showToast('Playback failed');
+        };
+        audio.play().catch(() => {
+          setSpeaking(false);
+          fallbackToBrowserTTS(clean);
+        });
       })
       .catch(() => {
-        setSpeaking(false);
-        showToast('Voice unavailable. Please try again.');
+        // Edge TTS unavailable – fallback to browser speech synthesis
+        fallbackToBrowserTTS(clean);
       });
+
+    function fallbackToBrowserTTS(text: string) {
+      if (!window.speechSynthesis) {
+        setSpeaking(false);
+        showToast('Voice not supported on this browser');
+        return;
+      }
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.rate = 0.95;
+      utt.pitch = 1;
+      utt.volume = 1;
+
+      const setVoice = () => {
+        const voices = window.speechSynthesis.getVoices();
+        const preferred = voices.find(v =>
+          v.lang.startsWith('en') && (
+            v.name.includes('Daniel') || v.name.includes('Samantha') ||
+            v.name.includes('Karen') || v.name.includes('Google US') ||
+            v.name.includes('Google UK') || v.name.includes('Natural') ||
+            v.name.includes('Premium')
+          )
+        ) || voices.find(v => v.lang.startsWith('en-US'))
+          || voices.find(v => v.lang.startsWith('en-GB'))
+          || voices.find(v => v.lang.startsWith('en'));
+
+        if (preferred) utt.voice = preferred;
+        window.speechSynthesis.speak(utt);
+      };
+
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        setVoice();
+      } else {
+        window.speechSynthesis.onvoiceschanged = () => {
+          setVoice();
+          window.speechSynthesis.onvoiceschanged = null;
+        };
+      }
+
+      utt.onend = () => setSpeaking(false);
+      utt.onerror = () => {
+        setSpeaking(false);
+        showToast('Playback failed');
+      };
+    }
   };
 
   const handleCopy = () => {
