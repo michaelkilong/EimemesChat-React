@@ -1,8 +1,7 @@
-// lib/markdown.ts — v1.1 — Added Mermaid diagram rendering + "Save as PNG" button
+// lib/markdown.ts — v1.2 — Client‑only dynamic Mermaid import for build compatibility
 import { marked } from 'marked';
 import katex from 'katex';
 import hljs from 'highlight.js';
-import mermaid from 'mermaid';
 
 // Configure marked
 marked.setOptions({ breaks: true, gfm: true });
@@ -86,27 +85,27 @@ export function highlightCodeBlocks(container: HTMLElement, showToast: (msg: str
 
 /**
  * Convert Mermaid code blocks to SVG diagrams with a "Save as PNG" button.
- * Call after inserting markdown content into the DOM (e.g., in MessageBubble).
+ * Dynamically imports Mermaid only when executed (client‑side), no static import.
  */
 export async function renderMermaidBlocks(container: HTMLElement) {
   const mermaidBlocks = container.querySelectorAll<HTMLElement>('pre code.language-mermaid');
 
   for (const code of mermaidBlocks) {
     try {
+      // Dynamic import – Mermaid loads only in the browser
+      const mermaid = (await import('mermaid')).default;
+
       const pre = code.parentElement!;
       const mermaidCode = code.textContent || '';
 
-      // Create a unique ID for Mermaid
       const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
 
-      // Temporary element to render SVG
       const tempDiv = document.createElement('div');
       tempDiv.style.display = 'none';
       tempDiv.id = id;
       tempDiv.textContent = mermaidCode;
       document.body.appendChild(tempDiv);
 
-      // Render the SVG
       await mermaid.run({ nodes: [tempDiv] });
       const svgElement = tempDiv.querySelector('svg');
       if (!svgElement) {
@@ -114,44 +113,34 @@ export async function renderMermaidBlocks(container: HTMLElement) {
         throw new Error('No SVG generated');
       }
 
-      // Clone the SVG to keep it
       const svgClone = svgElement.cloneNode(true) as SVGElement;
-
-      // Cleanup temp element
       document.body.removeChild(tempDiv);
 
-      // Create a wrapper for the diagram + toolbar
       const diagramWrapper = document.createElement('div');
       diagramWrapper.className = 'mermaid-diagram-wrapper';
       diagramWrapper.style.position = 'relative';
       diagramWrapper.appendChild(svgClone);
 
-      // Toolbar with download button
       const toolbar = document.createElement('div');
       toolbar.className = 'mermaid-toolbar';
       toolbar.style.cssText = 'display:flex; justify-content:flex-end; padding:4px 0;';
       const downloadBtn = document.createElement('button');
       downloadBtn.textContent = 'Save as PNG';
-      downloadBtn.className = 'copy-btn'; // reuse your existing button style
+      downloadBtn.className = 'copy-btn';
       downloadBtn.addEventListener('click', () => {
         downloadMermaidAsPNG(svgClone);
       });
       toolbar.appendChild(downloadBtn);
       diagramWrapper.appendChild(toolbar);
 
-      // Replace the original <pre> block
       pre.replaceWith(diagramWrapper);
 
     } catch (err) {
       console.warn('Mermaid render failed:', err);
-      // Keep the original code block as fallback
     }
   }
 }
 
-/**
- * Convert an SVG element to a PNG and trigger download.
- */
 function downloadMermaidAsPNG(svgElement: SVGElement) {
   try {
     const svgData = new XMLSerializer().serializeToString(svgElement);
@@ -160,7 +149,7 @@ function downloadMermaidAsPNG(svgElement: SVGElement) {
 
     const img = new Image();
     img.onload = () => {
-      const scale = 2; // 2x for high DPI
+      const scale = 2;
       const svgRect = svgElement.getBoundingClientRect();
       const width = svgRect.width || 600;
       const height = svgRect.height || 400;
@@ -187,9 +176,7 @@ function downloadMermaidAsPNG(svgElement: SVGElement) {
 
       URL.revokeObjectURL(url);
     };
-    img.onerror = () => {
-      console.error('Failed to load SVG into image');
-    };
+    img.onerror = () => console.error('Failed to load SVG into image');
     img.src = url;
   } catch (err) {
     console.error('PNG download failed:', err);
