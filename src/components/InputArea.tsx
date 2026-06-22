@@ -1,4 +1,4 @@
-// InputArea.tsx — v2.11 — Placeholder pulled to top, extra gap above icons
+// InputArea.tsx — v2.13 — Placeholder at top, icons at bottom, taller input box
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -144,13 +144,14 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           border: '1px solid var(--border)',
           borderRadius: '20px',
           boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-          padding: '4px 14px 10px',   // top: 4px — placeholder hugs the top edge
+          padding: '14px 16px 12px',
+          minHeight: '90px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',                // increased gap: clear separation between text and icons
+          justifyContent: 'space-between',
         }}>
 
-          {/* Textarea */}
+          {/* Textarea — sits at the top */}
           <textarea
             ref={textareaRef}
             value={value}
@@ -173,15 +174,15 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
               overflowY: 'auto',
               fontFamily: 'inherit',
               padding: 0,
+              flexShrink: 0,
             }}
           />
 
-          {/* ── Toolbar row ── */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* ── Toolbar row (pinned to bottom) ── */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, marginTop: 'auto' }}>
 
-            {/* Left: web search only */}
+            {/* Left: web search pill */}
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              {/* Web search pill */}
               <button
                 onClick={() => { haptic.light(); setWebSearch(w => !w); }}
                 disabled={busy}
@@ -232,7 +233,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
 
             {/* Right: attach + send/stop */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* + Attach file */}
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={busy || processing}
@@ -271,7 +271,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                 </svg>
               </button>
 
-              {/* Send / Stop */}
               {isStreaming ? (
                 <button
                   onClick={onStop}
