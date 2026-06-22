@@ -1,6 +1,4 @@
 // App.tsx
-// v2.6 — Dynamic Mermaid import for build compatibility (no server‑side import)
-// v2.5 — Added Mermaid initialization & theme sync for diagram rendering
 // v2.4 — Fixed regen doubling bug by using regenerate from useChat instead of handleSend
 import React, { useState, useCallback, useEffect } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -61,7 +59,7 @@ export default function App() {
   useAuth();
   useTheme();
 
-  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen, isDark } = useApp();
+  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen } = useApp();
   const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
   const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
@@ -69,17 +67,6 @@ export default function App() {
 
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
-
-  // ── Mermaid initialization (client‑only dynamic import) ─────
-  useEffect(() => {
-    import('mermaid').then(({ default: mermaid }) => {
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: isDark ? 'dark' : 'neutral',
-        securityLevel: 'loose',
-      });
-    });
-  }, [isDark]);
 
   const handleNewChat = useCallback(async () => {
     if (currentConvId) {
