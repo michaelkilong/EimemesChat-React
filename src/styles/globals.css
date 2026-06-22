@@ -1,4 +1,4 @@
-/* index.css — v2.2 — Brightened accent & hover for dark mode (white icons, clearer feedback) */
+/* index.css — v2.3 — Added font size CSS variable for message text */
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&display=swap');
 
 @tailwind base;
@@ -15,6 +15,11 @@
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
 }
+
+/* Font size options (set by AppContext on <html>) */
+html[data-font-size="small"]  { --msg-font-size: 14px; }
+html[data-font-size="medium"] { --msg-font-size: 16px; }
+html[data-font-size="large"]  { --msg-font-size: 18px; }
 
 /* ── Black & Grey Dark Theme ──────────────────────────────────── */
 html.dark {
@@ -180,6 +185,9 @@ a:hover { text-decoration: underline; }
 /* ═══════════════════════════════════════════
    MESSAGE BODY MARKDOWN
 ═══════════════════════════════════════════ */
+.msg-body {
+  font-size: var(--msg-font-size, 16px);
+}
 .msg-body h1, .msg-body h2, .msg-body h3, .msg-body h4 {
   font-family: 'Bricolage Grotesque', sans-serif;
   font-weight: 600; margin: 18px 0 8px; color: var(--text-1);
