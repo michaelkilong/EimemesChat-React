@@ -1,4 +1,8 @@
-// lib/markdown.ts — v1.4 — Use mermaid.render for reliable SVG generation
+// lib/markdown.ts — v1.5 — Sanitize Mermaid input before rendering (fixes AI formatting quirks)
+// v1.4 — Use mermaid.render for reliable SVG generation
+// v1.3 — Improved Mermaid rendering (off‑screen temp, wrapper replacement)
+// v1.2 — Client‑only dynamic Mermaid import for build compatibility
+// v1.1 — Added Mermaid diagram rendering + "Save as PNG" button
 import { marked } from 'marked';
 import katex from 'katex';
 import hljs from 'highlight.js';
@@ -92,26 +96,39 @@ export async function renderMermaidBlocks(container: HTMLElement) {
 
   for (const code of mermaidBlocks) {
     try {
-      const mermaid = (await import('mermaid')).default;
-      const mermaidCode = code.textContent || '';
+      const mermaidModule = await import('mermaid');
+      const mermaid = mermaidModule.default;
+
+      let rawCode = code.textContent || '';
+
+      // ── Sanitize common Mermaid syntax errors from the AI ─────
+      rawCode = rawCode
+        // Fix trailing ">" after pipe labels: |text|> → |text|
+        .replace(/\|([^|]+)\|>/g, '|$1|')
+        // Remove leading whitespace on each line (common in chat output)
+        .split('\n')
+        .map(line => line.trimStart())
+        .join('\n');
+
       const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
 
       // Primary method: mermaid.render returns SVG string directly
       let svgString: string;
       try {
-        const { svg } = await mermaid.render(id, mermaidCode);
+        const { svg } = await mermaid.render(id, rawCode);
         svgString = svg;
-      } catch {
-        // Fallback: try run method on a temp element
+      } catch (renderErr) {
+        console.warn('[Mermaid] Primary render failed, trying fallback:', renderErr);
+        // Fallback: try mermaid.run on a temp element
         const tempDiv = document.createElement('div');
         tempDiv.id = id;
-        tempDiv.textContent = mermaidCode;
+        tempDiv.textContent = rawCode;
         tempDiv.style.position = 'absolute';
         tempDiv.style.left = '-9999px';
         document.body.appendChild(tempDiv);
         await mermaid.run({ nodes: [tempDiv] });
         const svgEl = tempDiv.querySelector('svg');
-        if (!svgEl) throw new Error('No SVG');
+        if (!svgEl) throw new Error('No SVG from fallback');
         svgString = svgEl.outerHTML;
         document.body.removeChild(tempDiv);
       }
@@ -140,7 +157,7 @@ export async function renderMermaidBlocks(container: HTMLElement) {
       toolbar.appendChild(downloadBtn);
       diagramWrapper.appendChild(toolbar);
 
-      // Replace the whole .code-block wrapper if it exists, otherwise just the <pre>
+      // Replace the code-block wrapper (or the <pre> as fallback)
       const wrapper = code.closest('.code-block') || code.parentElement!;
       if (wrapper && wrapper.parentNode) {
         wrapper.parentNode.replaceChild(diagramWrapper, wrapper);
@@ -148,8 +165,10 @@ export async function renderMermaidBlocks(container: HTMLElement) {
         code.parentElement?.replaceWith(diagramWrapper);
       }
 
+      console.log(`[Mermaid] Rendered diagram "${id}"`);
+
     } catch (err) {
-      console.warn('Mermaid render failed:', err);
+      console.error('[Mermaid] Render failed:', err);
       // Keep the original code block as fallback
     }
   }
