@@ -1,4 +1,4 @@
-// MessageBubble.tsx — v1.5 — Clean TTS with emoji stripping & natural voice selection
+// MessageBubble.tsx — v1.5 — Original structure, emoji filter, better voice selection
 import React, { useEffect, useRef, useState } from 'react';
 import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
@@ -39,7 +39,7 @@ function ActionBtn({ title, onClick, active, activeColor, children }: {
   );
 }
 
-/** Clean text for speech: removes markdown, emojis, symbols */
+/** Removes markdown and emojis so speech sounds natural */
 function stripForSpeech(text: string): string {
   return text
     .replace(/```[\s\S]*?```/g, '')
@@ -53,7 +53,6 @@ function stripForSpeech(text: string): string {
     .replace(/^\d+\.\s+/gm, '')
     .replace(/^>\s+/gm, '')
     .replace(/^[-*_]{3,}$/gm, '')
-    // Remove emojis and decorative Unicode
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2300}-\u{23FF}\u{2B50}\u{2B55}\u{231A}\u{231B}\u{2328}\u{23CF}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{2934}\u{2935}\u{25AA}\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}\u{200D}\u{20E3}]/gu, '')
     .replace(/[*_~]/g, '')
     .replace(/[<>{}[\]|\\^`]/g, '')
@@ -65,7 +64,8 @@ function stripForSpeech(text: string): string {
 
 export default function MessageBubble({ message, isLast, lastUserMsg, convId, onRegen }: Props) {
   const { showToast } = useApp();
-  const bodyRef = useRef<HTMLDivElement>(null);
+  const bodyRef    = useRef<HTMLDivElement>(null);
+  const uttRef     = useRef<SpeechSynthesisUtterance | null>(null);
   const [thumbUp,   setThumbUp]   = useState(false);
   const [thumbDown, setThumbDown] = useState(false);
   const [copied,    setCopied]    = useState(false);
@@ -81,10 +81,10 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
     }
   }, [message.content, message.role, showToast, msgKey]);
 
-  // Cancel speech when component unmounts
+  // Cancel speech when component unmounts (original behaviour)
   useEffect(() => {
     return () => {
-      window.speechSynthesis.cancel();
+      if (uttRef.current) window.speechSynthesis.cancel();
     };
   }, []);
 
@@ -99,42 +99,32 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
 
     haptic.light();
     const clean = stripForSpeech(message.content);
-    if (!clean.trim()) { showToast('Nothing to read'); return; }
+    const utt   = new SpeechSynthesisUtterance(clean);
+    utt.rate    = 0.95;   // slightly slower, more natural
+    utt.pitch   = 1;
+    utt.volume  = 1;
 
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.rate  = 0.95;
-    utt.pitch = 1;
-    utt.volume = 1;
-
-    const setVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      const preferred = voices.find(v =>
-        v.lang.startsWith('en') && (
-          v.name.includes('Daniel') || v.name.includes('Samantha') ||
-          v.name.includes('Karen') || v.name.includes('Google US') ||
-          v.name.includes('Google UK') || v.name.includes('Natural') ||
-          v.name.includes('Premium')
-        )
-      ) || voices.find(v => v.lang.startsWith('en-US'))
-        || voices.find(v => v.lang.startsWith('en-GB'))
-        || voices.find(v => v.lang.startsWith('en'));
-
-      if (preferred) utt.voice = preferred;
-      window.speechSynthesis.speak(utt);
-    };
-
+    // Pick the best available natural voice (synchronous – original logic)
     const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      setVoice();
-    } else {
-      window.speechSynthesis.onvoiceschanged = () => {
-        setVoice();
-        window.speechSynthesis.onvoiceschanged = null;
-      };
-    }
+    const preferred = voices.find(v =>
+      v.lang.startsWith('en') && (
+        v.name.includes('Daniel') ||
+        v.name.includes('Samantha') ||
+        v.name.includes('Karen') ||
+        v.name.includes('Google US') ||
+        v.name.includes('Google UK') ||
+        v.name.includes('Natural') ||
+        v.name.includes('Premium')
+      )
+    ) || voices.find(v => v.lang.startsWith('en'));
+    if (preferred) utt.voice = preferred;
 
     utt.onend   = () => setSpeaking(false);
-    utt.onerror = () => { setSpeaking(false); showToast('Playback failed'); };
+    utt.onerror = () => setSpeaking(false);
+
+    uttRef.current = utt;
+    window.speechSynthesis.speak(utt);
+    setSpeaking(true);
   };
 
   const handleCopy = () => {
@@ -239,7 +229,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
 
         {message.sources?.length ? <SourcesList sources={message.sources} msgKey={msgKey} /> : null}
 
-        {/* Action bar */}
+        {/* Action bar — all actions except regenerate always visible */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0px', marginTop: '6px' }}>
 
           {/* Copy */}
