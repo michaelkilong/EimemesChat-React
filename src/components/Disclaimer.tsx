@@ -11,13 +11,16 @@ const MESSAGES = {
 
 export default function Disclaimer({ type }: Props) {
   if (!type) return null;
+
   return (
-    <p style={{
-      fontSize: '12px',
-      color: type === 'critical' ? '#f59e0b' : 'rgba(255,255,255,0.6)',
-      margin: '8px 0 0',
-      lineHeight: 1.5,
-    }}>
+    <p
+      style={{
+        fontSize: '12px',
+        color: type === 'critical' ? '#f59e0b' : 'var(--text-3)',
+        margin: '8px 0 0',
+        lineHeight: 1.5,
+      }}
+    >
       {MESSAGES[type]}
     </p>
   );
