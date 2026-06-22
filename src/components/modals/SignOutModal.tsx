@@ -33,7 +33,10 @@ export default function SignOutModal({ visible, onClose }: Props) {
   });
 
   return (
-    <div className={`modal-overlay ${visible ? 'show' : ''}`}>
+    <div
+      className={`modal-overlay ${visible ? 'show' : ''}`}
+      onClick={(e) => e.stopPropagation()}
+    >
       <div className="modal-card">
         <div style={{
           width: '52px', height: '52px', borderRadius: '16px',
@@ -57,7 +60,14 @@ export default function SignOutModal({ visible, onClose }: Props) {
         <button style={btnStyle(true)} disabled={loading} onClick={handleSignOut}>
           {loading ? 'Signing out…' : 'Yes, sign out'}
         </button>
-        <button style={btnStyle(false)} onClick={onClose}>Cancel</button>
+        <button
+          style={btnStyle(false)}
+          onClick={onClose}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-2)'; e.currentTarget.style.color = 'var(--text-1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-3)'; e.currentTarget.style.color = 'var(--text-2)'; }}
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
