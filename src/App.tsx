@@ -1,163 +1,283 @@
 // App.tsx
 // v2.4 — Fixed regen doubling bug by using regenerate from useChat instead of handleSend
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import type { User } from 'firebase/auth';
-import type { View } from '../types';
+import React, { useState, useCallback, useEffect } from 'react';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from './firebase';
+import { useApp } from './context/AppContext';
+import { useAuth } from './hooks/useAuth';
+import { useTheme } from './hooks/useTheme';
+import { useConversations } from './hooks/useConversations';
+import { useMessages } from './hooks/useMessages';
+import { useChat } from './hooks/useChat';
 
-interface AppContextType {
-  currentUser: User | null;
-  setCurrentUser: (u: User | null) => void;
-  authReady: boolean;
-  setAuthReady: (r: boolean) => void;
-  view: View;
-  setView: (v: View) => void;
-  showToast: (msg: string, dur?: number) => void;
-  showConfirm: (msg: string, yesLabel?: string, title?: string) => Promise<boolean>;
-  sidebarOpen: boolean;
-  setSidebarOpen: (o: boolean) => void;
-  isDark: boolean;
-  setIsDark: (d: boolean) => void;
-  fontSize: 'small' | 'medium' | 'large';
-  setFontSize: (s: 'small' | 'medium' | 'large') => void;
+import LoadingScreen         from './components/LoadingScreen';
+import Sidebar               from './components/Sidebar';
+import MessageList           from './components/MessageList';
+import InputArea             from './components/InputArea';
+import SettingsView          from './components/SettingsView';
+import ProfileView           from './components/ProfileView';
+import PersonalizationView   from './components/PersonalizationView';
+import AboutView             from './components/AboutView';
+import LicensesView          from './components/LicensesView';
+import LoginModal            from './components/modals/LoginModal';
+import type { Attachment }   from './types';
+
+const DAILY_LIMIT = 150;
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+// Circular icon button
+function CircleBtn({ onClick, children, className }: { onClick: () => void; children: React.ReactNode; className?: string }) {
+  const [pressed, setPressed] = useState(false);
+  return (
+    <button
+      className={className}
+      onClick={onClick}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      onMouseLeave={() => setPressed(false)}
+      onTouchStart={() => setPressed(true)}
+      onTouchEnd={() => setPressed(false)}
+      style={{
+        width: '40px', height: '40px', borderRadius: '50%',
+        background: pressed ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.22)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.35)',
+        cursor: 'pointer', flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'var(--text-1)',
+        transition: 'background 0.12s',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {children}
+    </button>
+  );
 }
 
-const AppContext = createContext<AppContextType>(null!);
-export const useApp = () => useContext(AppContext);
+export default function App() {
+  useAuth();
+  useTheme();
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [authReady,   setAuthReady]   = useState(false);
-  const [view,        setView_]       = useState<View>('chat');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDark,      setIsDark]      = useState(true);
-  const [fontSize,     setFontSizeState] = useState<'small' | 'medium' | 'large'>(
-    (localStorage.getItem('ec_font_size') as 'small' | 'medium' | 'large') || 'medium'
+  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen } = useApp();
+  const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
+  const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
+  const [dailyLimitReached, setDailyLimitReached] = useState(false);
+  const [dailyCount,        setDailyCount]        = useState(0);
+
+  const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
+  const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
+
+  const handleNewChat = useCallback(async () => {
+    if (currentConvId) {
+      const currentConv = conversations.find(c => c.id === currentConvId);
+      if (!currentConv?.messages?.length) {
+        setView('chat');
+        return;
+      }
+    }
+    const id = await createNewChat();
+    if (id) { setCurrentConvId(id); setView('chat'); }
+  }, [createNewChat, setView, currentConvId, conversations]);
+
+  const {
+    isSending, isStreaming, isTyping, isSearching,
+    streamText, streamDone, streamModel, streamDisclaimer, streamSources,
+    streamThinking, isThinking,
+    sendMessage, stopStreaming, regenerate,
+  } = useChat(
+    currentConvId, setCurrentConvId,
+    conversations, createNewChat,
+    setConvTitle, isStreamingRef, setMessages,
   );
 
-  // Persist fontSize + sync to DOM attribute
-  const setFontSize = useCallback((s: 'small' | 'medium' | 'large') => {
-    setFontSizeState(s);
-    localStorage.setItem('ec_font_size', s);
-    document.documentElement.setAttribute('data-font-size', s);
-  }, []);
-
-  // Set initial attribute
   useEffect(() => {
-    document.documentElement.setAttribute('data-font-size', fontSize);
-  }, [fontSize]);
+    if (!currentUser) return;
+    const ref = doc(db, 'users', currentUser.uid);
+    getDoc(ref).then(snap => {
+      if (!snap.exists()) return;
+      const data = snap.data() as { dailyCount?: number; lastDate?: string };
+      const count = data.lastDate === todayStr() ? (data.dailyCount || 0) : 0;
+      setDailyCount(count);
+      if (count >= DAILY_LIMIT) setDailyLimitReached(true);
+    }).catch(() => {});
+  }, [currentUser]);
 
-  // Wrap setView to push browser history entries
-  const setView = useCallback((v: View) => {
-    setView_(v);
-    if (v === 'chat') {
-      history.replaceState({ view: 'chat' }, '', '/');
-    } else {
-      history.pushState({ view: v }, '', '/');
-    }
-  }, []);
+  const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean, useThinking?: boolean) => {
+    sendMessage(text, () => {
+      setChipsUsed(true);
+      localStorage.setItem('ec_chips_used', 'true');
+    }, attachment, useWebSearch, undefined, useThinking);
+  }, [sendMessage]);
 
-  // Listen to browser back/forward button
+  const handleRegen = useCallback(async (originalMsg: string) => {
+    if (!currentConvId || isSending || isStreaming) return;
+    const convRef = getConvRef(currentConvId);
+    if (!convRef) return;
+    const snap = await getDoc(convRef);
+    if (!snap.exists()) return;
+    const msgs    = snap.data().messages || [];
+    const trimmed = [...msgs];
+    while (trimmed.length && trimmed[trimmed.length - 1].role === 'assistant') trimmed.pop();
+    await updateDoc(convRef, { messages: trimmed, updatedAt: new Date() });
+    // Use regenerate to avoid duplicating the user message
+    regenerate(originalMsg);
+  }, [currentConvId, isSending, isStreaming, getConvRef, regenerate]);
+
+  const handleDeleteConv = useCallback(async (id: string) => {
+    await deleteConv(id);
+    if (currentConvId === id) setCurrentConvId(null);
+  }, [deleteConv, currentConvId]);
+
+  const handleClearChats = useCallback(async () => {
+    await clearAllChats();
+    setCurrentConvId(null);
+  }, [clearAllChats]);
+
+  // Keyboard shortcuts
   useEffect(() => {
-    history.replaceState({ view: 'chat' }, '', '/');
-
-    const handlePop = (e: PopStateEvent) => {
-      const v = (e.state?.view as View) || 'chat';
-      setView_(v);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key === 'n') { e.preventDefault(); handleNewChat(); }
+      if (mod && e.key === 'k') { e.preventDefault(); setSidebarOpen(true); window.dispatchEvent(new CustomEvent('focus-search')); }
+      if (e.key === 'Escape' && sidebarOpen) { setSidebarOpen(false); }
     };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleNewChat, sidebarOpen, setSidebarOpen]);
 
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
-  }, []);
+  const topbarTitle = currentConvId
+    ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
+    : '';
 
-  // Toast
-  const [toastMsg,     setToastMsg]     = useState('');
-  const [toastVisible, setToastVisible] = useState(false);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showToast = useCallback((msg: string, dur = 3500) => {
-    setToastMsg(msg);
-    setToastVisible(true);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToastVisible(false), dur);
-  }, []);
-
-  // Confirm dialog
-  const [confirmState, setConfirmState] = useState<{
-    open: boolean;
-    title: string;
-    msg: string;
-    yesLabel: string;
-  }>({ open: false, title: '', msg: '', yesLabel: 'Delete' });
-  const confirmResolve = useRef<((v: boolean) => void) | null>(null);
-
-  const showConfirm = useCallback((msg: string, yesLabel = 'Delete', title = 'Are you sure?') => {
-    return new Promise<boolean>(resolve => {
-      confirmResolve.current = resolve;
-      setConfirmState({ open: true, title, msg, yesLabel });
-    });
-  }, []);
-
-  const handleConfirmYes = useCallback(() => {
-    setConfirmState(s => ({ ...s, open: false }));
-    confirmResolve.current?.(true);
-    confirmResolve.current = null;
-  }, []);
-
-  const handleConfirmNo = useCallback(() => {
-    setConfirmState(s => ({ ...s, open: false }));
-    confirmResolve.current?.(false);
-    confirmResolve.current = null;
-  }, []);
+  if (!authReady) return <LoadingScreen visible />;
 
   return (
-    <AppContext.Provider value={{
-      currentUser, setCurrentUser,
-      authReady, setAuthReady,
-      view, setView,
-      showToast,
-      showConfirm,
-      sidebarOpen, setSidebarOpen,
-      isDark, setIsDark,
-      fontSize, setFontSize,
-    }}>
-      {children}
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
+      <LoadingScreen visible={false} />
 
-      {/* Toast */}
-      <div className={`toast ${toastVisible ? 'show' : ''}`}>{toastMsg}</div>
+      <Sidebar
+        conversations={conversations}
+        currentConvId={currentConvId}
+        onNewChat={handleNewChat}
+        onSelectConv={id => { setCurrentConvId(id); setView('chat'); }}
+        onOpenSettings={() => { setView('settings'); setSidebarOpen(false); }}
+        onDeleteConv={handleDeleteConv}
+        dailyCount={dailyCount}
+        dailyLimit={DAILY_LIMIT}
+      />
 
-      {/* Confirm Dialog – only closes via Cancel/action button */}
-      <div className={`confirm-overlay ${confirmState.open ? 'show' : ''}`}>
-        <div className="confirm-card">
-          <div style={{ padding: '24px 22px 18px', textAlign: 'center' }}>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}>
-              {confirmState.title}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* ── CHAT VIEW ── */}
+        {view === 'chat' && (
+          <>
+            {/* Topbar */}
+            <header style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between',
+              height: 'calc(60px + var(--sat))',
+              padding: 'calc(var(--sat) + 10px) 16px 10px',
+              background: `linear-gradient(to bottom, var(--fade-top) 0%, var(--fade-top) 55%, transparent 100%)`,
+              position: 'relative', zIndex: 10,
+            }}>
+              <CircleBtn onClick={() => setSidebarOpen(true)} className="menu-btn-mobile">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6"/>
+                  <line x1="3" y1="12" x2="21" y2="12"/>
+                  <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </CircleBtn>
+
+              <span style={{
+                position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+                fontSize: '16px', fontWeight: 600, color: 'var(--text-1)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                maxWidth: 'calc(100% - 120px)',
+              }}>
+                {topbarTitle}
+              </span>
+
+              <CircleBtn onClick={handleNewChat} className="topbar-newchat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </CircleBtn>
+            </header>
+
+            {/* MessageList fills remaining space; InputArea floats over it */}
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <MessageList
+                messages={messages}
+                isTyping={isTyping}
+                isSearching={isSearching}
+                isStreaming={isStreaming}
+                streamText={streamText}
+                streamDone={streamDone}
+                streamModel={streamModel}
+                streamDisclaimer={streamDisclaimer}
+                streamSources={streamSources}
+                streamThinking={streamThinking}
+                isThinking={isThinking}
+                convId={currentConvId}
+                chipsUsed={chipsUsed}
+                onChipClick={handleSend}
+                onRegen={handleRegen}
+              />
+              {/* InputArea positioned absolutely so messages scroll underneath it */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5 }}>
+                <InputArea
+                  onSend={handleSend}
+                  onStop={stopStreaming}
+                  isSending={isSending}
+                  isStreaming={isStreaming}
+                  dailyLimitReached={dailyLimitReached}
+                />
+              </div>
             </div>
-            <div style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.5 }}>
-              {confirmState.msg}
-            </div>
-          </div>
-          <div style={{ height: '1px', background: 'var(--border-b)' }} />
-          <div style={{ display: 'flex' }}>
-            <button
-              onClick={handleConfirmNo}
-              onMouseEnter={e => { const b = e.currentTarget; b.style.background = 'var(--glass-3)'; b.style.color = 'var(--text-1)'; }}
-              onMouseLeave={e => { const b = e.currentTarget; b.style.background = 'none'; b.style.color = 'var(--text-2)'; }}
-              style={{ flex: 1, padding: '15px 0', fontSize: '15px', fontWeight: 500, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.12s, color 0.12s' }}
-            >
-              Cancel
-            </button>
-            <div style={{ width: '1px', background: 'var(--border-b)', flexShrink: 0 }} />
-            <button
-              onClick={handleConfirmYes}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,107,107,0.12)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
-              style={{ flex: 1, padding: '15px 0', fontSize: '15px', fontWeight: 700, color: '#ff6b6b', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.12s' }}
-            >
-              {confirmState.yesLabel}
-            </button>
-          </div>
-        </div>
+          </>
+        )}
+
+        {view === 'settings' && (
+          <SettingsView
+            onBack={() => setView('chat')}
+            onOpenProfile={() => setView('profile')}
+            onOpenPersonalization={() => setView('personalization')}
+            onOpenAbout={() => setView('about')}
+            onClearChats={handleClearChats}
+            conversations={conversations}
+          />
+        )}
+
+        {view === 'profile' && (
+          <ProfileView
+            onBack={() => setView('settings')}
+            getUserConvsRef={getUserConvsRef}
+          />
+        )}
+
+        {view === 'personalization' && (
+          <PersonalizationView
+            onBack={() => setView('settings')}
+          />
+        )}
+
+        {view === 'about' && (
+          <AboutView
+            onBack={() => setView('settings')}
+            onOpenLicenses={() => setView('licenses')}
+          />
+        )}
+
+        {view === 'licenses' && (
+          <LicensesView
+            onBack={() => setView('about')}
+          />
+        )}
       </div>
-    </AppContext.Provider>
+
+      <LoginModal visible={!currentUser} />
+    </div>
   );
 }
