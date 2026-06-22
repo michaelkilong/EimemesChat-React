@@ -1,4 +1,4 @@
-// components/modals/LoginModal.tsx — v1.1 (hover + per‑button loading)
+// components/modals/LoginModal.tsx — v1.2 (blue checkbox + legal links)
 import React, { useState } from 'react';
 import {
   signInWithPopup,
@@ -133,6 +133,8 @@ export default function LoginModal({ visible }: Props) {
     </svg>
   );
 
+  const linkBlue = '#0a84ff';
+
   return (
     <div className={`login-overlay ${visible ? 'show' : ''}`}>
       <div className="login-card">
@@ -203,19 +205,19 @@ export default function LoginModal({ visible }: Props) {
           <input
             type="checkbox" checked={agreed}
             onChange={e => { setAgreed(e.target.checked); setError(''); }}
-            style={{ marginTop: '3px', accentColor: 'var(--accent)', flexShrink: 0 }}
+            style={{ marginTop: '3px', accentColor: linkBlue, flexShrink: 0 }}
           />
           <label style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.4 }}>
             I agree to the{' '}
-            <a href="https://app-eimemeschat.vercel.app/terms.html" target="_blank" rel="noreferrer">Terms</a>
+            <a href="https://app-eimemeschat.vercel.app/terms.html" target="_blank" rel="noreferrer" style={{ color: linkBlue, textDecoration: 'none' }}>Terms</a>
             {' '}and{' '}
-            <a href="https://app-eimemeschat.vercel.app/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>
+            <a href="https://app-eimemeschat.vercel.app/privacy.html" target="_blank" rel="noreferrer" style={{ color: linkBlue, textDecoration: 'none' }}>Privacy Policy</a>
           </label>
         </div>
 
         <span
           onClick={() => { if (!anyLoading) { setIsSignUp(!isSignUp); setError(''); } }}
-          style={{ display: 'inline-block', color: 'var(--accent)', cursor: anyLoading ? 'default' : 'pointer', marginTop: '12px', fontSize: '14px', fontWeight: 500, opacity: anyLoading ? 0.5 : 1 }}
+          style={{ display: 'inline-block', color: linkBlue, cursor: anyLoading ? 'default' : 'pointer', marginTop: '12px', fontSize: '14px', fontWeight: 500, opacity: anyLoading ? 0.5 : 1 }}
         >
           {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
         </span>
@@ -223,7 +225,6 @@ export default function LoginModal({ visible }: Props) {
         {error && <div style={{ color: '#ff6b6b', fontSize: '13.5px', marginTop: '10px', minHeight: '20px' }}>{error}</div>}
       </div>
 
-      {/* keyframes for spinner */}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
