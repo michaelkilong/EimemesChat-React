@@ -1,10 +1,12 @@
 // api/chat.js
+// v5.8 — Fixed disclaimer rendering: now sends 'critical' or 'web' string to frontend
 // v5.7 — Always strip last user message from history to prevent double input
 // v5.6 — Behavioral prompt now contains full personality & formatting rules;
 //        fingerprint prompt built from same content for leak protection.
 // v5.5 — Regeneration fix: strip last user message from history to avoid doubling
 // v5.4 — Native Gemini REST API with proper thinkingConfig; Groq fallback stays OpenAI format
 // Changelog:
+//   v5.8 — Fixed disclaimer: sends 'critical' or 'web' string instead of boolean true
 //   v5.7 — Always remove trailing user message from history (current message sent separately)
 //   v5.6 — Moved complete instructions into BEHAVIORAL_PROMPT; fingerprint covers everything
 //   v5.5 — When isRegeneration is true, remove trailing user message from history so AI sees fresh request
@@ -705,12 +707,15 @@ export default async function handler(req, res) {
 
   if (result.leaked) return;
 
+  // Determine the correct disclaimer type
+  const finalDisclaimer = needsDisclaimer ? 'critical' : (shouldSearch ? 'web' : false);
+
   sseEvent(res, {
     done: true,
     model: result.model,
     reply: result.fullText,
     ...(result.thinkingText && { thinkingDone: true }),
-    ...((needsDisclaimer || shouldSearch) && { disclaimer: true }),
+    ...(finalDisclaimer && { disclaimer: finalDisclaimer }),
     ...(searchResults?.length && { sources: searchResults }),
   });
 
