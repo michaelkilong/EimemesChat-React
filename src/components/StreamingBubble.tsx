@@ -1,6 +1,6 @@
-// StreamingBubble.tsx — v1.2 — DeepSeek-style "Thinking >" with animated dots and expand/collapse
+// StreamingBubble.tsx — v1.3 — Added Mermaid diagram rendering when stream completes
 import React, { useEffect, useRef, useState } from 'react';
-import { renderMarkdown, highlightCodeBlocks, escHtml } from '../lib/markdown';
+import { renderMarkdown, highlightCodeBlocks, renderMermaidBlocks, escHtml } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
 import Disclaimer from './Disclaimer';
 import SourcesList from './SourcesList';
@@ -37,6 +37,8 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
     if (done) {
       bodyRef.current.innerHTML = renderMarkdown(text, '__streaming');
       highlightCodeBlocks(bodyRef.current, showToast);
+      // Render Mermaid diagrams after stream finishes (async, non‑blocking)
+      renderMermaidBlocks(bodyRef.current);
     } else if (text) {
       bodyRef.current.innerHTML = escHtml(text).replace(/\n/g, '<br>') + '<span class="stream-cursor"></span>';
     }
@@ -137,4 +139,3 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
     </div>
   );
 }
-  
