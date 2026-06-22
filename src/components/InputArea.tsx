@@ -1,4 +1,4 @@
-// InputArea.tsx — v2.5 — Web search pill with icon + text, bold icons
+// InputArea.tsx — v2.7 — Attach moved to right, blue hover on toolbar buttons
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -179,45 +179,9 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           {/* ── Toolbar row ── */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
 
-            {/* Left: attach + web search */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
-              {/* + Attach file */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={busy || processing}
-                title="Attach file"
-                style={{
-                  width: '34px', height: '34px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '50%',
-                  background: attachment ? 'var(--accent-dim)' : 'var(--glass-3)',
-                  border: attachment ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  color: attachment ? 'var(--accent)' : 'var(--text-2)',
-                  cursor: (busy || processing) ? 'default' : 'pointer',
-                  opacity: (busy || processing) ? 0.4 : 1,
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => {
-                  if (!busy && !processing) {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.background = attachment ? 'var(--accent-dim)' : 'var(--glass-2)';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!busy && !processing) {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.background = attachment ? 'var(--accent-dim)' : 'var(--glass-3)';
-                  }
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"/>
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-              </button>
-
-              {/* Web search pill – icon + text */}
+            {/* Left: web search only */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {/* Web search pill */}
               <button
                 onClick={() => { haptic.light(); setWebSearch(w => !w); }}
                 disabled={busy}
@@ -225,14 +189,14 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  height: '34px',
-                  padding: '0 14px',
-                  borderRadius: '17px',
-                  background: webSearch ? 'var(--accent-dim)' : 'var(--glass-3)',
-                  border: webSearch ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  color: webSearch ? 'var(--accent)' : 'var(--text-2)',
-                  fontSize: '13px',
+                  gap: '5px',
+                  height: '30px',
+                  padding: '0 12px',
+                  borderRadius: '15px',
+                  background: webSearch ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)',
+                  border: webSearch ? '1px solid rgba(10,132,255,0.5)' : '1px solid var(--border)',
+                  color: webSearch ? '#0a84ff' : 'var(--text-2)',
+                  fontSize: '12.5px',
                   fontWeight: 500,
                   fontFamily: 'inherit',
                   cursor: busy ? 'default' : 'pointer',
@@ -243,17 +207,21 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                 onMouseEnter={e => {
                   if (!busy) {
                     const el = e.currentTarget as HTMLButtonElement;
-                    el.style.background = webSearch ? 'var(--accent-dim)' : 'var(--glass-2)';
+                    el.style.background = webSearch ? 'rgba(10,132,255,0.25)' : 'rgba(10,132,255,0.12)';
+                    el.style.borderColor = 'rgba(10,132,255,0.6)';
+                    el.style.color = '#0a84ff';
                   }
                 }}
                 onMouseLeave={e => {
                   if (!busy) {
                     const el = e.currentTarget as HTMLButtonElement;
-                    el.style.background = webSearch ? 'var(--accent-dim)' : 'var(--glass-3)';
+                    el.style.background = webSearch ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)';
+                    el.style.borderColor = webSearch ? 'rgba(10,132,255,0.5)' : 'var(--border)';
+                    el.style.color = webSearch ? '#0a84ff' : 'var(--text-2)';
                   }
                 }}
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/>
                   <line x1="2" y1="12" x2="22" y2="12"/>
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
@@ -262,46 +230,87 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
               </button>
             </div>
 
-            {/* Right: send / stop */}
-            {isStreaming ? (
+            {/* Right: attach + send/stop */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* + Attach file (now on the right) */}
               <button
-                onClick={onStop}
-                title="Stop generating"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy || processing}
+                title="Attach file"
                 style={{
-                  width: '34px', height: '34px', borderRadius: '50%',
-                  background: 'rgba(255,60,60,0.9)', border: 'none', color: 'white',
+                  width: '30px', height: '30px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', boxShadow: '0 2px 10px rgba(255,50,50,0.35)', flexShrink: 0,
+                  borderRadius: '50%',
+                  background: attachment ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)',
+                  border: attachment ? '1px solid rgba(10,132,255,0.5)' : '1px solid var(--border)',
+                  color: attachment ? '#0a84ff' : 'var(--text-2)',
+                  cursor: (busy || processing) ? 'default' : 'pointer',
+                  opacity: (busy || processing) ? 0.4 : 1,
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  if (!busy && !processing) {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.background = attachment ? 'rgba(10,132,255,0.25)' : 'rgba(10,132,255,0.12)';
+                    el.style.borderColor = 'rgba(10,132,255,0.6)';
+                    el.style.color = '#0a84ff';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!busy && !processing) {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.background = attachment ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)';
+                    el.style.borderColor = attachment ? 'rgba(10,132,255,0.5)' : 'var(--border)';
+                    el.style.color = attachment ? '#0a84ff' : 'var(--text-2)';
+                  }
                 }}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="4" y="4" width="16" height="16" rx="2.5"/>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               </button>
-            ) : (
-              <button
-                onClick={handleSend}
-                disabled={!canSend}
-                title="Send message"
-                style={{
-                  width: '34px', height: '34px', borderRadius: '50%',
-                  background: canSend ? 'var(--send-bg)' : 'var(--glass-3)',
-                  border: 'none',
-                  color: canSend ? 'var(--send-fg)' : 'var(--text-3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: canSend ? 'pointer' : 'default',
-                  boxShadow: canSend ? '0 2px 12px var(--accent-dim)' : 'none',
-                  flexShrink: 0,
-                  transition: 'background 0.15s, box-shadow 0.15s, color 0.15s',
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="19" x2="12" y2="5"/>
-                  <polyline points="5 12 12 5 19 12"/>
-                </svg>
-              </button>
-            )}
 
+              {/* Send / Stop */}
+              {isStreaming ? (
+                <button
+                  onClick={onStop}
+                  title="Stop generating"
+                  style={{
+                    width: '30px', height: '30px', borderRadius: '50%',
+                    background: 'rgba(255,60,60,0.9)', border: 'none', color: 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', boxShadow: '0 2px 10px rgba(255,50,50,0.35)', flexShrink: 0,
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="4" y="4" width="16" height="16" rx="2.5"/>
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  title="Send message"
+                  style={{
+                    width: '30px', height: '30px', borderRadius: '50%',
+                    background: canSend ? 'var(--send-bg)' : 'var(--glass-3)',
+                    border: 'none',
+                    color: canSend ? 'var(--send-fg)' : 'var(--text-3)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: canSend ? 'pointer' : 'default',
+                    boxShadow: canSend ? '0 2px 12px rgba(10,132,255,0.3)' : 'none',
+                    flexShrink: 0,
+                    transition: 'background 0.15s, box-shadow 0.15s, color 0.15s',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5"/>
+                    <polyline points="5 12 12 5 19 12"/>
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
