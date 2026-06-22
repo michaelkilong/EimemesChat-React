@@ -1,4 +1,4 @@
-// Sidebar.tsx — v2.3 — Increased mobile overlay blur for better sidebar distinction
+// Sidebar.tsx — v2.4 — Settings button now matches search bar style (solid grey)
 import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -281,11 +281,12 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
               width: '100%', padding: '11px 12px', borderRadius: '14px',
               color: 'var(--text-2)', fontSize: '14.5px',
               display: 'flex', alignItems: 'center', gap: '10px',
-              background: 'var(--glass-3)', border: '1px solid transparent',
+              background: 'var(--glass-2)',                      // same solid grey as search
+              border: '1px solid var(--border-b)',                // matching border
               cursor: 'pointer', transition: 'background 0.12s, border-color 0.12s, color 0.12s',
             }}
-            onMouseEnter={e => { const b = e.currentTarget; b.style.background = 'var(--glass-2)'; b.style.color = 'var(--text-1)'; b.style.borderColor = 'var(--border-b)'; }}
-            onMouseLeave={e => { const b = e.currentTarget; b.style.background = 'var(--glass-3)'; b.style.color = 'var(--text-2)'; b.style.borderColor = 'transparent'; }}
+            onMouseEnter={e => { const b = e.currentTarget; b.style.background = 'var(--glass-1)'; b.style.color = 'var(--text-1)'; b.style.borderColor = 'var(--border)'; }}
+            onMouseLeave={e => { const b = e.currentTarget; b.style.background = 'var(--glass-2)'; b.style.color = 'var(--text-2)'; b.style.borderColor = 'var(--border-b)'; }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
               <circle cx="12" cy="12" r="3"/>
