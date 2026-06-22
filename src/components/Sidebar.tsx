@@ -1,5 +1,5 @@
-// Sidebar.tsx — v1.1 — Removed duplicate New chat button; search bar uses grey background
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+// Sidebar.tsx — v2.0 — Time‑based conversation grouping (Today, Yesterday, Last 30 Days, Earlier)
+import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
 import type { Conversation } from '../types';
@@ -13,6 +13,32 @@ interface Props {
   onDeleteConv: (id: string) => void;
   dailyCount?: number;
   dailyLimit?: number;
+}
+
+// ── Time grouping helper ──────────────────────────────────────
+function getRelativeDateLabel(date: Date | { seconds: number; nanoseconds: number } | string | undefined): string {
+  if (!date) return 'Earlier';
+
+  let jsDate: Date;
+  if (date instanceof Date) {
+    jsDate = date;
+  } else if (typeof date === 'object' && 'seconds' in date) {
+    jsDate = new Date(date.seconds * 1000);
+  } else if (typeof date === 'string') {
+    jsDate = new Date(date);
+  } else {
+    return 'Earlier';
+  }
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+  const thirtyDaysAgo = new Date(todayStart.getTime() - 30 * 86400000);
+
+  if (jsDate >= todayStart) return 'Today';
+  if (jsDate >= yesterdayStart) return 'Yesterday';
+  if (jsDate >= thirtyDaysAgo) return 'Last 30 Days';
+  return 'Earlier';
 }
 
 export default function Sidebar({ conversations, currentConvId, onNewChat, onSelectConv, onOpenSettings, onDeleteConv, dailyCount = 0, dailyLimit = 150 }: Props) {
@@ -62,6 +88,46 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
     onSelectConv(convId);
     setSidebarOpen(false);
   }, [onSelectConv, setSidebarOpen]);
+
+  // ── Grouped conversations (only when not searching) ─────────
+  const groupedConversations = useMemo(() => {
+    const filtered = searchQuery
+      ? conversations.filter(c => (c.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      : conversations;
+
+    if (searchQuery) {
+      // Search mode: flat list
+      return { 'Results': filtered };
+    }
+
+    // Default: group by relative time
+    const groups: Record<string, Conversation[]> = {
+      'Today': [],
+      'Yesterday': [],
+      'Last 30 Days': [],
+      'Earlier': [],
+    };
+
+    const sorted = [...filtered].sort((a, b) => {
+      const aTime = (a.updatedAt as any)?.seconds || 0;
+      const bTime = (b.updatedAt as any)?.seconds || 0;
+      return bTime - aTime; // newest first
+    });
+
+    for (const conv of sorted) {
+      const label = getRelativeDateLabel(conv.updatedAt);
+      if (groups[label]) {
+        groups[label].push(conv);
+      } else {
+        groups['Earlier'].push(conv);
+      }
+    }
+
+    // Remove empty groups
+    return Object.fromEntries(
+      Object.entries(groups).filter(([_, convs]) => convs.length > 0)
+    );
+  }, [conversations, searchQuery]);
 
   return (
     <>
@@ -127,7 +193,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '8px 12px', borderRadius: '12px',
-            background: 'var(--glass-2)',          // solid grey, was var(--glass-3)
+            background: 'var(--glass-2)',
             border: '1px solid var(--border-b)',
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -162,42 +228,45 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
           Hold to delete a conversation
         </div>
 
-        {/* History */}
+        {/* History — grouped by time */}
         <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
-          <div style={{ fontSize: '10.5px', fontWeight: 600, letterSpacing: '0.7px', textTransform: 'uppercase', color: 'var(--text-3)', padding: '6px 10px 4px' }}>
-            {searchQuery ? 'Results' : 'Recents'}
-          </div>
-          {(() => {
-            const filtered = searchQuery
-              ? conversations.filter(c => (c.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
-              : conversations;
-            if (filtered.length === 0) return <div style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--text-3)' }}>{searchQuery ? 'No matches' : 'No conversations yet'}</div>;
-            return filtered.map(conv => (
-              <div
-                key={conv.id}
-                onClick={() => handleClick(conv.id)}
-                onMouseDown={() => startPress(conv.id, conv.title)}
-                onMouseUp={() => endPress(conv.id)}
-                onTouchStart={() => startPress(conv.id, conv.title)}
-                onTouchEnd={() => endPress(conv.id)}
-                onContextMenu={e => e.preventDefault()}
-                style={{
-                  padding: '9px 12px', borderRadius: '10px',
-                  color: conv.id === currentConvId ? 'var(--accent)' : 'var(--text-2)',
-                  background: conv.id === currentConvId ? 'var(--accent-dim)' : 'transparent',
-                  fontWeight: conv.id === currentConvId ? 500 : 400,
-                  fontSize: '14.5px', cursor: 'pointer',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  transition: 'background 0.12s, color 0.12s',
-                  userSelect: 'none', WebkitUserSelect: 'none',
-                }}
-                onMouseEnter={e => { if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-3)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-1)'; } }}
-                onMouseLeave={e => { endPress(conv.id); if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-2)'; } }}
-              >
-                {conv.title || 'New conversation'}
+          {Object.entries(groupedConversations).map(([section, convs]) => (
+            <div key={section} style={{ marginBottom: '4px' }}>
+              {/* Section title */}
+              <div style={{
+                fontSize: '10.5px', fontWeight: 600, letterSpacing: '0.7px',
+                textTransform: 'uppercase', color: 'var(--text-3)',
+                padding: '6px 10px 4px',
+              }}>
+                {section}
               </div>
-            ));
-          })()}
+              {convs.map(conv => (
+                <div
+                  key={conv.id}
+                  onClick={() => handleClick(conv.id)}
+                  onMouseDown={() => startPress(conv.id, conv.title)}
+                  onMouseUp={() => endPress(conv.id)}
+                  onTouchStart={() => startPress(conv.id, conv.title)}
+                  onTouchEnd={() => endPress(conv.id)}
+                  onContextMenu={e => e.preventDefault()}
+                  style={{
+                    padding: '9px 12px', borderRadius: '10px',
+                    color: conv.id === currentConvId ? 'var(--accent)' : 'var(--text-2)',
+                    background: conv.id === currentConvId ? 'var(--accent-dim)' : 'transparent',
+                    fontWeight: conv.id === currentConvId ? 500 : 400,
+                    fontSize: '14.5px', cursor: 'pointer',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    transition: 'background 0.12s, color 0.12s',
+                    userSelect: 'none', WebkitUserSelect: 'none',
+                  }}
+                  onMouseEnter={e => { if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-3)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-1)'; } }}
+                  onMouseLeave={e => { endPress(conv.id); if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-2)'; } }}
+                >
+                  {conv.title || 'New conversation'}
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
 
         {/* Footer — Usage + Settings */}
