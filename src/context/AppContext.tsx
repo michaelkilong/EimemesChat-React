@@ -15,6 +15,8 @@ interface AppContextType {
   setSidebarOpen: (o: boolean) => void;
   isDark: boolean;
   setIsDark: (d: boolean) => void;
+  fontSize: 'small' | 'medium' | 'large';
+  setFontSize: (s: 'small' | 'medium' | 'large') => void;
 }
 
 const AppContext = createContext<AppContextType>(null!);
@@ -26,6 +28,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [view,        setView_]       = useState<View>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark,      setIsDark]      = useState(true);
+  const [fontSize,     setFontSizeState] = useState<'small' | 'medium' | 'large'>(
+    (localStorage.getItem('ec_font_size') as 'small' | 'medium' | 'large') || 'medium'
+  );
+
+  // Persist fontSize + sync to DOM attribute
+  const setFontSize = useCallback((s: 'small' | 'medium' | 'large') => {
+    setFontSizeState(s);
+    localStorage.setItem('ec_font_size', s);
+    document.documentElement.setAttribute('data-font-size', s);
+  }, []);
+
+  // Set initial attribute
+  useEffect(() => {
+    document.documentElement.setAttribute('data-font-size', fontSize);
+  }, [fontSize]);
 
   // Wrap setView to push browser history entries
   const setView = useCallback((v: View) => {
@@ -99,6 +116,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       showConfirm,
       sidebarOpen, setSidebarOpen,
       isDark, setIsDark,
+      fontSize, setFontSize,
     }}>
       {children}
 
