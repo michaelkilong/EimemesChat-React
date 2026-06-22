@@ -1,4 +1,4 @@
-// StreamingBubble.tsx — v1.2 — DeepSeek-style "Thinking >" with animated dots and expand/collapse
+// StreamingBubble.tsx — v1.4 — Font size via CSS variable
 import React, { useEffect, useRef, useState } from 'react';
 import { renderMarkdown, highlightCodeBlocks, escHtml } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
@@ -13,8 +13,8 @@ interface Props {
   disclaimer: 'critical' | 'web' | false;
   time: string;
   sources?: Source[];
-  thinking: string;       // accumulated reasoning text
-  isThinking: boolean;    // true while reasoning tokens are arriving
+  thinking: string;
+  isThinking: boolean;
 }
 
 export default function StreamingBubble({ text, done, model, disclaimer, time, sources, thinking, isThinking }: Props) {
@@ -24,7 +24,6 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
   const thinkStartRef = useRef<number>(Date.now());
   const [thinkSeconds, setThinkSeconds] = useState(0);
 
-  // Track how long thinking took
   useEffect(() => {
     if (isThinking) thinkStartRef.current = Date.now();
     if (!isThinking && thinking) {
@@ -49,10 +48,8 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
     <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '8px 0' }}>
       <div style={{ width: '100%' }}>
 
-        {/* ── Thinking — DeepSeek style: "Thinking >" row, expand to see content ── */}
         {(showThinkingSkeleton || showThinkingPill) && (
           <div style={{ marginBottom: '10px' }}>
-            {/* Clickable header row */}
             <button
               onClick={() => showThinkingPill && setThinkExpanded(e => !e)}
               style={{
@@ -66,7 +63,6 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
                 {showThinkingSkeleton ? 'Thinking' : `Thought for ${thinkSeconds > 0 ? `${thinkSeconds}s` : 'a moment'}`}
               </span>
 
-              {/* Animated dots while thinking */}
               {showThinkingSkeleton && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px' }}>
                   {[0, 1, 2].map(i => (
@@ -80,7 +76,6 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
                 </span>
               )}
 
-              {/* Chevron when done */}
               {showThinkingPill && (
                 <svg
                   width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)"
@@ -92,10 +87,8 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
               )}
             </button>
 
-            {/* Divider line — like DeepSeek */}
             <div style={{ height: '1px', background: 'var(--border)', margin: '8px 0', opacity: 0.5 }} />
 
-            {/* Expanded thinking content — shown while thinking OR when expanded */}
             {(showThinkingSkeleton || thinkExpanded) && thinking && (
               <div style={{
                 fontSize: '13px', color: 'var(--text-3)',
@@ -111,12 +104,11 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
           </div>
         )}
 
-        {/* ── Reply body ── */}
         {(text || done) && (
           <div
             ref={bodyRef}
             className="msg-body"
-            style={{ color: 'var(--text-1)', fontSize: '16px', lineHeight: 1.75, padding: '2px 0' }}
+            style={{ color: 'var(--text-1)', fontSize: 'var(--msg-font-size)', lineHeight: 1.75, padding: '2px 0' }}
           />
         )}
 
@@ -137,4 +129,3 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
     </div>
   );
 }
-  
