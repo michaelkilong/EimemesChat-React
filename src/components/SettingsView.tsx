@@ -1,4 +1,4 @@
-// SettingsView.tsx — v2.0 (iOS‑style grouped settings + Font Size)
+// SettingsView.tsx — v2.1 (Dropdown font size selector, better icon)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -126,11 +126,21 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
     if (yes) { onClearChats(); showToast('All chats cleared.'); }
   };
 
-  const cycleFontSize = () => {
-    const sizes: Array<'small' | 'medium' | 'large'> = ['small', 'medium', 'large'];
-    const idx = sizes.indexOf(fontSize);
-    const next = sizes[(idx + 1) % 3];
-    setFontSize(next);
+  // ── Font size dropdown style ──────────────────────────────
+  const selectStyle: React.CSSProperties = {
+    fontSize: '15px',
+    color: 'var(--text-2)',
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    padding: '4px 24px 4px 8px',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffffff55' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 4px center',
   };
 
   return (
@@ -236,15 +246,34 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
             toggleOn={isDark}
             onToggle={toggleTheme}
           />
-          <GroupRow
-            iconColor="var(--accent-dim)"
-            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12h6"/><path d="M12 9v6"/><path d="M4 6h16"/><path d="M20 18H4"/></svg>}
-            label="Font Size"
-            desc="Adjust message text size"
-            value={fontSize.charAt(0).toUpperCase() + fontSize.slice(1)}
-            onClick={cycleFontSize}
-            last
-          />
+          {/* Font Size row with dropdown */}
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: '14px',
+              padding: '13px 16px',
+            }}
+          >
+            <RoundIcon color="var(--accent-dim)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 6h16" />
+                <path d="M7 12h10" />
+                <path d="M10 18h4" />
+              </svg>
+            </RoundIcon>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text-1)' }}>Font Size</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-3)', marginTop: '1px' }}>Adjust message text size</div>
+            </div>
+            <select
+              value={fontSize}
+              onChange={e => setFontSize(e.target.value as 'small' | 'medium' | 'large')}
+              style={selectStyle}
+            >
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
+          </div>
         </SettingsGroup>
 
         {/* Info */}
