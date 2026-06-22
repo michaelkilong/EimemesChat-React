@@ -1,4 +1,5 @@
 // App.tsx
+// v2.6 — Dynamic Mermaid import for build compatibility (no server‑side import)
 // v2.5 — Added Mermaid initialization & theme sync for diagram rendering
 // v2.4 — Fixed regen doubling bug by using regenerate from useChat instead of handleSend
 import React, { useState, useCallback, useEffect } from 'react';
@@ -10,7 +11,6 @@ import { useTheme } from './hooks/useTheme';
 import { useConversations } from './hooks/useConversations';
 import { useMessages } from './hooks/useMessages';
 import { useChat } from './hooks/useChat';
-import mermaid from 'mermaid';
 
 import LoadingScreen         from './components/LoadingScreen';
 import Sidebar               from './components/Sidebar';
@@ -70,12 +70,14 @@ export default function App() {
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
 
-  // ── Mermaid initialization (theme‑aware) ─────────────────────
+  // ── Mermaid initialization (client‑only dynamic import) ─────
   useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: isDark ? 'dark' : 'neutral',
-      securityLevel: 'loose',
+    import('mermaid').then(({ default: mermaid }) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: isDark ? 'dark' : 'neutral',
+        securityLevel: 'loose',
+      });
     });
   }, [isDark]);
 
