@@ -1,6 +1,4 @@
-// api/tts.js — v1.0 — Free neural TTS via Microsoft Edge (no API key, unlimited)
-import { EdgeTTS } from 'edge-tts';
-
+// api/tts.js — v1.1 — Fixed import for Vercel compatibility
 export default async function handler(req, res) {
   // ── CORS ────────────────────────────────────────────────────
   const origin = req.headers.origin || '';
@@ -26,10 +24,11 @@ export default async function handler(req, res) {
 
   const safeText = text.slice(0, 2000).trim();
 
-  // ── TTS ──────────────────────────────────────────────────────
+  // ── TTS via Microsoft Edge (free, no key) ────────────────────
   try {
+    const { EdgeTTS } = await import('edge-tts');
     const tts = new EdgeTTS({
-      voice: 'en-US-AriaNeural',   // warm female – natural & clear
+      voice: 'en-US-AriaNeural',
       rate: '+0%',
       pitch: '+0Hz',
     });
