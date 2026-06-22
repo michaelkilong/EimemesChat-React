@@ -1,3 +1,4 @@
+// Sidebar.tsx — v1.1 — Removed duplicate New chat button; search bar uses grey background
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -42,7 +43,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
     didLongPress.current = false;
     pressTimer.current = setTimeout(async () => {
       didLongPress.current = true;
-      haptic.heavy(); // buzz on long press trigger
+      haptic.heavy();
       const yes = await showConfirm(
         `"${(title || 'This conversation').slice(0, 40)}" will be permanently deleted.`,
         'Delete',
@@ -121,32 +122,13 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
           </button>
         </div>
 
-        {/* New chat */}
-        <button
-          onClick={onNewChat}
-          style={{
-            margin: '12px 12px 0', padding: '11px 14px', borderRadius: '14px',
-            border: '1px solid var(--border)', background: 'var(--glass-3)',
-            color: 'var(--text-2)', fontSize: '14.5px', fontWeight: 500,
-            display: 'flex', alignItems: 'center', gap: '8px',
-            cursor: 'pointer', flexShrink: 0,
-            transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-          }}
-          onMouseEnter={e => { const b = e.currentTarget; b.style.background = 'var(--accent-dim)'; b.style.borderColor = 'var(--accent)'; b.style.color = 'var(--accent)'; }}
-          onMouseLeave={e => { const b = e.currentTarget; b.style.background = 'var(--glass-3)'; b.style.borderColor = 'var(--border)'; b.style.color = 'var(--text-2)'; }}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          New chat
-        </button>
-
-        {/* Search */}
+        {/* Search — grey background */}
         <div style={{ padding: '10px 12px 0' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '8px 12px', borderRadius: '12px',
-            background: 'var(--glass-3)', border: '1px solid var(--border-b)',
+            background: 'var(--glass-2)',          // solid grey, was var(--glass-3)
+            border: '1px solid var(--border-b)',
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -163,7 +145,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} style={{
-                width: '16px', height: '16px', borderRadius: '50%', background: 'var(--glass-2)',
+                width: '16px', height: '16px', borderRadius: '50%', background: 'var(--glass-3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'var(--text-3)', cursor: 'pointer', flexShrink: 0, border: 'none',
               }}>
