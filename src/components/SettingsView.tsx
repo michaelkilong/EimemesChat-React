@@ -1,4 +1,4 @@
-// SettingsView.tsx — v1.1 — iOS-style grouped settings rows
+// SettingsView.tsx — v1.2 — iOS-style inset separators
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -16,7 +16,6 @@ interface Props {
 
 // ── Helpers ────────────────────────────────────────────────────
 
-/** Small icon container (reused) */
 function RoundIcon({ color, children }: { color?: string; children: React.ReactNode }) {
   return (
     <div style={{
@@ -31,7 +30,17 @@ function RoundIcon({ color, children }: { color?: string; children: React.ReactN
   );
 }
 
-/** Single row inside a group – same content as before, but no outer card background */
+/** A thin horizontal line, inset to align with the row's label text */
+function Separator() {
+  return (
+    <div style={{
+      height: '1px',
+      background: 'var(--border-b)',
+      marginLeft: '50px',   // 36px icon + 14px gap
+    }} />
+  );
+}
+
 function GroupRow({
   icon, iconColor, label, desc, red, value, toggle, toggleOn, onToggle, onClick, last,
 }: {
@@ -41,65 +50,66 @@ function GroupRow({
 }) {
   const [pressed, setPressed] = useState(false);
   return (
-    <div
-      onClick={onClick}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
-      onMouseLeave={() => setPressed(false)}
-      onTouchStart={() => setPressed(true)}
-      onTouchEnd={() => setPressed(false)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: '14px',
-        padding: '13px 16px',
-        background: pressed ? 'var(--glass-1)' : 'transparent',
-        borderBottom: last ? 'none' : '1px solid var(--border-b)',
-        cursor: 'pointer',
-        transition: 'background 0.12s',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <RoundIcon color={red ? 'rgba(255,75,75,0.25)' : iconColor}>{icon}</RoundIcon>
+    <div>
+      <div
+        onClick={onClick}
+        onMouseDown={() => setPressed(true)}
+        onMouseUp={() => setPressed(false)}
+        onMouseLeave={() => setPressed(false)}
+        onTouchStart={() => setPressed(true)}
+        onTouchEnd={() => setPressed(false)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '14px',
+          padding: '13px 16px',
+          background: pressed ? 'var(--glass-1)' : 'transparent',
+          cursor: 'pointer',
+          transition: 'background 0.12s',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <RoundIcon color={red ? 'rgba(255,75,75,0.25)' : iconColor}>{icon}</RoundIcon>
 
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: '16px', fontWeight: 500, color: red ? '#ff6b6b' : 'var(--text-1)' }}>{label}</div>
-        {desc && <div style={{ fontSize: '13px', color: 'var(--text-3)', marginTop: '1px' }}>{desc}</div>}
-      </div>
-
-      {value && !toggle && (
-        <span style={{ fontSize: '15px', color: 'var(--text-3)', marginRight: '4px' }}>{value}</span>
-      )}
-
-      {toggle && (
-        <div
-          onClick={e => { e.stopPropagation(); onToggle?.(); }}
-          style={{
-            width: '51px', height: '31px', borderRadius: '999px', flexShrink: 0,
-            background: toggleOn ? '#30d158' : 'rgba(255,255,255,0.2)',
-            position: 'relative', cursor: 'pointer',
-            transition: 'background 0.22s',
-          }}
-        >
-          <div style={{
-            position: 'absolute', top: '2px',
-            left: toggleOn ? '22px' : '2px',
-            width: '27px', height: '27px', borderRadius: '50%',
-            background: 'white',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-            transition: 'left 0.22s',
-          }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '16px', fontWeight: 500, color: red ? '#ff6b6b' : 'var(--text-1)' }}>{label}</div>
+          {desc && <div style={{ fontSize: '13px', color: 'var(--text-3)', marginTop: '1px' }}>{desc}</div>}
         </div>
-      )}
 
-      {!toggle && (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      )}
+        {value && !toggle && (
+          <span style={{ fontSize: '15px', color: 'var(--text-3)', marginRight: '4px' }}>{value}</span>
+        )}
+
+        {toggle && (
+          <div
+            onClick={e => { e.stopPropagation(); onToggle?.(); }}
+            style={{
+              width: '51px', height: '31px', borderRadius: '999px', flexShrink: 0,
+              background: toggleOn ? '#30d158' : 'rgba(255,255,255,0.2)',
+              position: 'relative', cursor: 'pointer',
+              transition: 'background 0.22s',
+            }}
+          >
+            <div style={{
+              position: 'absolute', top: '2px',
+              left: toggleOn ? '22px' : '2px',
+              width: '27px', height: '27px', borderRadius: '50%',
+              background: 'white',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+              transition: 'left 0.22s',
+            }} />
+          </div>
+        )}
+
+        {!toggle && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        )}
+      </div>
+      {!last && <Separator />}
     </div>
   );
 }
 
-/** Full-width group container (rounded card) that holds multiple rows */
 function SettingsGroup({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
@@ -158,7 +168,7 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
 
       <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 40px' }}>
 
-        {/* Profile – standalone card (unchanged) */}
+        {/* Profile */}
         {currentUser && (
           <SettingsGroup>
             <GroupRow
