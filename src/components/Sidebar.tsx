@@ -1,4 +1,4 @@
-// Sidebar.tsx — v2.0 — Time‑based conversation grouping (Today, Yesterday, Last 30 Days, Earlier)
+// Sidebar.tsx — v2.1 — Bold conversation titles in history
 import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -253,7 +253,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
                     padding: '9px 12px', borderRadius: '10px',
                     color: conv.id === currentConvId ? 'var(--accent)' : 'var(--text-2)',
                     background: conv.id === currentConvId ? 'var(--accent-dim)' : 'transparent',
-                    fontWeight: conv.id === currentConvId ? 500 : 400,
+                    fontWeight: 600,                                           // <-- bold for easy spotting
                     fontSize: '14.5px', cursor: 'pointer',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     transition: 'background 0.12s, color 0.12s',
