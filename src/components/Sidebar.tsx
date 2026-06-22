@@ -1,4 +1,4 @@
-// Sidebar.tsx — v2.1 — Bold conversation titles in history
+// Sidebar.tsx — v2.2 — Adjusted font weight & white titles for inactive conversations
 import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -46,7 +46,6 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Track window width reactively for mobile/desktop layout switch
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 768);
@@ -54,14 +53,12 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Listen for Cmd+K focus-search event from App
   useEffect(() => {
     const onFocus = () => setTimeout(() => searchRef.current?.focus(), 100);
     window.addEventListener('focus-search', onFocus);
     return () => window.removeEventListener('focus-search', onFocus);
   }, []);
 
-  // Long press logic — 500ms hold triggers delete confirm
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
 
@@ -89,18 +86,15 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
     setSidebarOpen(false);
   }, [onSelectConv, setSidebarOpen]);
 
-  // ── Grouped conversations (only when not searching) ─────────
   const groupedConversations = useMemo(() => {
     const filtered = searchQuery
       ? conversations.filter(c => (c.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
       : conversations;
 
     if (searchQuery) {
-      // Search mode: flat list
       return { 'Results': filtered };
     }
 
-    // Default: group by relative time
     const groups: Record<string, Conversation[]> = {
       'Today': [],
       'Yesterday': [],
@@ -111,7 +105,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
     const sorted = [...filtered].sort((a, b) => {
       const aTime = (a.updatedAt as any)?.seconds || 0;
       const bTime = (b.updatedAt as any)?.seconds || 0;
-      return bTime - aTime; // newest first
+      return bTime - aTime;
     });
 
     for (const conv of sorted) {
@@ -123,7 +117,6 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
       }
     }
 
-    // Remove empty groups
     return Object.fromEntries(
       Object.entries(groups).filter(([_, convs]) => convs.length > 0)
     );
@@ -232,7 +225,6 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
         <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
           {Object.entries(groupedConversations).map(([section, convs]) => (
             <div key={section} style={{ marginBottom: '4px' }}>
-              {/* Section title */}
               <div style={{
                 fontSize: '10.5px', fontWeight: 600, letterSpacing: '0.7px',
                 textTransform: 'uppercase', color: 'var(--text-3)',
@@ -251,16 +243,16 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
                   onContextMenu={e => e.preventDefault()}
                   style={{
                     padding: '9px 12px', borderRadius: '10px',
-                    color: conv.id === currentConvId ? 'var(--accent)' : 'var(--text-2)',
+                    color: conv.id === currentConvId ? 'var(--accent)' : 'var(--text-1)',   // white for inactive
                     background: conv.id === currentConvId ? 'var(--accent-dim)' : 'transparent',
-                    fontWeight: 600,                                           // <-- bold for easy spotting
+                    fontWeight: 500,                                                       // regular weight
                     fontSize: '14.5px', cursor: 'pointer',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     transition: 'background 0.12s, color 0.12s',
                     userSelect: 'none', WebkitUserSelect: 'none',
                   }}
                   onMouseEnter={e => { if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-3)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-1)'; } }}
-                  onMouseLeave={e => { endPress(conv.id); if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-2)'; } }}
+                  onMouseLeave={e => { endPress(conv.id); if (conv.id !== currentConvId) { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-1)'; } }}
                 >
                   {conv.title || 'New conversation'}
                 </div>
@@ -271,7 +263,6 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
 
         {/* Footer — Usage + Settings */}
         <div style={{ borderTop: '1px solid var(--border-b)', padding: '10px', paddingBottom: 'calc(10px + var(--sab))', flexShrink: 0 }}>
-          {/* Usage counter */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '6px 12px 10px', fontSize: '12px', color: 'var(--text-3)',
