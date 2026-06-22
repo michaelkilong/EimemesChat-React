@@ -105,7 +105,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       {/* Toast */}
       <div className={`toast ${toastVisible ? 'show' : ''}`}>{toastMsg}</div>
 
-      {/* Confirm Dialog – now only closes via Cancel/action button */}
+      {/* Confirm Dialog – only closes via Cancel/action button */}
       <div className={`confirm-overlay ${confirmState.open ? 'show' : ''}`}>
         <div className="confirm-card">
           <div style={{ padding: '24px 22px 18px', textAlign: 'center' }}>
@@ -120,14 +120,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           <div style={{ display: 'flex' }}>
             <button
               onClick={handleConfirmNo}
-              style={{ flex: 1, padding: '15px 0', fontSize: '15px', fontWeight: 500, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+              onMouseEnter={e => { const b = e.currentTarget; b.style.background = 'var(--glass-3)'; b.style.color = 'var(--text-1)'; }}
+              onMouseLeave={e => { const b = e.currentTarget; b.style.background = 'none'; b.style.color = 'var(--text-2)'; }}
+              style={{ flex: 1, padding: '15px 0', fontSize: '15px', fontWeight: 500, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.12s, color 0.12s' }}
             >
               Cancel
             </button>
             <div style={{ width: '1px', background: 'var(--border-b)', flexShrink: 0 }} />
             <button
               onClick={handleConfirmYes}
-              style={{ flex: 1, padding: '15px 0', fontSize: '15px', fontWeight: 700, color: '#ff6b6b', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,107,107,0.12)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+              style={{ flex: 1, padding: '15px 0', fontSize: '15px', fontWeight: 700, color: '#ff6b6b', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.12s' }}
             >
               {confirmState.yesLabel}
             </button>
