@@ -1,4 +1,4 @@
-// InputArea.tsx — v2.8 — Slightly taller input bar
+// InputArea.tsx — v2.9 — Placeholder closer to top border (more room below)
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -144,7 +144,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           border: '1px solid var(--border)',
           borderRadius: '20px',
           boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-          padding: '14px 14px 12px',   // slightly taller than before (was 12px 14px 10px)
+          padding: '10px 14px 12px',   // top reduced from 14px → 10px (placeholder closer to top)
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
