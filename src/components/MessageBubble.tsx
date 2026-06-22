@@ -1,6 +1,6 @@
-// MessageBubble.tsx — v1.2 — Voice output via Web Speech API
+// MessageBubble.tsx — v1.3 — Added Mermaid diagram rendering after message content
 import React, { useEffect, useRef, useState } from 'react';
-import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
+import { renderMarkdown, highlightCodeBlocks, renderMermaidBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
 import { getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -74,6 +74,8 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
     if (message.role === 'assistant') {
       bodyRef.current.innerHTML = renderMarkdown(message.content, msgKey);
       highlightCodeBlocks(bodyRef.current, showToast);
+      // Render Mermaid diagrams (async, non-blocking)
+      renderMermaidBlocks(bodyRef.current);
     }
   }, [message.content, message.role, showToast, msgKey]);
 
