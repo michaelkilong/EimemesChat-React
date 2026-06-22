@@ -31,22 +31,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const setView = useCallback((v: View) => {
     setView_(v);
     if (v === 'chat') {
-      // Going back to chat — don't push, let back button handle it
       history.replaceState({ view: 'chat' }, '', '/');
     } else {
-      // Push a new history entry so back button returns here
       history.pushState({ view: v }, '', '/');
     }
   }, []);
 
   // Listen to browser back/forward button
   useEffect(() => {
-    // Set initial state
     history.replaceState({ view: 'chat' }, '', '/');
 
     const handlePop = (e: PopStateEvent) => {
       const v = (e.state?.view as View) || 'chat';
-      setView_(v); // use internal setter to avoid pushing another history entry
+      setView_(v);
     };
 
     window.addEventListener('popstate', handlePop);
@@ -108,11 +105,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       {/* Toast */}
       <div className={`toast ${toastVisible ? 'show' : ''}`}>{toastMsg}</div>
 
-      {/* Confirm Dialog */}
-      <div
-        className={`confirm-overlay ${confirmState.open ? 'show' : ''}`}
-        onClick={e => { if (e.target === e.currentTarget) handleConfirmNo(); }}
-      >
+      {/* Confirm Dialog – now only closes via Cancel/action button */}
+      <div className={`confirm-overlay ${confirmState.open ? 'show' : ''}`}>
         <div className="confirm-card">
           <div style={{ padding: '24px 22px 18px', textAlign: 'center' }}>
             <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}>
@@ -143,4 +137,3 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     </AppContext.Provider>
   );
 }
-                         
