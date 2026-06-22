@@ -1,4 +1,4 @@
-// InputArea.tsx — v2.14 — Dedicated spacer for obvious separation between text and icons
+// InputArea.tsx — v2.14 — Placeholder at top, icons at bottom, full working file
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -145,12 +145,12 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           borderRadius: '20px',
           boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
           padding: '14px 16px 12px',
-          minHeight: '100px',                              // generous height
+          minHeight: '100px',
           display: 'flex',
           flexDirection: 'column',
         }}>
 
-          {/* Textarea — pinned to top */}
+          {/* Textarea — pinned to top, placeholder always visible when empty */}
           <textarea
             ref={textareaRef}
             value={value}
