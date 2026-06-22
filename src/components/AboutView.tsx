@@ -1,26 +1,45 @@
-// AboutView.tsx — v2.2 (uses AppContext for theme, correct import)
+// AboutView.tsx — v2.3 — iOS-style inset separators, white labels/values, description white
+// v2.2 — Uses AppContext for theme, correct import
+// v2.1 — (previous history) …
+// v1.3 — Larger logo, removed duplicate brand name
+
 import React from 'react';
-import { useApp } from '../context/AppContext'; // adjust if your folder structure differs
+import { useApp } from '../context/AppContext';
 
 interface Props {
   onBack: () => void;
   onOpenLicenses: () => void;
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+/** A thin horizontal line, inset to align with the row's text (like iOS). */
+function Separator() {
   return (
     <div
       style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '14px 16px',
-        borderBottom: '1px solid var(--border-b)',
+        height: '1px',
+        background: 'var(--border-b)',
+        marginLeft: '16px',
       }}
-    >
-      <span style={{ fontSize: '15px', color: 'var(--text-2)' }}>{label}</span>
-      <span style={{ fontSize: '15px', color: 'var(--text-3)' }}>{value}</span>
-    </div>
+    />
+  );
+}
+
+function InfoRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  return (
+    <>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '14px 16px',
+        }}
+      >
+        <span style={{ fontSize: '15px', color: 'var(--text-1)' }}>{label}</span>
+        <span style={{ fontSize: '15px', color: 'var(--text-1)' }}>{value}</span>
+      </div>
+      {!last && <Separator />}
+    </>
   );
 }
 
@@ -29,6 +48,14 @@ export default function AboutView({ onBack, onOpenLicenses }: Props) {
 
   // Dark theme → original logo, Light theme → new light logo
   const logoSrc = isDark ? '/chat-logo.png' : '/chat-logo-light.png';
+
+  const infoRows = [
+    { label: 'Developer', value: 'EimemesChat Developers' },
+    { label: 'Version', value: '4.0.0' },
+    { label: 'Platform', value: 'Web / PWA' },
+    { label: 'AI Model', value: 'Llama 3 via Groq' },
+    { label: 'Released', value: '2026' },
+  ];
 
   return (
     <div
@@ -127,7 +154,7 @@ export default function AboutView({ onBack, onOpenLicenses }: Props) {
           </div>
         </div>
 
-        {/* Info rows */}
+        {/* Info rows – iOS grouped card with inset separators */}
         <div
           style={{
             background: 'var(--glass-2)',
@@ -136,14 +163,17 @@ export default function AboutView({ onBack, onOpenLicenses }: Props) {
             marginBottom: '16px',
           }}
         >
-          <Row label="Developer" value="EimemesChat Developers" />
-          <Row label="Version" value="4.0.0" />
-          <Row label="Platform" value="Web / PWA" />
-          <Row label="AI Model" value="Llama 3 via Groq" />
-          <Row label="Released" value="2026" />
+          {infoRows.map((row, i) => (
+            <InfoRow
+              key={row.label}
+              label={row.label}
+              value={row.value}
+              last={i === infoRows.length - 1}
+            />
+          ))}
         </div>
 
-        {/* Description */}
+        {/* Description – now white text */}
         <div
           style={{
             padding: '16px',
@@ -151,7 +181,7 @@ export default function AboutView({ onBack, onOpenLicenses }: Props) {
             background: 'var(--glass-2)',
             marginBottom: '16px',
             fontSize: '14px',
-            color: 'var(--text-2)',
+            color: 'var(--text-1)',
             lineHeight: 1.7,
           }}
         >
@@ -161,7 +191,7 @@ export default function AboutView({ onBack, onOpenLicenses }: Props) {
           conversation.
         </div>
 
-        {/* Open Source Licenses */}
+        {/* Open Source Licenses – unchanged */}
         <div
           onClick={onOpenLicenses}
           style={{
