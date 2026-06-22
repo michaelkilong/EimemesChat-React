@@ -1,4 +1,4 @@
-// SettingsView.tsx — v1.2 — iOS-style inset separators
+// SettingsView.tsx — v2.0 (iOS‑style grouped settings + Font Size)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -14,8 +14,6 @@ interface Props {
   conversations: Conversation[];
 }
 
-// ── Helpers ────────────────────────────────────────────────────
-
 function RoundIcon({ color, children }: { color?: string; children: React.ReactNode }) {
   return (
     <div style={{
@@ -30,13 +28,12 @@ function RoundIcon({ color, children }: { color?: string; children: React.ReactN
   );
 }
 
-/** A thin horizontal line, inset to align with the row's label text */
 function Separator() {
   return (
     <div style={{
       height: '1px',
       background: 'var(--border-b)',
-      marginLeft: '50px',   // 36px icon + 14px gap
+      marginLeft: '50px',
     }} />
   );
 }
@@ -68,16 +65,13 @@ function GroupRow({
         }}
       >
         <RoundIcon color={red ? 'rgba(255,75,75,0.25)' : iconColor}>{icon}</RoundIcon>
-
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '16px', fontWeight: 500, color: red ? '#ff6b6b' : 'var(--text-1)' }}>{label}</div>
           {desc && <div style={{ fontSize: '13px', color: 'var(--text-3)', marginTop: '1px' }}>{desc}</div>}
         </div>
-
         {value && !toggle && (
           <span style={{ fontSize: '15px', color: 'var(--text-3)', marginRight: '4px' }}>{value}</span>
         )}
-
         {toggle && (
           <div
             onClick={e => { e.stopPropagation(); onToggle?.(); }}
@@ -98,7 +92,6 @@ function GroupRow({
             }} />
           </div>
         )}
-
         {!toggle && (
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6"/>
@@ -123,10 +116,8 @@ function SettingsGroup({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── Main view ──────────────────────────────────────────────────
-
 export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalization, onOpenAbout, onClearChats }: Props) {
-  const { currentUser, showToast, showConfirm } = useApp();
+  const { currentUser, showToast, showConfirm, fontSize, setFontSize } = useApp();
   const { isDark, toggleTheme } = useTheme();
   const [signOutVisible, setSignOutVisible] = useState(false);
 
@@ -135,9 +126,15 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
     if (yes) { onClearChats(); showToast('All chats cleared.'); }
   };
 
+  const cycleFontSize = () => {
+    const sizes: Array<'small' | 'medium' | 'large'> = ['small', 'medium', 'large'];
+    const idx = sizes.indexOf(fontSize);
+    const next = sizes[(idx + 1) % 3];
+    setFontSize(next);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
-
       {/* Header */}
       <header style={{
         display: 'flex', alignItems: 'center', gap: '14px',
@@ -167,7 +164,6 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
       </header>
 
       <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 40px' }}>
-
         {/* Profile */}
         {currentUser && (
           <SettingsGroup>
@@ -239,6 +235,14 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
             toggle
             toggleOn={isDark}
             onToggle={toggleTheme}
+          />
+          <GroupRow
+            iconColor="var(--accent-dim)"
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12h6"/><path d="M12 9v6"/><path d="M4 6h16"/><path d="M20 18H4"/></svg>}
+            label="Font Size"
+            desc="Adjust message text size"
+            value={fontSize.charAt(0).toUpperCase() + fontSize.slice(1)}
+            onClick={cycleFontSize}
             last
           />
         </SettingsGroup>
