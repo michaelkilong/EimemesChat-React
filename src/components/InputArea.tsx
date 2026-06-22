@@ -1,4 +1,4 @@
-// InputArea.tsx — v2.7 — Attach moved to right, blue hover on toolbar buttons
+// InputArea.tsx — v2.8 — Slightly taller input bar
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -144,7 +144,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           border: '1px solid var(--border)',
           borderRadius: '20px',
           boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-          padding: '12px 14px 10px',
+          padding: '14px 14px 12px',   // slightly taller than before (was 12px 14px 10px)
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
@@ -232,7 +232,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
 
             {/* Right: attach + send/stop */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* + Attach file (now on the right) */}
+              {/* + Attach file */}
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={busy || processing}
