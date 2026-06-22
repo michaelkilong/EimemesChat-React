@@ -1,4 +1,4 @@
-// InputArea.tsx — v2.4 — Removed Think button; + icon for attach; fixed --bg and send shadow
+// InputArea.tsx — v2.5 — Web search pill with icon + text, bold icons
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -21,7 +21,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const [processing, setProcessing] = useState(false);
   const [fileError,  setFileError]  = useState('');
   const [webSearch,  setWebSearch]  = useState(false);
-  // Removed useThinking state
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,7 +46,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
     setAttachment(null);
     setFileError('');
     setWebSearch(false);
-    // Removed setUseThinking
     onSend(text || 'Please analyze this file.', att, ws);
   };
 
@@ -75,14 +73,12 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const busy = isSending || isStreaming;
 
   return (
-    /* Floating wrapper — gradient fade from transparent to page bg */
     <div style={{
       position: 'relative',
       flexShrink: 0,
       paddingTop: '40px',
       paddingInline: '16px',
       paddingBottom: 'calc(12px + var(--sab))',
-      // Fixed: use a gradient that fades to page background
       background: 'linear-gradient(to top, var(--bg-a), transparent)',
     }}>
       <div style={{ maxWidth: '740px', margin: '0 auto' }}>
@@ -184,9 +180,9 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
 
             {/* Left: attach + web search */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
 
-              {/* + (Attach {/* + (Attach file) – bold circle */}
+              {/* + Attach file */}
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={busy || processing}
@@ -194,10 +190,10 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                 style={{
                   width: '34px', height: '34px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '50%',                               // circle shape
-                  background: attachment ? 'var(--accent-dim)' : 'var(--glass-3)',  // subtle circle even when empty
+                  borderRadius: '50%',
+                  background: attachment ? 'var(--accent-dim)' : 'var(--glass-3)',
                   border: attachment ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  color: attachment ? 'var(--accent)' : 'var(--text-3)',
+                  color: attachment ? 'var(--accent)' : 'var(--text-2)',
                   cursor: (busy || processing) ? 'default' : 'pointer',
                   opacity: (busy || processing) ? 0.4 : 1,
                   transition: 'all 0.15s',
@@ -215,40 +211,55 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                   }
                 }}
               >
-                {/* Bold plus */}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               </button>
-              
 
-              {/* Web search */}
+              {/* Web search pill – icon + text */}
               <button
                 onClick={() => { haptic.light(); setWebSearch(w => !w); }}
                 disabled={busy}
                 title={webSearch ? 'Web search on' : 'Web search off'}
                 style={{
-                  width: '34px', height: '34px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '10px',
-                  background: webSearch ? 'var(--accent-dim)' : 'transparent',
-                  border: 'none',
-                  color: webSearch ? 'var(--accent)' : 'var(--text-3)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  height: '34px',
+                  padding: '0 14px',
+                  borderRadius: '17px',
+                  background: webSearch ? 'var(--accent-dim)' : 'var(--glass-3)',
+                  border: webSearch ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  color: webSearch ? 'var(--accent)' : 'var(--text-2)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  fontFamily: 'inherit',
                   cursor: busy ? 'default' : 'pointer',
                   opacity: busy ? 0.4 : 1,
                   transition: 'all 0.15s',
+                  whiteSpace: 'nowrap',
                 }}
-                onMouseEnter={e => { if (!busy && !webSearch) (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-3)'; }}
-                onMouseLeave={e => { if (!webSearch) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                onMouseEnter={e => {
+                  if (!busy) {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.background = webSearch ? 'var(--accent-dim)' : 'var(--glass-2)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!busy) {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.background = webSearch ? 'var(--accent-dim)' : 'var(--glass-3)';
+                  }
+                }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/>
                   <line x1="2" y1="12" x2="22" y2="12"/>
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                 </svg>
+                <span>Search Web</span>
               </button>
-
             </div>
 
             {/* Right: send / stop */}
@@ -279,7 +290,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                   color: canSend ? 'var(--send-fg)' : 'var(--text-3)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: canSend ? 'pointer' : 'default',
-                  // Fixed: use accent variable instead of hardcoded blue
                   boxShadow: canSend ? '0 2px 12px var(--accent-dim)' : 'none',
                   flexShrink: 0,
                   transition: 'background 0.15s, box-shadow 0.15s, color 0.15s',
