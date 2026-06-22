@@ -1,4 +1,4 @@
-// MessageList.tsx — v1.3 — Fixed auto-scroll: ignores programmatic scrolls during streaming
+// MessageList.tsx — v1.4 — Timestamp‑based programmatic scroll suppression
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import MessageBubble from './MessageBubble';
 import StreamingBubble from './StreamingBubble';
@@ -39,6 +39,7 @@ interface Props {
 }
 
 const INPUT_AREA_HEIGHT = 170;
+const PROGRAMMATIC_GRACE_MS = 200;       // ignore scroll events for this long after our own change
 
 export default function MessageList({
   messages, isTyping, isSearching, isStreaming,
@@ -48,31 +49,30 @@ export default function MessageList({
   const bottomRef              = useRef<HTMLDivElement>(null);
   const scrollRef              = useRef<HTMLDivElement>(null);
   const userScrolledUp         = useRef(false);
-  const programmaticScroll     = useRef(false); // <-- flag for programmatic scrolls
+  const lastProgrammaticScroll = useRef(0);            // timestamp of last forced scroll
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  // Smooth scroll for discrete events (new message sent, typing indicator appears)
+  // ── Scroll to bottom on new message / typing ────────────────
   useEffect(() => {
     userScrolledUp.current = false;
-    programmaticScroll.current = true;        // mark as programmatic
+    lastProgrammaticScroll.current = Date.now();
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, isTyping]);
 
-  // Auto-scroll during streaming — only if user hasn't scrolled up
+  // ── Auto‑scroll during streaming (unless user scrolled up) ──
   useEffect(() => {
     if (!isStreaming || !scrollRef.current) return;
     if (userScrolledUp.current) return;
     const el = scrollRef.current;
-    programmaticScroll.current = true;        // set flag before forcing scroll
+    lastProgrammaticScroll.current = Date.now();
     el.scrollTop = el.scrollHeight;
   }, [streamText, isStreaming]);
 
-  // Track whether user has manually scrolled up (ignore programmatic scrolls)
+  // ── Track user scrolls ──────────────────────────────────────
   const handleScroll = useCallback(() => {
-    if (programmaticScroll.current) {
-      programmaticScroll.current = false;     // ignore this event
-      return;
-    }
+    // Ignore scroll events caused by our own programmatic changes
+    if (Date.now() - lastProgrammaticScroll.current < PROGRAMMATIC_GRACE_MS) return;
+
     const el = scrollRef.current;
     if (!el) return;
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -82,8 +82,8 @@ export default function MessageList({
 
   const scrollToBottom = () => {
     haptic.light();
-    userScrolledUp.current = false;           // resume following
-    programmaticScroll.current = true;        // mark as programmatic
+    userScrolledUp.current = false;
+    lastProgrammaticScroll.current = Date.now();
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
