@@ -1,9 +1,11 @@
 // api/chat.js
+// v5.7 — Always strip last user message from history to prevent double input
 // v5.6 — Behavioral prompt now contains full personality & formatting rules;
 //        fingerprint prompt built from same content for leak protection.
 // v5.5 — Regeneration fix: strip last user message from history to avoid doubling
 // v5.4 — Native Gemini REST API with proper thinkingConfig; Groq fallback stays OpenAI format
 // Changelog:
+//   v5.7 — Always remove trailing user message from history (current message sent separately)
 //   v5.6 — Moved complete instructions into BEHAVIORAL_PROMPT; fingerprint covers everything
 //   v5.5 — When isRegeneration is true, remove trailing user message from history so AI sees fresh request
 //   v5.4 — Migrated Gemini to native REST API (/v1beta/models/...); thinking via thinkingConfig; parts-based response
@@ -594,12 +596,10 @@ export default async function handler(req, res) {
     ? history.slice(-8).map(({ role, content }) => ({ role, content }))
     : [];
 
-  // If this is a regeneration request, remove the last user message from history
-  // (it's already being sent as the current message — avoids doubling)
-  if (isRegeneration && trimmedHistory.length) {
-    while (trimmedHistory.length && trimmedHistory[trimmedHistory.length - 1].role === 'user') {
-      trimmedHistory.pop();
-    }
+  // The current user message is already sent separately – remove it from history
+  // to prevent the AI from seeing the same input twice.
+  if (trimmedHistory.length && trimmedHistory[trimmedHistory.length - 1].role === 'user') {
+    trimmedHistory.pop();
   }
 
   setSSEHeaders(res);
