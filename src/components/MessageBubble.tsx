@@ -1,4 +1,4 @@
-// MessageBubble.tsx — v1.2 — Voice output via Web Speech API
+// MessageBubble.tsx — v1.4 — Improved TTS: realistic voices, no emojis/symbols, natural pacing
 import React, { useEffect, useRef, useState } from 'react';
 import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
@@ -39,22 +39,27 @@ function ActionBtn({ title, onClick, active, activeColor, children }: {
   );
 }
 
-// Strip markdown syntax so speech sounds natural
-function stripMarkdown(text: string): string {
+/** Clean text for speech: removes markdown, emojis, symbols – only spoken words remain */
+function stripForSpeech(text: string): string {
   return text
-    .replace(/```[\s\S]*?```/g, 'code block')   // code blocks
+    .replace(/```[\s\S]*?```/g, '')               // code blocks
     .replace(/`[^`]+`/g, '')                      // inline code
     .replace(/#{1,6}\s+/g, '')                    // headings
     .replace(/\*\*(.*?)\*\*/g, '$1')              // bold
     .replace(/\*(.*?)\*/g, '$1')                  // italic
     .replace(/\[(.*?)\]\(.*?\)/g, '$1')           // links
     .replace(/!\[.*?\]\(.*?\)/g, '')              // images
-    .replace(/[-*+]\s+/g, '')                     // list bullets
-    .replace(/\d+\.\s+/g, '')                     // numbered lists
-    .replace(/>\s+/g, '')                         // blockquotes
-    .replace(/\n{2,}/g, '. ')                     // paragraph breaks
-    .replace(/\n/g, ' ')                          // line breaks
-    .replace(/\s{2,}/g, ' ')                      // extra spaces
+    .replace(/^[-*+]\s+/gm, '')                   // unordered list markers
+    .replace(/^\d+\.\s+/gm, '')                   // ordered list markers
+    .replace(/^>\s+/gm, '')                       // blockquotes
+    .replace(/^[-*_]{3,}$/gm, '')                 // horizontal rules
+    // Remove emojis and decorative Unicode (keep basic punctuation)
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2300}-\u{23FF}\u{2B50}\u{2B55}\u{231A}\u{231B}\u{2328}\u{23CF}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{2934}\u{2935}\u{25AA}\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}\u{200D}\u{20E3}]/gu, '')
+    .replace(/[*_~]/g, '')                        // stray formatting chars
+    .replace(/[<>{}[\]|\\^`]/g, '')               // other non‑speech symbols
+    .replace(/\n{3,}/g, '. ')                     // multiple newlines → pause
+    .replace(/\n/g, ' ')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
@@ -94,24 +99,49 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
     }
 
     haptic.light();
-    const clean = stripMarkdown(message.content);
-    const utt   = new SpeechSynthesisUtterance(clean);
-    utt.rate    = 1.05;
-    utt.pitch   = 1;
-    utt.volume  = 1;
+    const clean = stripForSpeech(message.content);
+    if (!clean.trim()) { showToast('Nothing to read'); return; }
 
-    // Pick a natural English voice if available
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.rate  = 0.95;   // slightly slower, more natural pacing
+    utt.pitch = 1;
+    utt.volume = 1;
+
+    const setVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      // Priority: best natural voices first
+      const preferred = voices.find(v =>
+        v.lang.startsWith('en') && (
+          v.name.includes('Daniel') ||
+          v.name.includes('Samantha') ||
+          v.name.includes('Karen') ||
+          v.name.includes('Google US') ||
+          v.name.includes('Google UK') ||
+          v.name.includes('Natural') ||
+          v.name.includes('Premium')
+        )
+      ) || voices.find(v => v.lang.startsWith('en-US'))
+        || voices.find(v => v.lang.startsWith('en-GB'))
+        || voices.find(v => v.lang.startsWith('en'));
+
+      if (preferred) utt.voice = preferred;
+      window.speechSynthesis.speak(utt);
+    };
+
+    // Voices may load asynchronously
     const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v =>
-      v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Premium'))
-    ) || voices.find(v => v.lang.startsWith('en'));
-    if (preferred) utt.voice = preferred;
+    if (voices.length > 0) {
+      setVoice();
+    } else {
+      window.speechSynthesis.onvoiceschanged = () => {
+        setVoice();
+        window.speechSynthesis.onvoiceschanged = null;
+      };
+    }
 
     utt.onend   = () => setSpeaking(false);
     utt.onerror = () => setSpeaking(false);
-
     uttRef.current = utt;
-    window.speechSynthesis.speak(utt);
     setSpeaking(true);
   };
 
@@ -217,7 +247,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
 
         {message.sources?.length ? <SourcesList sources={message.sources} msgKey={msgKey} /> : null}
 
-        {/* Action bar — all actions except regenerate always visible */}
+        {/* Action bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0px', marginTop: '6px' }}>
 
           {/* Copy */}
