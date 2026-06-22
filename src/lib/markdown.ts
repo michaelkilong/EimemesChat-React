@@ -1,8 +1,3 @@
-// lib/markdown.ts — v1.5 — Sanitize Mermaid input before rendering (fixes AI formatting quirks)
-// v1.4 — Use mermaid.render for reliable SVG generation
-// v1.3 — Improved Mermaid rendering (off‑screen temp, wrapper replacement)
-// v1.2 — Client‑only dynamic Mermaid import for build compatibility
-// v1.1 — Added Mermaid diagram rendering + "Save as PNG" button
 import { marked } from 'marked';
 import katex from 'katex';
 import hljs from 'highlight.js';
@@ -15,6 +10,7 @@ export function renderMarkdown(text: string, msgKey?: string): string {
     const mathBlocks: Array<{ type: 'display' | 'inline'; eq: string }> = [];
 
     let protected_text = text
+      // Display math $$...$$ — replace before marked so it doesn't mangle it
       .replace(/\$\$([\s\S]+?)\$\$/g, (_, eq: string) => {
         mathBlocks.push({ type: 'display', eq });
         return `%%MATH_DISPLAY_${mathBlocks.length - 1}%%`;
@@ -26,8 +22,12 @@ export function renderMarkdown(text: string, msgKey?: string): string {
 
     let html = marked.parse(protected_text) as string;
 
+    // FIX 1: Display math placeholder ends up inside <p>...</p> after marked.
+    // Unwrap it so the KaTeX block element isn't nested inside <p> (invalid HTML).
     html = html.replace(/<p>\s*(%%MATH_DISPLAY_\d+%%)\s*<\/p>/g, '$1');
 
+    // FIX 2: Replace placeholders with KaTeX output.
+    // Display mode: let KaTeX handle its own .katex-display class — no extra wrapper.
     html = html
       .replace(/%%MATH_DISPLAY_(\d+)%%/g, (_, i: string) => {
         try {
@@ -87,135 +87,6 @@ export function highlightCodeBlocks(container: HTMLElement, showToast: (msg: str
   });
 }
 
-/**
- * Convert Mermaid code blocks to SVG diagrams with a "Save as PNG" button.
- * Dynamically imports Mermaid only when executed (client‑side), no static import.
- */
-export async function renderMermaidBlocks(container: HTMLElement) {
-  const mermaidBlocks = container.querySelectorAll<HTMLElement>('pre code.language-mermaid');
-
-  for (const code of mermaidBlocks) {
-    try {
-      const mermaidModule = await import('mermaid');
-      const mermaid = mermaidModule.default;
-
-      let rawCode = code.textContent || '';
-
-      // ── Sanitize common Mermaid syntax errors from the AI ─────
-      rawCode = rawCode
-        // Fix trailing ">" after pipe labels: |text|> → |text|
-        .replace(/\|([^|]+)\|>/g, '|$1|')
-        // Remove leading whitespace on each line (common in chat output)
-        .split('\n')
-        .map(line => line.trimStart())
-        .join('\n');
-
-      const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
-
-      // Primary method: mermaid.render returns SVG string directly
-      let svgString: string;
-      try {
-        const { svg } = await mermaid.render(id, rawCode);
-        svgString = svg;
-      } catch (renderErr) {
-        console.warn('[Mermaid] Primary render failed, trying fallback:', renderErr);
-        // Fallback: try mermaid.run on a temp element
-        const tempDiv = document.createElement('div');
-        tempDiv.id = id;
-        tempDiv.textContent = rawCode;
-        tempDiv.style.position = 'absolute';
-        tempDiv.style.left = '-9999px';
-        document.body.appendChild(tempDiv);
-        await mermaid.run({ nodes: [tempDiv] });
-        const svgEl = tempDiv.querySelector('svg');
-        if (!svgEl) throw new Error('No SVG from fallback');
-        svgString = svgEl.outerHTML;
-        document.body.removeChild(tempDiv);
-      }
-
-      // Parse SVG string to DOM element
-      const parser = new DOMParser();
-      const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
-      const svgElement = svgDoc.querySelector('svg');
-      if (!svgElement) throw new Error('Invalid SVG');
-
-      // Build diagram wrapper + toolbar
-      const diagramWrapper = document.createElement('div');
-      diagramWrapper.className = 'mermaid-diagram-wrapper';
-      diagramWrapper.style.position = 'relative';
-      diagramWrapper.appendChild(svgElement);
-
-      const toolbar = document.createElement('div');
-      toolbar.className = 'mermaid-toolbar';
-      toolbar.style.cssText = 'display:flex; justify-content:flex-end; padding:4px 0;';
-      const downloadBtn = document.createElement('button');
-      downloadBtn.textContent = 'Save as PNG';
-      downloadBtn.className = 'copy-btn';
-      downloadBtn.addEventListener('click', () => {
-        downloadMermaidAsPNG(svgElement);
-      });
-      toolbar.appendChild(downloadBtn);
-      diagramWrapper.appendChild(toolbar);
-
-      // Replace the code-block wrapper (or the <pre> as fallback)
-      const wrapper = code.closest('.code-block') || code.parentElement!;
-      if (wrapper && wrapper.parentNode) {
-        wrapper.parentNode.replaceChild(diagramWrapper, wrapper);
-      } else {
-        code.parentElement?.replaceWith(diagramWrapper);
-      }
-
-      console.log(`[Mermaid] Rendered diagram "${id}"`);
-
-    } catch (err) {
-      console.error('[Mermaid] Render failed:', err);
-      // Keep the original code block as fallback
-    }
-  }
-}
-
-function downloadMermaidAsPNG(svgElement: SVGElement) {
-  try {
-    const svgData = new XMLSerializer().serializeToString(svgElement);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-
-    const img = new Image();
-    img.onload = () => {
-      const scale = 2;
-      const svgRect = svgElement.getBoundingClientRect();
-      const width = svgRect.width || 600;
-      const height = svgRect.height || 400;
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width * scale;
-      canvas.height = height * scale;
-      canvas.style.width = width + 'px';
-      canvas.style.height = height + 'px';
-
-      const ctx = canvas.getContext('2d')!;
-      ctx.scale(scale, scale);
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(blob => {
-        if (!blob) return;
-        const downloadUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = 'diagram.png';
-        a.click();
-        URL.revokeObjectURL(downloadUrl);
-      }, 'image/png');
-
-      URL.revokeObjectURL(url);
-    };
-    img.onerror = () => console.error('Failed to load SVG into image');
-    img.src = url;
-  } catch (err) {
-    console.error('PNG download failed:', err);
-  }
-}
-
 export function getTime(): string {
   const d = new Date();
   return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -233,3 +104,4 @@ export function syncHljsTheme(isDark: boolean) {
   if (light) light.media = isDark ? 'not all' : 'all';
   if (dark)  dark.media  = isDark ? 'all' : 'not all';
 }
+        
