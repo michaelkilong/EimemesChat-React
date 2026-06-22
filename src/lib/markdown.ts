@@ -1,4 +1,4 @@
-// lib/markdown.ts — v1.2 — Client‑only dynamic Mermaid import for build compatibility
+// lib/markdown.ts — v1.4 — Use mermaid.render for reliable SVG generation
 import { marked } from 'marked';
 import katex from 'katex';
 import hljs from 'highlight.js';
@@ -92,34 +92,41 @@ export async function renderMermaidBlocks(container: HTMLElement) {
 
   for (const code of mermaidBlocks) {
     try {
-      // Dynamic import – Mermaid loads only in the browser
       const mermaid = (await import('mermaid')).default;
-
-      const pre = code.parentElement!;
       const mermaidCode = code.textContent || '';
-
       const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
 
-      const tempDiv = document.createElement('div');
-      tempDiv.style.display = 'none';
-      tempDiv.id = id;
-      tempDiv.textContent = mermaidCode;
-      document.body.appendChild(tempDiv);
-
-      await mermaid.run({ nodes: [tempDiv] });
-      const svgElement = tempDiv.querySelector('svg');
-      if (!svgElement) {
+      // Primary method: mermaid.render returns SVG string directly
+      let svgString: string;
+      try {
+        const { svg } = await mermaid.render(id, mermaidCode);
+        svgString = svg;
+      } catch {
+        // Fallback: try run method on a temp element
+        const tempDiv = document.createElement('div');
+        tempDiv.id = id;
+        tempDiv.textContent = mermaidCode;
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        document.body.appendChild(tempDiv);
+        await mermaid.run({ nodes: [tempDiv] });
+        const svgEl = tempDiv.querySelector('svg');
+        if (!svgEl) throw new Error('No SVG');
+        svgString = svgEl.outerHTML;
         document.body.removeChild(tempDiv);
-        throw new Error('No SVG generated');
       }
 
-      const svgClone = svgElement.cloneNode(true) as SVGElement;
-      document.body.removeChild(tempDiv);
+      // Parse SVG string to DOM element
+      const parser = new DOMParser();
+      const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
+      const svgElement = svgDoc.querySelector('svg');
+      if (!svgElement) throw new Error('Invalid SVG');
 
+      // Build diagram wrapper + toolbar
       const diagramWrapper = document.createElement('div');
       diagramWrapper.className = 'mermaid-diagram-wrapper';
       diagramWrapper.style.position = 'relative';
-      diagramWrapper.appendChild(svgClone);
+      diagramWrapper.appendChild(svgElement);
 
       const toolbar = document.createElement('div');
       toolbar.className = 'mermaid-toolbar';
@@ -128,15 +135,22 @@ export async function renderMermaidBlocks(container: HTMLElement) {
       downloadBtn.textContent = 'Save as PNG';
       downloadBtn.className = 'copy-btn';
       downloadBtn.addEventListener('click', () => {
-        downloadMermaidAsPNG(svgClone);
+        downloadMermaidAsPNG(svgElement);
       });
       toolbar.appendChild(downloadBtn);
       diagramWrapper.appendChild(toolbar);
 
-      pre.replaceWith(diagramWrapper);
+      // Replace the whole .code-block wrapper if it exists, otherwise just the <pre>
+      const wrapper = code.closest('.code-block') || code.parentElement!;
+      if (wrapper && wrapper.parentNode) {
+        wrapper.parentNode.replaceChild(diagramWrapper, wrapper);
+      } else {
+        code.parentElement?.replaceWith(diagramWrapper);
+      }
 
     } catch (err) {
       console.warn('Mermaid render failed:', err);
+      // Keep the original code block as fallback
     }
   }
 }
