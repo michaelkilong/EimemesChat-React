@@ -1,4 +1,4 @@
-// api/tts.js — v1.1 — Fixed import for Vercel compatibility
+// api/tts.js — v1.2 — Direct Microsoft Edge TTS API (no package, no key, free)
 export default async function handler(req, res) {
   // ── CORS ────────────────────────────────────────────────────
   const origin = req.headers.origin || '';
@@ -24,19 +24,36 @@ export default async function handler(req, res) {
 
   const safeText = text.slice(0, 2000).trim();
 
-  // ── TTS via Microsoft Edge (free, no key) ────────────────────
+  // ── Microsoft Edge TTS (free, no key required) ───────────────
   try {
-    const { EdgeTTS } = await import('edge-tts');
-    const tts = new EdgeTTS({
-      voice: 'en-US-AriaNeural',
-      rate: '+0%',
-      pitch: '+0Hz',
-    });
+    // Construct SSML for the request
+    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+      <voice name="en-US-AriaNeural">
+        ${safeText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+      </voice>
+    </speak>`;
+
+    const response = await fetch(
+      `https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        body: ssml,
+      }
+    );
+
+    if (!response.ok) throw new Error(`TTS API returned ${response.status}`);
+
+    const audioBuffer = await response.arrayBuffer();
 
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(Buffer.from(audioBuffer));
 
-    await tts.stream(safeText, res);
   } catch (err) {
     console.error('[tts] Error:', err.message);
     if (!res.headersSent) {
