@@ -1,4 +1,4 @@
-// InputArea.tsx — v2.13 — Placeholder at top, icons at bottom, taller input box
+// InputArea.tsx — v2.14 — Dedicated spacer for obvious separation between text and icons
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -145,13 +145,12 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           borderRadius: '20px',
           boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
           padding: '14px 16px 12px',
-          minHeight: '90px',
+          minHeight: '100px',                              // generous height
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'space-between',
         }}>
 
-          {/* Textarea — sits at the top */}
+          {/* Textarea — pinned to top */}
           <textarea
             ref={textareaRef}
             value={value}
@@ -178,8 +177,11 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
             }}
           />
 
+          {/* Dedicated spacer — creates obvious gap */}
+          <div style={{ flex: 1 }} />
+
           {/* ── Toolbar row (pinned to bottom) ── */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, marginTop: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
 
             {/* Left: web search pill */}
             <div style={{ display: 'flex', alignItems: 'center' }}>
