@@ -1,4 +1,4 @@
-// Sidebar.tsx — v2.2 — Adjusted font weight & white titles for inactive conversations
+// Sidebar.tsx — v2.3 — Increased mobile overlay blur for better sidebar distinction
 import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -131,7 +131,7 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
           style={{
             display: 'block', position: 'fixed', inset: 0,
             background: 'rgba(0,0,0,0.55)', zIndex: 29,
-            backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+            backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
           }}
         />
       )}
@@ -243,9 +243,9 @@ export default function Sidebar({ conversations, currentConvId, onNewChat, onSel
                   onContextMenu={e => e.preventDefault()}
                   style={{
                     padding: '9px 12px', borderRadius: '10px',
-                    color: conv.id === currentConvId ? 'var(--accent)' : 'var(--text-1)',   // white for inactive
+                    color: conv.id === currentConvId ? 'var(--accent)' : 'var(--text-1)',
                     background: conv.id === currentConvId ? 'var(--accent-dim)' : 'transparent',
-                    fontWeight: 500,                                                       // regular weight
+                    fontWeight: 500,
                     fontSize: '14.5px', cursor: 'pointer',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     transition: 'background 0.12s, color 0.12s',
