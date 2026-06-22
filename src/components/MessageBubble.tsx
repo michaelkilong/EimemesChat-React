@@ -1,4 +1,4 @@
-// MessageBubble.tsx — v1.5 — Original structure, emoji filter, better voice selection
+// MessageBubble.tsx — v1.6 — Font size via CSS variable
 import React, { useEffect, useRef, useState } from 'react';
 import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
@@ -39,7 +39,7 @@ function ActionBtn({ title, onClick, active, activeColor, children }: {
   );
 }
 
-/** Removes markdown and emojis so speech sounds natural */
+/** Clean text for speech: removes markdown, emojis, symbols */
 function stripForSpeech(text: string): string {
   return text
     .replace(/```[\s\S]*?```/g, '')
@@ -81,7 +81,6 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
     }
   }, [message.content, message.role, showToast, msgKey]);
 
-  // Cancel speech when component unmounts (original behaviour)
   useEffect(() => {
     return () => {
       if (uttRef.current) window.speechSynthesis.cancel();
@@ -100,11 +99,10 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
     haptic.light();
     const clean = stripForSpeech(message.content);
     const utt   = new SpeechSynthesisUtterance(clean);
-    utt.rate    = 0.95;   // slightly slower, more natural
+    utt.rate    = 0.95;
     utt.pitch   = 1;
     utt.volume  = 1;
 
-    // Pick the best available natural voice (synchronous – original logic)
     const voices = window.speechSynthesis.getVoices();
     const preferred = voices.find(v =>
       v.lang.startsWith('en') && (
@@ -221,7 +219,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
           <div
             ref={bodyRef}
             className="msg-body"
-            style={{ color: 'var(--text-1)', fontSize: '16px', lineHeight: 1.75, padding: '2px 0' }}
+            style={{ color: 'var(--text-1)', fontSize: 'var(--msg-font-size)', lineHeight: 1.75, padding: '2px 0' }}
           />
         )}
 
@@ -229,7 +227,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
 
         {message.sources?.length ? <SourcesList sources={message.sources} msgKey={msgKey} /> : null}
 
-        {/* Action bar — all actions except regenerate always visible */}
+        {/* Action bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0px', marginTop: '6px' }}>
 
           {/* Copy */}
