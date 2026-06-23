@@ -1,4 +1,5 @@
 // App.tsx
+// v2.9 — Timestamp‑based cooldown + troubleshooting hints + Google fallback
 // v2.8 — Fixed resend countdown (uses ref for interval)
 // v2.7 — Enforced email verification for password sign-ups + resend cooldown
 // v2.6 — Clean email verification gate + auto‑dismiss
@@ -69,8 +70,29 @@ export default function App() {
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
   const [dailyCount,        setDailyCount]        = useState(0);
   const [verifying,         setVerifying]         = useState(false);
-  const [resendCooldown,    setResendCooldown]    = useState(0);
-  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Timestamp‑based cooldown (survives backgrounding) ────────
+  const [cooldownUntil, setCooldownUntil] = useState<number>(() => {
+    const stored = localStorage.getItem('ec_verify_cooldown');
+    return stored ? parseInt(stored, 10) : 0;
+  });
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Recalculate remaining cooldown every second
+  useEffect(() => {
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
+      setResendCooldown(remaining);
+      if (remaining <= 0) {
+        if (tickRef.current) clearInterval(tickRef.current);
+        localStorage.removeItem('ec_verify_cooldown');
+      }
+    };
+    tick();
+    tickRef.current = setInterval(tick, 1000);
+    return () => { if (tickRef.current) clearInterval(tickRef.current); };
+  }, [cooldownUntil]);
 
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
@@ -85,13 +107,6 @@ export default function App() {
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [currentUser]);
-
-  // Cleanup cooldown interval on unmount
-  useEffect(() => {
-    return () => {
-      if (cooldownRef.current) clearInterval(cooldownRef.current);
-    };
-  }, []);
 
   const handleNewChat = useCallback(async () => {
     if (currentConvId) {
@@ -145,7 +160,6 @@ export default function App() {
     const trimmed = [...msgs];
     while (trimmed.length && trimmed[trimmed.length - 1].role === 'assistant') trimmed.pop();
     await updateDoc(convRef, { messages: trimmed, updatedAt: new Date() });
-    // Use regenerate to avoid duplicating the user message
     regenerate(originalMsg);
   }, [currentConvId, isSending, isStreaming, getConvRef, regenerate]);
 
@@ -185,25 +199,14 @@ export default function App() {
     setVerifying(true);
     try {
       await reload(currentUser);
-      if (currentUser.emailVerified) return; // gate auto‑dismiss
+      if (currentUser.emailVerified) return;
       await sendEmailVerification(currentUser);
       showToast('Verification email sent! Check your inbox.');
 
-      // Clear any old interval before starting a new one
-      if (cooldownRef.current) clearInterval(cooldownRef.current);
+      const until = Date.now() + 60000;
+      setCooldownUntil(until);
+      localStorage.setItem('ec_verify_cooldown', until.toString());
       setResendCooldown(60);
-      cooldownRef.current = setInterval(() => {
-        setResendCooldown(prev => {
-          if (prev <= 1) {
-            if (cooldownRef.current) {
-              clearInterval(cooldownRef.current);
-              cooldownRef.current = null;
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
     } catch {
       showToast('Failed to send. Please try again.');
     } finally {
@@ -213,7 +216,6 @@ export default function App() {
 
   if (!authReady) return <LoadingScreen visible />;
 
-  // Block access until email is verified for password sign‑ups
   if (needsVerification) {
     return (
       <div style={{ display: 'flex', height: '100dvh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-a)', padding: '24px' }}>
@@ -261,6 +263,47 @@ export default function App() {
             onMouseLeave={e => { if (!verifying && resendCooldown === 0) e.currentTarget.style.background = 'var(--glass-2)'; }}
           >
             {verifying ? 'Sending…' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
+          </button>
+
+          {/* ── Troubleshooting tips ────────────────────────────── */}
+          <div style={{ marginTop: '24px', padding: '16px', background: 'var(--glass-2)', borderRadius: '14px', textAlign: 'left' }}>
+            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '8px' }}>
+              Not seeing the email?
+            </p>
+            <ul style={{ fontSize: '13px', color: 'var(--text-3)', lineHeight: 1.6, paddingLeft: '16px', margin: 0 }}>
+              <li>Check your <strong style={{ color: 'var(--text-2)' }}>spam / junk folder</strong></li>
+              <li>Make sure you entered the correct email address</li>
+              <li>Wait a few minutes — some providers are slow</li>
+              <li>If all else fails, use Google Sign‑In below</li>
+            </ul>
+          </div>
+
+          {/* ── Google fallback ─────────────────────────────────── */}
+          <button
+            onClick={async () => {
+              if (currentUser) {
+                try { await signOut(auth); } catch {}
+              }
+            }}
+            style={{
+              width: '100%', padding: '14px', borderRadius: '14px',
+              background: 'var(--glass-1)', color: 'var(--text-1)',
+              fontSize: '15px', fontWeight: 500, fontFamily: 'inherit',
+              border: '1px solid var(--border)',
+              cursor: 'pointer', marginTop: '12px',
+              transition: 'background 0.15s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-2)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-1)'; }}
+          >
+            <svg width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#4285F4" d="M24 9.5c3.19 0 5.38 1.38 6.62 2.53l4.88-4.76C32.48 4.1 28.58 2 24 2 14.82 2 7.07 7.71 4.04 15.53l5.68 4.41C11.36 13.77 17.18 9.5 24 9.5z"/>
+              <path fill="#34A853" d="M46 24.5c0-1.57-.14-2.73-.43-3.91H24v7.38h12.72C36.19 31.31 33.68 34 30.36 35.62l5.52 4.28C40.93 36.08 46 30.86 46 24.5z"/>
+              <path fill="#FBBC05" d="M9.72 28.63A14.5 14.5 0 0 1 9.5 24c0-1.61.28-3.17.78-4.62l-5.68-4.41A23.96 23.96 0 0 0 2 24c0 3.87.93 7.53 2.57 10.76l5.15-6.13z"/>
+              <path fill="#EA4335" d="M24 46c4.97 0 9.15-1.64 12.21-4.46l-5.52-4.28C28.93 38.68 26.65 39.5 24 39.5c-6.82 0-12.64-4.27-14.28-10.87l-5.15 6.13C7.07 42.29 14.82 46 24 46z"/>
+            </svg>
+            Try Google Sign‑In instead
           </button>
 
           <p style={{ fontSize: '13px', color: 'var(--text-3)', marginTop: '20px' }}>
