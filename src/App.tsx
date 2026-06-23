@@ -1,8 +1,10 @@
 // App.tsx
+// v2.6 — Enforced email verification for password sign-ups (no dummy emails)
 // v2.4 — Fixed regen doubling bug by using regenerate from useChat instead of handleSend
 import React, { useState, useCallback, useEffect } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
+import { sendEmailVerification, reload, signOut } from 'firebase/auth';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
@@ -25,7 +27,7 @@ import type { Attachment }   from './types';
 const DAILY_LIMIT = 150;
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
-// Circular icon button
+// Circular icon button (unchanged)
 function CircleBtn({ onClick, children, className }: { onClick: () => void; children: React.ReactNode; className?: string }) {
   const [pressed, setPressed] = useState(false);
   return (
@@ -59,14 +61,26 @@ export default function App() {
   useAuth();
   useTheme();
 
-  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen } = useApp();
+  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen, showToast } = useApp();
   const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
   const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
   const [dailyCount,        setDailyCount]        = useState(0);
+  const [verifying,         setVerifying]         = useState(false);
 
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
+
+  // Reload user when window gains focus – auto-dismisses verification gate once verified
+  useEffect(() => {
+    const onFocus = () => {
+      if (currentUser && !currentUser.emailVerified) {
+        reload(currentUser).catch(() => {});
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [currentUser]);
 
   const handleNewChat = useCallback(async () => {
     if (currentConvId) {
@@ -150,8 +164,93 @@ export default function App() {
     ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
     : '';
 
+  // ── Email verification gate (password accounts only) ─────────
+  const needsVerification = currentUser
+    && !currentUser.emailVerified
+    && currentUser.providerData?.some(p => p.providerId === 'password');
+
+  const resendVerification = async () => {
+    if (!currentUser || verifying) return;
+    setVerifying(true);
+    try {
+      await sendEmailVerification(currentUser);
+      showToast('Verification email sent! Check your inbox.');
+    } catch {
+      showToast('Failed to send. Please try again.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   if (!authReady) return <LoadingScreen visible />;
 
+  // Block access until email is verified for password sign‑ups
+  if (needsVerification) {
+    return (
+      <div style={{ display: 'flex', height: '100dvh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-a)', padding: '24px' }}>
+        <div style={{ maxWidth: '420px', width: '100%', textAlign: 'center' }}>
+          {/* Mail icon */}
+          <div style={{
+            width: '72px', height: '72px', borderRadius: '50%',
+            background: 'linear-gradient(135deg, #0a84ff22, #0a84ff0a)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 24px',
+          }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+              <path d="m22 4-10 8L2 4"/>
+            </svg>
+          </div>
+
+          <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '24px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}>
+            Check your email
+          </h2>
+          <p style={{ fontSize: '15px', color: 'var(--text-2)', lineHeight: 1.6, marginBottom: '8px' }}>
+            We sent a verification link to
+          </p>
+          <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '24px', wordBreak: 'break-all' }}>
+            {currentUser?.email}
+          </p>
+          <p style={{ fontSize: '14px', color: 'var(--text-3)', lineHeight: 1.5, marginBottom: '28px' }}>
+            Click the link in the email to verify your account.
+            This page will update automatically once verified.
+          </p>
+
+          <button
+            onClick={resendVerification}
+            disabled={verifying}
+            style={{
+              width: '100%', padding: '14px', borderRadius: '14px',
+              background: 'var(--glass-2)', color: 'var(--text-1)',
+              fontSize: '15px', fontWeight: 500, fontFamily: 'inherit',
+              border: '1px solid var(--border)', cursor: verifying ? 'default' : 'pointer',
+              opacity: verifying ? 0.6 : 1, transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => { if (!verifying) e.currentTarget.style.background = 'var(--glass-1)'; }}
+            onMouseLeave={e => { if (!verifying) e.currentTarget.style.background = 'var(--glass-2)'; }}
+          >
+            {verifying ? 'Sending…' : 'Resend verification email'}
+          </button>
+
+          <p style={{ fontSize: '13px', color: 'var(--text-3)', marginTop: '20px' }}>
+            Wrong email?{' '}
+            <span
+              onClick={async () => {
+                if (currentUser) {
+                  try { await signOut(auth); } catch {}
+                }
+              }}
+              style={{ color: '#0a84ff', cursor: 'pointer', fontWeight: 500 }}
+            >
+              Sign out and start over
+            </span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main app (verified or Google user) ───────────────────────
   return (
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
       <LoadingScreen visible={false} />
