@@ -1,5 +1,6 @@
 // App.tsx
-// v2.6 — Enforced email verification for password sign-ups (no dummy emails)
+// v2.7 — Enforced email verification for password sign-ups + resend cooldown
+// v2.6 — Clean email verification gate + auto‑dismiss
 // v2.4 — Fixed regen doubling bug by using regenerate from useChat instead of handleSend
 import React, { useState, useCallback, useEffect } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -67,6 +68,7 @@ export default function App() {
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
   const [dailyCount,        setDailyCount]        = useState(0);
   const [verifying,         setVerifying]         = useState(false);
+  const [resendCooldown,    setResendCooldown]    = useState(0);
 
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
@@ -170,11 +172,22 @@ export default function App() {
     && currentUser.providerData?.some(p => p.providerId === 'password');
 
   const resendVerification = async () => {
-    if (!currentUser || verifying) return;
+    if (!currentUser || verifying || resendCooldown > 0) return;
     setVerifying(true);
     try {
+      // Reload user to ensure latest state before sending
+      await reload(currentUser);
+      if (currentUser.emailVerified) return; // already verified, gate will auto-dismiss
       await sendEmailVerification(currentUser);
       showToast('Verification email sent! Check your inbox.');
+      // Start cooldown (60 seconds)
+      setResendCooldown(60);
+      const interval = setInterval(() => {
+        setResendCooldown(prev => {
+          if (prev <= 1) { clearInterval(interval); return 0; }
+          return prev - 1;
+        });
+      }, 1000);
     } catch {
       showToast('Failed to send. Please try again.');
     } finally {
@@ -218,18 +231,20 @@ export default function App() {
 
           <button
             onClick={resendVerification}
-            disabled={verifying}
+            disabled={verifying || resendCooldown > 0}
             style={{
               width: '100%', padding: '14px', borderRadius: '14px',
               background: 'var(--glass-2)', color: 'var(--text-1)',
               fontSize: '15px', fontWeight: 500, fontFamily: 'inherit',
-              border: '1px solid var(--border)', cursor: verifying ? 'default' : 'pointer',
-              opacity: verifying ? 0.6 : 1, transition: 'background 0.15s',
+              border: '1px solid var(--border)',
+              cursor: (verifying || resendCooldown > 0) ? 'default' : 'pointer',
+              opacity: (verifying || resendCooldown > 0) ? 0.6 : 1,
+              transition: 'background 0.15s',
             }}
-            onMouseEnter={e => { if (!verifying) e.currentTarget.style.background = 'var(--glass-1)'; }}
-            onMouseLeave={e => { if (!verifying) e.currentTarget.style.background = 'var(--glass-2)'; }}
+            onMouseEnter={e => { if (!verifying && resendCooldown === 0) e.currentTarget.style.background = 'var(--glass-1)'; }}
+            onMouseLeave={e => { if (!verifying && resendCooldown === 0) e.currentTarget.style.background = 'var(--glass-2)'; }}
           >
-            {verifying ? 'Sending…' : 'Resend verification email'}
+            {verifying ? 'Sending…' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
           </button>
 
           <p style={{ fontSize: '13px', color: 'var(--text-3)', marginTop: '20px' }}>
