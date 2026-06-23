@@ -1,11 +1,15 @@
-// components/modals/LoginModal.tsx — v1.2 (blue checkbox + legal links)
+// components/modals/LoginModal.tsx — v1.3 (password reset, email verification, Google detection)
 import React, { useState } from 'react';
 import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { auth, gauth } from '../../firebase';
+import { useApp } from '../../context/AppContext';
 
 declare global {
   interface Window {
@@ -37,6 +41,7 @@ function isWebView(): boolean {
 interface Props { visible: boolean; }
 
 export default function LoginModal({ visible }: Props) {
+  const { showToast } = useApp();
   const [isSignUp,      setIsSignUp]      = useState(true);
   const [email,         setEmail]         = useState('');
   const [password,      setPassword]      = useState('');
@@ -72,6 +77,19 @@ export default function LoginModal({ visible }: Props) {
   const handleEmail = async () => {
     if (!agreed) { setError('Please agree to the terms first.'); return; }
     if (!email || !password) { setError('Please enter your email and password.'); return; }
+
+    // Check if this email is a Google‑only account (no password)
+    try {
+      const methods = await fetchSignInMethodsForEmail(auth, email.trim());
+      if (methods.includes('google.com') && !methods.includes('password')) {
+        setError('This email uses Google Sign‑In. Please continue with Google.');
+        return;
+      }
+    } catch (e: any) {
+      setError(friendlyAuthError(e.code));
+      return;
+    }
+
     setLoadingEmail(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -86,13 +104,42 @@ export default function LoginModal({ visible }: Props) {
     if (!agreed) { setError('Please agree to the terms first.'); return; }
     if (!email)              { setError('Please enter your email address.'); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+
+    // Quick check for existing account
+    try {
+      const methods = await fetchSignInMethodsForEmail(auth, email.trim());
+      if (methods.length > 0) {
+        setError('An account with this email already exists. Please sign in instead.');
+        return;
+      }
+    } catch (e: any) {
+      setError(friendlyAuthError(e.code));
+      return;
+    }
+
     setLoadingEmail(true);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(result.user);
+      showToast('Account created! Check your email to verify your address.');
     } catch (e: any) {
       setError(friendlyAuthError(e.code));
     } finally {
       setLoadingEmail(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Please enter your email address first.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      showToast('Password reset link sent! Check your inbox.');
+      setError('');
+    } catch (e: any) {
+      setError(friendlyAuthError(e.code));
     }
   };
 
@@ -126,7 +173,6 @@ export default function LoginModal({ visible }: Props) {
     transition: 'opacity .15s, background .15s, filter .15s',
   };
 
-  // tiny spinner SVG
   const spinner = (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite' }}>
       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
@@ -151,6 +197,23 @@ export default function LoginModal({ visible }: Props) {
 
         <input style={inputStyle} type="email"    placeholder="Email"    value={email}    onChange={e => { setEmail(e.target.value); setError(''); }} />
         <input style={inputStyle} type="password" placeholder="Password" value={password} onChange={e => { setPassword(e.target.value); setError(''); }} />
+
+        {/* Forgot password link – only shown in sign‑in mode */}
+        {!isSignUp && (
+          <div style={{ textAlign: 'right', marginBottom: '8px' }}>
+            <span
+              onClick={handleForgotPassword}
+              style={{
+                color: linkBlue,
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 500,
+              }}
+            >
+              Forgot password?
+            </span>
+          </div>
+        )}
 
         {isSignUp
           ? (
