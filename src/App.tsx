@@ -1,8 +1,9 @@
 // App.tsx
+// v2.8 — Fixed resend countdown (uses ref for interval)
 // v2.7 — Enforced email verification for password sign-ups + resend cooldown
 // v2.6 — Clean email verification gate + auto‑dismiss
 // v2.4 — Fixed regen doubling bug by using regenerate from useChat instead of handleSend
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { sendEmailVerification, reload, signOut } from 'firebase/auth';
@@ -69,6 +70,7 @@ export default function App() {
   const [dailyCount,        setDailyCount]        = useState(0);
   const [verifying,         setVerifying]         = useState(false);
   const [resendCooldown,    setResendCooldown]    = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
@@ -83,6 +85,13 @@ export default function App() {
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [currentUser]);
+
+  // Cleanup cooldown interval on unmount
+  useEffect(() => {
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, []);
 
   const handleNewChat = useCallback(async () => {
     if (currentConvId) {
@@ -175,16 +184,23 @@ export default function App() {
     if (!currentUser || verifying || resendCooldown > 0) return;
     setVerifying(true);
     try {
-      // Reload user to ensure latest state before sending
       await reload(currentUser);
-      if (currentUser.emailVerified) return; // already verified, gate will auto-dismiss
+      if (currentUser.emailVerified) return; // gate auto‑dismiss
       await sendEmailVerification(currentUser);
       showToast('Verification email sent! Check your inbox.');
-      // Start cooldown (60 seconds)
+
+      // Clear any old interval before starting a new one
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
       setResendCooldown(60);
-      const interval = setInterval(() => {
+      cooldownRef.current = setInterval(() => {
         setResendCooldown(prev => {
-          if (prev <= 1) { clearInterval(interval); return 0; }
+          if (prev <= 1) {
+            if (cooldownRef.current) {
+              clearInterval(cooldownRef.current);
+              cooldownRef.current = null;
+            }
+            return 0;
+          }
           return prev - 1;
         });
       }, 1000);
