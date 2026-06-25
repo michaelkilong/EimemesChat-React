@@ -1,12 +1,12 @@
 // App.tsx
+// v3.2 — Instant verification check via ID token claims (no backend call)
 // v3.1 — Backend‑verified email check (Admin SDK, no loading spinner)
 // v3.0 — Use ID token claims for verification (finally kills the gate)
-// v2.14 — LocalStorage verified flag prevents gate for verified users
 // (full history in previous versions)
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { sendEmailVerification, signOut } from 'firebase/auth';
+import { sendEmailVerification, signOut, getIdTokenResult } from 'firebase/auth';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
@@ -69,7 +69,7 @@ export default function App() {
   const [dailyCount,        setDailyCount]        = useState(0);
   const [verifying,         setVerifying]         = useState(false);
 
-  // ── Verification state from backend (lightning fast) ──────────
+  // ── Verification state (lightning fast token check) ──────────
   const [emailVerified, setEmailVerified] = useState<boolean | null>(
     localStorage.getItem('ec_email_verified') === 'true' ? true : null
   );
@@ -79,7 +79,7 @@ export default function App() {
       setEmailVerified(null);
       return;
     }
-    // Already confirmed verified — skip
+    // Already confirmed — done
     if (localStorage.getItem('ec_email_verified') === 'true') {
       setEmailVerified(true);
       return;
@@ -89,23 +89,17 @@ export default function App() {
       setEmailVerified(true);
       return;
     }
-    // Password user — check with backend
-    currentUser.getIdToken().then(token => {
-      fetch('/api/check-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    // Check ID token claims (instant, no network)
+    getIdTokenResult(currentUser, false)
+      .then(result => {
+        const verified = result.claims.email_verified === true;
+        setEmailVerified(verified);
+        if (verified) localStorage.setItem('ec_email_verified', 'true');
       })
-        .then(res => res.json())
-        .then(data => {
-          const verified = data.emailVerified === true;
-          setEmailVerified(verified);
-          if (verified) localStorage.setItem('ec_email_verified', 'true');
-        })
-        .catch(() => setEmailVerified(currentUser.emailVerified));
-    });
+      .catch(() => setEmailVerified(currentUser.emailVerified));
   }, [currentUser]);
 
-  // Cooldown logic (unchanged)
+  // Cooldown logic
   const [cooldownUntil, setCooldownUntil] = useState<number>(() => {
     const stored = localStorage.getItem('ec_verify_cooldown');
     return stored ? parseInt(stored, 10) : 0;
@@ -210,7 +204,7 @@ export default function App() {
     ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
     : '';
 
-  // ── Verification gate (based on backend check) ───────────────
+  // ── Verification gate (based on token claims, near‑instant) ──
   const isPasswordUser = currentUser?.providerData?.some(p => p.providerId === 'password');
   const needsVerification = currentUser
     && emailVerified === false
@@ -236,10 +230,7 @@ export default function App() {
 
   if (!authReady) return <LoadingScreen visible />;
 
-  // Show gate only while backend check is pending (emailVerified === null) or verification needed
-  // We don't show gate while emailVerified is null – we show nothing (loading screen is lightweight)
-  // Actually we need to wait until the check finishes, otherwise we'd flash the gate.
-  // We'll show a minimal loading screen while emailVerified is null.
+  // Tiny loading state while token claims are being read (a few ms at most)
   if (emailVerified === null) return <LoadingScreen visible />;
 
   if (needsVerification) {
