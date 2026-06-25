@@ -1,4 +1,4 @@
-// components/EditProfileView.tsx
+// components/EditProfileView.tsx — v2.2 (consistent UI, glass‑style controls)
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useProfile } from '../hooks/useProfile';
@@ -17,7 +17,6 @@ export default function EditProfileView({ onBack }: Props) {
   const [photoDataUrl, setPhotoDataUrl] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load existing custom photo and name from Firestore
   useEffect(() => {
     if (!currentUser) return;
     getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
@@ -50,6 +49,20 @@ export default function EditProfileView({ onBack }: Props) {
   };
 
   const removePhoto = () => setPhotoDataUrl('');
+
+  // Consistent button style for secondary actions
+  const secondaryBtnStyle: React.CSSProperties = {
+    padding: '10px 18px',
+    borderRadius: '12px',
+    background: 'var(--glass-2)',
+    color: 'var(--text-1)',
+    border: '1px solid var(--border)',
+    fontWeight: 500,
+    fontSize: '14px',
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    transition: 'background 0.15s',
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -85,14 +98,19 @@ export default function EditProfileView({ onBack }: Props) {
       </header>
 
       <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '24px 20px' }}>
-        {/* Photo */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+
+        {/* Avatar & photo controls – consistent style */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          marginBottom: '32px',
+        }}>
           <div style={{
             width: '96px', height: '96px', borderRadius: '50%',
-            margin: '0 auto 16px',
+            marginBottom: '20px',
             background: 'var(--accent-dim)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
           }}>
             {photoDataUrl ? (
               <img src={photoDataUrl} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -105,12 +123,9 @@ export default function EditProfileView({ onBack }: Props) {
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
             <button
               onClick={() => fileRef.current?.click()}
-              style={{
-                padding: '8px 16px', borderRadius: '8px',
-                background: 'var(--glass-2)', color: 'var(--accent)',
-                border: '1px solid var(--border)', fontWeight: 500,
-                fontSize: '13px', fontFamily: 'inherit', cursor: 'pointer',
-              }}
+              style={secondaryBtnStyle}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-1)'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-2)'}
             >
               {photoDataUrl ? 'Change Photo' : 'Add Photo'}
             </button>
@@ -118,11 +133,13 @@ export default function EditProfileView({ onBack }: Props) {
               <button
                 onClick={removePhoto}
                 style={{
-                  padding: '8px 16px', borderRadius: '8px',
-                  background: 'var(--glass-3)', color: '#ff6b6b',
-                  border: '1px solid rgba(255,107,107,0.25)', fontWeight: 500,
-                  fontSize: '13px', fontFamily: 'inherit', cursor: 'pointer',
+                  ...secondaryBtnStyle,
+                  color: '#ff6b6b',
+                  borderColor: 'rgba(255,107,107,0.25)',
+                  background: 'rgba(255,107,107,0.08)',
                 }}
+                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,107,107,0.15)'}
+                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,107,107,0.08)'}
               >
                 Remove
               </button>
@@ -131,7 +148,7 @@ export default function EditProfileView({ onBack }: Props) {
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
         </div>
 
-        {/* Name */}
+        {/* Name input – matching app glass style */}
         <div style={{
           background: 'var(--glass-2)', borderRadius: '16px',
           border: '1px solid var(--border)', padding: '4px',
