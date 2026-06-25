@@ -1,18 +1,11 @@
 // App.tsx
+// v3.0 — Use ID token claims for verification (finally kills the gate)
 // v2.14 — LocalStorage verified flag prevents gate for verified users
-// v2.13 — Use Firestore verified flag to dismiss gate (no more stuck wall)
-// v2.12 — Force re‑render after reload so verification gate disappears immediately
-// v2.11 — Sync React context after reload (fixes reappearing gate)
-// v2.10 — Lightweight verification check (no blocking loading screen)
-// v2.9 — Timestamp‑based cooldown + troubleshooting hints + Google fallback
-// v2.8 — Fixed resend countdown (uses ref for interval)
-// v2.7 — Enforced email verification for password sign-ups + resend cooldown
-// v2.6 — Clean email verification gate + auto‑dismiss
-// v2.4 — Fixed regen doubling bug by using regenerate from useChat instead of handleSend
+// (full history in previous versions)
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { sendEmailVerification, reload, signOut } from 'firebase/auth';
+import { sendEmailVerification, reload, signOut, getIdTokenResult } from 'firebase/auth';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
@@ -35,7 +28,6 @@ import type { Attachment }   from './types';
 const DAILY_LIMIT = 150;
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
-// Circular icon button (unchanged)
 function CircleBtn({ onClick, children, className }: { onClick: () => void; children: React.ReactNode; className?: string }) {
   const [pressed, setPressed] = useState(false);
   return (
@@ -75,9 +67,37 @@ export default function App() {
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
   const [dailyCount,        setDailyCount]        = useState(0);
   const [verifying,         setVerifying]         = useState(false);
-  const [userVersion,       setUserVersion]       = useState(0);
 
-  // ── Timestamp‑based cooldown (survives backgrounding) ────────
+  // ── Verification state from ID token claim ───────────────────
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+
+  // On user change, fetch the ID token claims to get real email_verified
+  useEffect(() => {
+    if (!currentUser) {
+      setEmailVerified(null);
+      return;
+    }
+    // Quick path: if localStorage already says verified, don't wait
+    if (localStorage.getItem('ec_email_verified') === 'true') {
+      setEmailVerified(true);
+      return;
+    }
+    // Fetch fresh token claims
+    getIdTokenResult(currentUser, true)  // true forces refresh
+      .then(result => {
+        const verified = result.claims.email_verified === true;
+        setEmailVerified(verified);
+        if (verified) {
+          localStorage.setItem('ec_email_verified', 'true');
+        }
+      })
+      .catch(() => {
+        // Fallback to cached claim
+        setEmailVerified(currentUser.emailVerified);
+      });
+  }, [currentUser]);
+
+  // Cooldown logic (unchanged)
   const [cooldownUntil, setCooldownUntil] = useState<number>(() => {
     const stored = localStorage.getItem('ec_verify_cooldown');
     return stored ? parseInt(stored, 10) : 0;
@@ -100,37 +120,7 @@ export default function App() {
   }, [cooldownUntil]);
 
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
-  const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
-
-  // Reload user when window gains focus – auto-dismisses verification gate once verified
-  useEffect(() => {
-    const onFocus = () => {
-      if (currentUser && !currentUser.emailVerified) {
-        reload(currentUser).then(() => {
-          setCurrentUser(auth.currentUser);
-          setUserVersion(v => v + 1);
-          if (auth.currentUser?.emailVerified) {
-            localStorage.setItem('ec_email_verified', 'true');   // persist verified state
-          }
-        }).catch(() => {});
-      }
-    };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [currentUser, setCurrentUser]);
-
-  // ── Keep emailVerified current without blocking the UI ─────────
-  useEffect(() => {
-    if (!currentUser) return;
-    if (currentUser.emailVerified) return;
-    reload(currentUser).then(() => {
-      setCurrentUser(auth.currentUser);
-      setUserVersion(v => v + 1);
-      if (auth.currentUser?.emailVerified) {
-        localStorage.setItem('ec_email_verified', 'true');
-      }
-    }).catch(() => {});
-  }, [currentUser, setCurrentUser]);
+  const { messages, setMessages, convTitle, setConvTitle, isStreamingRef } = useMessages(currentConvId);
 
   const handleNewChat = useCallback(async () => {
     if (currentConvId) {
@@ -180,7 +170,7 @@ export default function App() {
     if (!convRef) return;
     const snap = await getDoc(convRef);
     if (!snap.exists()) return;
-    const msgs    = snap.data().messages || [];
+    const msgs = snap.data().messages || [];
     const trimmed = [...msgs];
     while (trimmed.length && trimmed[trimmed.length - 1].role === 'assistant') trimmed.pop();
     await updateDoc(convRef, { messages: trimmed, updatedAt: new Date() });
@@ -197,7 +187,6 @@ export default function App() {
     setCurrentConvId(null);
   }, [clearAllChats]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
@@ -213,23 +202,19 @@ export default function App() {
     ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
     : '';
 
-  // ── Verification gate (password accounts only) ────────────────
-  // Gate only appears if:
-  // 1. User is password-based
-  // 2. Firebase says email is not verified
-  // 3. No localStorage flag indicating previous verification
+  // ── Verification gate (based on ID token, never stale) ───────
   const isPasswordUser = currentUser?.providerData?.some(p => p.providerId === 'password');
-  const localStorageVerified = localStorage.getItem('ec_email_verified') === 'true';
-  const needsVerification = currentUser && !currentUser.emailVerified && isPasswordUser && !localStorageVerified;
+  const needsVerification = currentUser
+    && emailVerified === false
+    && isPasswordUser;
 
   const resendVerification = async () => {
     if (!currentUser || verifying || resendCooldown > 0) return;
     setVerifying(true);
     try {
       await reload(currentUser);
-      if (currentUser.emailVerified) return;
       await sendEmailVerification(currentUser);
-      showToast('Verification email sent! Check your inbox.');
+      showToast('If your email is not yet verified, a new link has been sent.');
 
       const until = Date.now() + 60000;
       setCooldownUntil(until);
@@ -242,7 +227,7 @@ export default function App() {
     }
   };
 
-  if (!authReady) return <LoadingScreen visible />;
+  if (!authReady || emailVerified === null) return <LoadingScreen visible />;
 
   if (needsVerification) {
     return (
@@ -349,7 +334,6 @@ export default function App() {
     );
   }
 
-  // ── Main app (verified or Google user) ───────────────────────
   return (
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
       <LoadingScreen visible={false} />
@@ -383,7 +367,6 @@ export default function App() {
                   <line x1="3" y1="18" x2="21" y2="18"/>
                 </svg>
               </CircleBtn>
-
               <span style={{
                 position: 'absolute', left: '50%', transform: 'translateX(-50%)',
                 fontSize: '16px', fontWeight: 600, color: 'var(--text-1)',
@@ -392,7 +375,6 @@ export default function App() {
               }}>
                 {topbarTitle}
               </span>
-
               <CircleBtn onClick={handleNewChat} className="topbar-newchat">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>
@@ -400,7 +382,6 @@ export default function App() {
                 </svg>
               </CircleBtn>
             </header>
-
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <MessageList
                 messages={messages}
