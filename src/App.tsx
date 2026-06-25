@@ -1,4 +1,5 @@
 // App.tsx
+// v2.11 — Sync React context after reload (fixes reappearing gate)
 // v2.10 — Lightweight verification check (no blocking loading screen)
 // v2.9 — Timestamp‑based cooldown + troubleshooting hints + Google fallback
 // v2.8 — Fixed resend countdown (uses ref for interval)
@@ -65,7 +66,7 @@ export default function App() {
   useAuth();
   useTheme();
 
-  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen, showToast } = useApp();
+  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen, showToast, setCurrentUser } = useApp();
   const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
   const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
@@ -102,21 +103,23 @@ export default function App() {
   useEffect(() => {
     const onFocus = () => {
       if (currentUser && !currentUser.emailVerified) {
-        reload(currentUser).catch(() => {});
+        reload(currentUser).then(() => {
+          setCurrentUser(auth.currentUser);   // sync fresh state into React
+        }).catch(() => {});
       }
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [currentUser]);
+  }, [currentUser, setCurrentUser]);
 
   // ── Keep emailVerified current without blocking the UI ─────────
   useEffect(() => {
     if (!currentUser) return;
-    // If Firebase already knows the email is verified, trust it.
-    // Otherwise reload once to get the most recent status.
     if (currentUser.emailVerified) return;
-    reload(currentUser).catch(() => {});
-  }, [currentUser]);
+    reload(currentUser).then(() => {
+      setCurrentUser(auth.currentUser);   // sync fresh state into React
+    }).catch(() => {});
+  }, [currentUser, setCurrentUser]);
 
   const handleNewChat = useCallback(async () => {
     if (currentConvId) {
