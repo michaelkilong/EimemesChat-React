@@ -1,4 +1,4 @@
-// components/EditProfileView.tsx — v2.3 (uses Firebase Storage via useProfile)
+// components/EditProfileView.tsx — v2.4 (fallback to Google photo, consistent button sizes)
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useProfile } from '../hooks/useProfile';
@@ -17,14 +17,20 @@ export default function EditProfileView({ onBack }: Props) {
   const [photoDataUrl, setPhotoDataUrl] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load existing custom photo and name from Firestore
+  // Load existing custom photo from Firestore; fall back to Google photo
   useEffect(() => {
     if (!currentUser) return;
     getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
       if (snap.exists()) {
         const data = snap.data();
-        if (data.profilePhoto) setPhotoDataUrl(data.profilePhoto);
+        if (data.profilePhoto) {
+          setPhotoDataUrl(data.profilePhoto);
+        } else if (currentUser.photoURL) {
+          setPhotoDataUrl(currentUser.photoURL);
+        }
         if (data.displayName) setDisplayName(data.displayName);
+      } else if (currentUser.photoURL) {
+        setPhotoDataUrl(currentUser.photoURL);
       }
     });
   }, [currentUser]);
@@ -35,7 +41,7 @@ export default function EditProfileView({ onBack }: Props) {
     haptic.medium();
     await saveProfile(currentUser, {
       displayName: displayName.trim(),
-      photoURL: photoDataUrl,   // will be uploaded to Storage if it's a data URL
+      photoURL: photoDataUrl,
     });
     showToast('Profile saved!');
     onBack();
@@ -51,7 +57,9 @@ export default function EditProfileView({ onBack }: Props) {
 
   const removePhoto = () => setPhotoDataUrl('');
 
-  const secondaryBtnStyle: React.CSSProperties = {
+  // Consistent button sizes – both buttons have the same min‑width
+  const actionBtnStyle: React.CSSProperties = {
+    minWidth: '120px',
     padding: '10px 18px',
     borderRadius: '12px',
     background: 'var(--glass-2)',
@@ -98,11 +106,14 @@ export default function EditProfileView({ onBack }: Props) {
       </header>
 
       <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '24px 20px' }}>
-        {/* Photo */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        {/* Avatar & photo controls – consistent button sizes */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          marginBottom: '32px',
+        }}>
           <div style={{
             width: '96px', height: '96px', borderRadius: '50%',
-            margin: '0 auto 16px',
+            marginBottom: '20px',
             background: 'var(--accent-dim)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden',
@@ -119,7 +130,7 @@ export default function EditProfileView({ onBack }: Props) {
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
             <button
               onClick={() => fileRef.current?.click()}
-              style={secondaryBtnStyle}
+              style={actionBtnStyle}
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-1)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-2)'}
             >
@@ -129,7 +140,7 @@ export default function EditProfileView({ onBack }: Props) {
               <button
                 onClick={removePhoto}
                 style={{
-                  ...secondaryBtnStyle,
+                  ...actionBtnStyle,
                   color: '#ff6b6b',
                   borderColor: 'rgba(255,107,107,0.25)',
                   background: 'rgba(255,107,107,0.08)',
@@ -144,7 +155,7 @@ export default function EditProfileView({ onBack }: Props) {
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
         </div>
 
-        {/* Name */}
+        {/* Name input – matching app glass style */}
         <div style={{
           background: 'var(--glass-2)', borderRadius: '16px',
           border: '1px solid var(--border)', padding: '4px',
