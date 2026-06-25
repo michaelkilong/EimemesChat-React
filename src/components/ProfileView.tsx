@@ -1,4 +1,4 @@
-// components/ProfileView.tsx — v2.1 (custom photo from Firestore + editable profile)
+// components/ProfileView.tsx — v2.2 (clean profile, no card)
 import React, { useState, useEffect } from 'react';
 import { signOut } from 'firebase/auth';
 import { setDoc, doc, getDoc } from 'firebase/firestore';
@@ -65,7 +65,6 @@ export default function ProfileView({ onBack, getUserConvsRef }: Props) {
   const [customPhoto, setCustomPhoto] = useState<string | null>(null);
   const [customDisplayName, setCustomDisplayName] = useState<string | null>(null);
 
-  // Fetch custom profile data from Firestore
   useEffect(() => {
     if (!currentUser) return;
     getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
@@ -123,41 +122,41 @@ export default function ProfileView({ onBack, getUserConvsRef }: Props) {
         <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '22px', fontWeight: 700, color: 'var(--text-1)' }}>Profile</span>
       </header>
 
-      <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 40px' }}>
+      <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '24px 20px 40px' }}>
 
-        {/* Profile Card */}
+        {/* Clean profile identity block – no card */}
         <div style={{
-          background: 'var(--glass-2)', borderRadius: '18px',
-          border: '1px solid var(--border)', padding: '24px',
-          marginBottom: '24px', textAlign: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          paddingBottom: '32px', borderBottom: '1px solid var(--border-b)', marginBottom: '24px',
         }}>
           <div style={{
-            width: '72px', height: '72px', borderRadius: '50%',
-            margin: '0 auto 12px',
+            width: '88px', height: '88px', borderRadius: '50%',
+            marginBottom: '16px',
             background: 'var(--accent-dim)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
           }}>
             {photoUrl ? (
               <img src={photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="var(--accent)" stroke="none">
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="var(--accent)" stroke="none">
                 <circle cx="12" cy="8" r="4"/><path d="M12 14c-4.42 0-8 2.69-8 6h16c0-3.31-3.58-6-8-6z"/>
               </svg>
             )}
           </div>
-          <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '4px' }}>
+          <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '22px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '4px' }}>
             {displayName}
-          </div>
-          <div style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '16px' }}>
+          </h2>
+          <p style={{ fontSize: '14px', color: 'var(--text-3)', marginBottom: '16px' }}>
             {currentUser?.email}
-          </div>
+          </p>
           <button
             onClick={() => setEditingProfile(true)}
             style={{
-              padding: '8px 20px', borderRadius: '10px',
+              padding: '8px 20px', borderRadius: '20px',
               background: 'var(--accent-dim)', color: 'var(--accent)',
-              fontWeight: 600, fontSize: '13px', fontFamily: 'inherit',
+              fontWeight: 600, fontSize: '14px', fontFamily: 'inherit',
               border: 'none', cursor: 'pointer',
             }}
           >
