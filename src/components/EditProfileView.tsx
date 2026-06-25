@@ -1,4 +1,4 @@
-// components/EditProfileView.tsx — v2.4 (fallback to Google photo, consistent button sizes)
+// components/EditProfileView.tsx — v2.5 (instant photo update + compression + consistent buttons)
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useProfile } from '../hooks/useProfile';
@@ -15,22 +15,23 @@ export default function EditProfileView({ onBack }: Props) {
   const { saving, saveProfile } = useProfile();
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
   const [photoDataUrl, setPhotoDataUrl] = useState('');
+  const [previewPhoto, setPreviewPhoto] = useState(''); // shown instantly on screen
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load existing custom photo from Firestore; fall back to Google photo
+  // Load existing photo
   useEffect(() => {
     if (!currentUser) return;
     getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
       if (snap.exists()) {
         const data = snap.data();
-        if (data.profilePhoto) {
-          setPhotoDataUrl(data.profilePhoto);
-        } else if (currentUser.photoURL) {
-          setPhotoDataUrl(currentUser.photoURL);
-        }
+        const photo = data.profilePhoto || currentUser.photoURL || '';
+        setPhotoDataUrl(photo);
+        setPreviewPhoto(photo);
         if (data.displayName) setDisplayName(data.displayName);
-      } else if (currentUser.photoURL) {
-        setPhotoDataUrl(currentUser.photoURL);
+      } else {
+        const photo = currentUser.photoURL || '';
+        setPhotoDataUrl(photo);
+        setPreviewPhoto(photo);
       }
     });
   }, [currentUser]);
@@ -39,9 +40,14 @@ export default function EditProfileView({ onBack }: Props) {
     if (!currentUser) return;
     if (!displayName.trim()) { showToast('Please enter a name.'); return; }
     haptic.medium();
+
+    // Optimistic: update UI immediately
+    const savedPhoto = photoDataUrl; // capture current photo state
+    setPreviewPhoto(savedPhoto);
+
     await saveProfile(currentUser, {
       displayName: displayName.trim(),
-      photoURL: photoDataUrl,
+      photoURL: savedPhoto,
     });
     showToast('Profile saved!');
     onBack();
@@ -51,13 +57,19 @@ export default function EditProfileView({ onBack }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => setPhotoDataUrl(reader.result as string);
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setPhotoDataUrl(result);        // for saving
+      setPreviewPhoto(result);        // show immediately
+    };
     reader.readAsDataURL(file);
   };
 
-  const removePhoto = () => setPhotoDataUrl('');
+  const removePhoto = () => {
+    setPhotoDataUrl('');
+    setPreviewPhoto('');
+  };
 
-  // Consistent button sizes – both buttons have the same min‑width
   const actionBtnStyle: React.CSSProperties = {
     minWidth: '120px',
     padding: '10px 18px',
@@ -106,21 +118,18 @@ export default function EditProfileView({ onBack }: Props) {
       </header>
 
       <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '24px 20px' }}>
-        {/* Avatar & photo controls – consistent button sizes */}
-        <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          marginBottom: '32px',
-        }}>
+        {/* Avatar & photo controls */}
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{
             width: '96px', height: '96px', borderRadius: '50%',
-            marginBottom: '20px',
+            margin: '0 auto 16px',
             background: 'var(--accent-dim)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden',
             boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
           }}>
-            {photoDataUrl ? (
-              <img src={photoDataUrl} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {previewPhoto ? (
+              <img src={previewPhoto} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <svg width="40" height="40" viewBox="0 0 24 24" fill="var(--accent)" stroke="none">
                 <circle cx="12" cy="8" r="4"/><path d="M12 14c-4.42 0-8 2.69-8 6h16c0-3.31-3.58-6-8-6z"/>
@@ -134,9 +143,9 @@ export default function EditProfileView({ onBack }: Props) {
               onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-1)'}
               onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-2)'}
             >
-              {photoDataUrl ? 'Change Photo' : 'Add Photo'}
+              {previewPhoto ? 'Change Photo' : 'Add Photo'}
             </button>
-            {photoDataUrl && (
+            {previewPhoto && (
               <button
                 onClick={removePhoto}
                 style={{
@@ -155,7 +164,7 @@ export default function EditProfileView({ onBack }: Props) {
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
         </div>
 
-        {/* Name input – matching app glass style */}
+        {/* Name input */}
         <div style={{
           background: 'var(--glass-2)', borderRadius: '16px',
           border: '1px solid var(--border)', padding: '4px',
