@@ -1,4 +1,5 @@
 // App.tsx
+// v2.13 — Use Firestore verified flag to dismiss gate (no more stuck wall)
 // v2.12 — Force re‑render after reload so verification gate disappears immediately
 // v2.11 — Sync React context after reload (fixes reappearing gate)
 // v2.10 — Lightweight verification check (no blocking loading screen)
@@ -73,7 +74,7 @@ export default function App() {
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
   const [dailyCount,        setDailyCount]        = useState(0);
   const [verifying,         setVerifying]         = useState(false);
-  const [userVersion,       setUserVersion]       = useState(0);   // ← force re‑render after reload
+  const [userVersion,       setUserVersion]       = useState(0);
 
   // ── Timestamp‑based cooldown (survives backgrounding) ────────
   const [cooldownUntil, setCooldownUntil] = useState<number>(() => {
@@ -83,7 +84,6 @@ export default function App() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Recalculate remaining cooldown every second
   useEffect(() => {
     const tick = () => {
       const remaining = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
@@ -107,7 +107,7 @@ export default function App() {
       if (currentUser && !currentUser.emailVerified) {
         reload(currentUser).then(() => {
           setCurrentUser(auth.currentUser);
-          setUserVersion(v => v + 1);                  // ← force re‑render
+          setUserVersion(v => v + 1);
         }).catch(() => {});
       }
     };
@@ -121,9 +121,25 @@ export default function App() {
     if (currentUser.emailVerified) return;
     reload(currentUser).then(() => {
       setCurrentUser(auth.currentUser);
-      setUserVersion(v => v + 1);                  // ← force re‑render
+      setUserVersion(v => v + 1);
     }).catch(() => {});
   }, [currentUser, setCurrentUser]);
+
+  // ── Check Firestore verified flag (ultimate fallback) ─────────
+  const [firestoreVerified, setFirestoreVerified] = useState(false);
+  const [firestoreChecked, setFirestoreChecked] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
+      if (snap.exists() && snap.data().verified === true) {
+        setFirestoreVerified(true);
+      }
+      setFirestoreChecked(true);
+    }).catch(() => {
+      setFirestoreChecked(true);
+    });
+  }, [currentUser]);
 
   const handleNewChat = useCallback(async () => {
     if (currentConvId) {
@@ -233,7 +249,13 @@ export default function App() {
 
   if (!authReady) return <LoadingScreen visible />;
 
-  if (needsVerification) {
+  // Show gate only if:
+  // - needsVerification is true (Firebase says unverified)
+  // - Firestore doesn't have verified: true
+  // - Firestore check has completed
+  const showGate = needsVerification && !firestoreVerified && firestoreChecked;
+
+  if (showGate) {
     return (
       <div style={{ display: 'flex', height: '100dvh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-a)', padding: '24px' }}>
         <div style={{ maxWidth: '420px', width: '100%', textAlign: 'center' }}>
@@ -362,7 +384,6 @@ export default function App() {
         {/* ── CHAT VIEW ── */}
         {view === 'chat' && (
           <>
-            {/* Topbar */}
             <header style={{
               flexShrink: 0, display: 'flex', alignItems: 'center',
               justifyContent: 'space-between',
@@ -396,7 +417,6 @@ export default function App() {
               </CircleBtn>
             </header>
 
-            {/* MessageList fills remaining space; InputArea floats over it */}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <MessageList
                 messages={messages}
@@ -415,7 +435,6 @@ export default function App() {
                 onChipClick={handleSend}
                 onRegen={handleRegen}
               />
-              {/* InputArea positioned absolutely so messages scroll underneath it */}
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5 }}>
                 <InputArea
                   onSend={handleSend}
