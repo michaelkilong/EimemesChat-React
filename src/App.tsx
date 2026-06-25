@@ -1,4 +1,5 @@
 // App.tsx
+// v2.12 — Force re‑render after reload so verification gate disappears immediately
 // v2.11 — Sync React context after reload (fixes reappearing gate)
 // v2.10 — Lightweight verification check (no blocking loading screen)
 // v2.9 — Timestamp‑based cooldown + troubleshooting hints + Google fallback
@@ -72,6 +73,7 @@ export default function App() {
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
   const [dailyCount,        setDailyCount]        = useState(0);
   const [verifying,         setVerifying]         = useState(false);
+  const [userVersion,       setUserVersion]       = useState(0);   // ← force re‑render after reload
 
   // ── Timestamp‑based cooldown (survives backgrounding) ────────
   const [cooldownUntil, setCooldownUntil] = useState<number>(() => {
@@ -104,7 +106,8 @@ export default function App() {
     const onFocus = () => {
       if (currentUser && !currentUser.emailVerified) {
         reload(currentUser).then(() => {
-          setCurrentUser(auth.currentUser);   // sync fresh state into React
+          setCurrentUser(auth.currentUser);
+          setUserVersion(v => v + 1);                  // ← force re‑render
         }).catch(() => {});
       }
     };
@@ -117,7 +120,8 @@ export default function App() {
     if (!currentUser) return;
     if (currentUser.emailVerified) return;
     reload(currentUser).then(() => {
-      setCurrentUser(auth.currentUser);   // sync fresh state into React
+      setCurrentUser(auth.currentUser);
+      setUserVersion(v => v + 1);                  // ← force re‑render
     }).catch(() => {});
   }, [currentUser, setCurrentUser]);
 
