@@ -1,3 +1,4 @@
+// components/modals/DeleteAccountModal.tsx — v1.1 (cleaned UI)
 import React, { useState } from 'react';
 import { deleteUser } from 'firebase/auth';
 import { writeBatch, getDocs, doc } from 'firebase/firestore';
@@ -41,7 +42,7 @@ export default function DeleteAccountModal({ visible, onClose, getUserConvsRef }
   };
 
   return (
-    <div className={`modal-overlay ${visible ? 'show' : ''}`} style={{ border: '1px solid rgba(255,75,75,0.22)' }}>
+    <div className={`modal-overlay ${visible ? 'show' : ''}`}>
       <div className="modal-card" style={{ border: '1px solid rgba(255,75,75,0.22)' }}>
         <div style={{
           width: '52px', height: '52px', borderRadius: '16px',
@@ -62,14 +63,6 @@ export default function DeleteAccountModal({ visible, onClose, getUserConvsRef }
         <p style={{ fontSize: '13.5px', color: 'var(--text-3)', lineHeight: 1.55, marginBottom: '20px' }}>
           This action is permanent and cannot be undone. All your conversations and data will be erased forever.
         </p>
-        <div style={{
-          fontSize: '12.5px', color: '#ff6b6b',
-          background: 'rgba(255,75,75,0.08)', border: '1px solid rgba(255,75,75,0.15)',
-          borderRadius: '12px', padding: '10px 14px', marginBottom: '20px',
-          textAlign: 'left', lineHeight: 1.5,
-        }}>
-          You will be immediately signed out and your account will be deleted. This cannot be reversed.
-        </div>
         <button
           onClick={handleDelete}
           disabled={loading}
