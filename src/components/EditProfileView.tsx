@@ -1,10 +1,36 @@
-// components/EditProfileView.tsx — v2.5 (instant photo update + compression + consistent buttons)
+// components/EditProfileView.tsx — v2.6 (instant compression + consistent border style)
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useProfile } from '../hooks/useProfile';
 import { haptic } from '../lib/haptic';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+
+/** Resize a base64 image to max 400×400 and return a compressed JPEG data URL */
+function compressImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxSize = 400;
+      let { width, height } = img;
+      if (width <= maxSize && height <= maxSize) {
+        resolve(dataUrl);
+        return;
+      }
+      if (width > height) { height = Math.round((height / width) * maxSize); width = maxSize; }
+      else               { width  = Math.round((width  / height) * maxSize); height = maxSize; }
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = dataUrl;
+  });
+}
 
 interface Props {
   onBack: () => void;
@@ -14,8 +40,8 @@ export default function EditProfileView({ onBack }: Props) {
   const { currentUser, showToast } = useApp();
   const { saving, saveProfile } = useProfile();
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
-  const [photoDataUrl, setPhotoDataUrl] = useState('');
-  const [previewPhoto, setPreviewPhoto] = useState(''); // shown instantly on screen
+  const [photoDataUrl, setPhotoDataUrl] = useState('');    // the small version for saving
+  const [previewPhoto, setPreviewPhoto] = useState('');    // what you see on screen
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Load existing photo
@@ -40,27 +66,31 @@ export default function EditProfileView({ onBack }: Props) {
     if (!currentUser) return;
     if (!displayName.trim()) { showToast('Please enter a name.'); return; }
     haptic.medium();
-
-    // Optimistic: update UI immediately
-    const savedPhoto = photoDataUrl; // capture current photo state
-    setPreviewPhoto(savedPhoto);
-
     await saveProfile(currentUser, {
       displayName: displayName.trim(),
-      photoURL: savedPhoto,
+      photoURL: photoDataUrl,
     });
     showToast('Profile saved!');
     onBack();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      setPhotoDataUrl(result);        // for saving
-      setPreviewPhoto(result);        // show immediately
+    reader.onloadend = async () => {
+      const fullSize = reader.result as string;
+      // Compress immediately
+      try {
+        const small = await compressImage(fullSize);
+        setPhotoDataUrl(small);
+        setPreviewPhoto(small);      // show compressed version instantly
+      } catch {
+        // Fallback to original if compression fails
+        setPhotoDataUrl(fullSize);
+        setPreviewPhoto(fullSize);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -164,21 +194,31 @@ export default function EditProfileView({ onBack }: Props) {
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
         </div>
 
-        {/* Name input */}
+        {/* Name input – search bar style */}
         <div style={{
-          background: 'var(--glass-2)', borderRadius: '16px',
-          border: '1px solid var(--border)', padding: '4px',
+          display: 'flex', alignItems: 'center',
+          padding: '8px 12px',
+          borderRadius: '12px',
+          background: 'var(--glass-2)',
+          border: '1px solid var(--border-b)',
           marginBottom: '24px',
         }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginRight: '8px' }}>
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+          </svg>
           <input
             value={displayName}
             onChange={e => setDisplayName(e.target.value)}
             placeholder="Your name"
             maxLength={60}
             style={{
-              width: '100%', padding: '14px 16px', borderRadius: '12px',
-              background: 'var(--glass-1)', border: '1px solid var(--border)',
-              color: 'var(--text-1)', fontSize: '16px', outline: 'none',
+              flex: 1,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              fontSize: '16px',
+              color: 'var(--text-1)',
               fontFamily: 'inherit',
             }}
           />
