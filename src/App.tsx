@@ -1,4 +1,5 @@
 // App.tsx
+// v2.14 — LocalStorage verified flag prevents gate for verified users
 // v2.13 — Use Firestore verified flag to dismiss gate (no more stuck wall)
 // v2.12 — Force re‑render after reload so verification gate disappears immediately
 // v2.11 — Sync React context after reload (fixes reappearing gate)
@@ -108,6 +109,9 @@ export default function App() {
         reload(currentUser).then(() => {
           setCurrentUser(auth.currentUser);
           setUserVersion(v => v + 1);
+          if (auth.currentUser?.emailVerified) {
+            localStorage.setItem('ec_email_verified', 'true');   // persist verified state
+          }
         }).catch(() => {});
       }
     };
@@ -122,24 +126,11 @@ export default function App() {
     reload(currentUser).then(() => {
       setCurrentUser(auth.currentUser);
       setUserVersion(v => v + 1);
+      if (auth.currentUser?.emailVerified) {
+        localStorage.setItem('ec_email_verified', 'true');
+      }
     }).catch(() => {});
   }, [currentUser, setCurrentUser]);
-
-  // ── Check Firestore verified flag (ultimate fallback) ─────────
-  const [firestoreVerified, setFirestoreVerified] = useState(false);
-  const [firestoreChecked, setFirestoreChecked] = useState(false);
-
-  useEffect(() => {
-    if (!currentUser) return;
-    getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
-      if (snap.exists() && snap.data().verified === true) {
-        setFirestoreVerified(true);
-      }
-      setFirestoreChecked(true);
-    }).catch(() => {
-      setFirestoreChecked(true);
-    });
-  }, [currentUser]);
 
   const handleNewChat = useCallback(async () => {
     if (currentConvId) {
@@ -222,10 +213,14 @@ export default function App() {
     ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
     : '';
 
-  // ── Email verification gate (password accounts only) ─────────
-  const needsVerification = currentUser
-    && !currentUser.emailVerified
-    && currentUser.providerData?.some(p => p.providerId === 'password');
+  // ── Verification gate (password accounts only) ────────────────
+  // Gate only appears if:
+  // 1. User is password-based
+  // 2. Firebase says email is not verified
+  // 3. No localStorage flag indicating previous verification
+  const isPasswordUser = currentUser?.providerData?.some(p => p.providerId === 'password');
+  const localStorageVerified = localStorage.getItem('ec_email_verified') === 'true';
+  const needsVerification = currentUser && !currentUser.emailVerified && isPasswordUser && !localStorageVerified;
 
   const resendVerification = async () => {
     if (!currentUser || verifying || resendCooldown > 0) return;
@@ -249,17 +244,10 @@ export default function App() {
 
   if (!authReady) return <LoadingScreen visible />;
 
-  // Show gate only if:
-  // - needsVerification is true (Firebase says unverified)
-  // - Firestore doesn't have verified: true
-  // - Firestore check has completed
-  const showGate = needsVerification && !firestoreVerified && firestoreChecked;
-
-  if (showGate) {
+  if (needsVerification) {
     return (
       <div style={{ display: 'flex', height: '100dvh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-a)', padding: '24px' }}>
         <div style={{ maxWidth: '420px', width: '100%', textAlign: 'center' }}>
-          {/* Mail icon */}
           <div style={{
             width: '72px', height: '72px', borderRadius: '50%',
             background: 'linear-gradient(135deg, #0a84ff22, #0a84ff0a)',
@@ -304,7 +292,6 @@ export default function App() {
             {verifying ? 'Sending…' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
           </button>
 
-          {/* ── Troubleshooting tips ────────────────────────────── */}
           <div style={{ marginTop: '24px', padding: '16px', background: 'var(--glass-2)', borderRadius: '14px', textAlign: 'left' }}>
             <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '8px' }}>
               Not seeing the email?
@@ -317,7 +304,6 @@ export default function App() {
             </ul>
           </div>
 
-          {/* ── Google fallback ─────────────────────────────────── */}
           <button
             onClick={async () => {
               if (currentUser) {
@@ -380,8 +366,6 @@ export default function App() {
       />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-        {/* ── CHAT VIEW ── */}
         {view === 'chat' && (
           <>
             <header style={{
