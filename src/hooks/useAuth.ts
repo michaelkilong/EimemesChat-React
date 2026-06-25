@@ -8,9 +8,10 @@ import { useProfile } from './useProfile';
 export function useAuth() {
   const { setCurrentUser, setAuthReady } = useApp();
   const { ensureDisplayName } = useProfile();
-  const ensuredRef = useRef<string | null>(null);   // guard against repeated calls
+  const ensuredRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Catch Google redirect result when returning from auth
     getRedirectResult(auth).catch(() => {});
 
     const unsub = onAuthStateChanged(auth, user => {
