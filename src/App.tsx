@@ -1,5 +1,5 @@
 // App.tsx
-// v2.10 — Reload user before showing verification gate (fixes reappearing gate)
+// v2.10 — Lightweight verification check (no blocking loading screen)
 // v2.9 — Timestamp‑based cooldown + troubleshooting hints + Google fallback
 // v2.8 — Fixed resend countdown (uses ref for interval)
 // v2.7 — Enforced email verification for password sign-ups + resend cooldown
@@ -95,9 +95,6 @@ export default function App() {
     return () => { if (tickRef.current) clearInterval(tickRef.current); };
   }, [cooldownUntil]);
 
-  // ── Verification check state ──────────────────────────────────
-  const [verificationChecked, setVerificationChecked] = useState(false);
-
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
 
@@ -112,21 +109,13 @@ export default function App() {
     return () => window.removeEventListener('focus', onFocus);
   }, [currentUser]);
 
-  // ── Reload user on first detection to get accurate emailVerified ──
+  // ── Keep emailVerified current without blocking the UI ─────────
   useEffect(() => {
-    if (!currentUser) {
-      setVerificationChecked(false);
-      return;
-    }
-    // Only check for password users (Google users skip the gate)
-    if (!currentUser.providerData?.some(p => p.providerId === 'password')) {
-      setVerificationChecked(true);
-      return;
-    }
-    // Reload user to get the latest emailVerified status
-    reload(currentUser)
-      .then(() => setVerificationChecked(true))
-      .catch(() => setVerificationChecked(true));
+    if (!currentUser) return;
+    // If Firebase already knows the email is verified, trust it.
+    // Otherwise reload once to get the most recent status.
+    if (currentUser.emailVerified) return;
+    reload(currentUser).catch(() => {});
   }, [currentUser]);
 
   const handleNewChat = useCallback(async () => {
@@ -235,7 +224,7 @@ export default function App() {
     }
   };
 
-  if (!authReady || !verificationChecked) return <LoadingScreen visible />;
+  if (!authReady) return <LoadingScreen visible />;
 
   if (needsVerification) {
     return (
