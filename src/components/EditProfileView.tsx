@@ -1,8 +1,10 @@
 // components/EditProfileView.tsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useProfile } from '../hooks/useProfile';
 import { haptic } from '../lib/haptic';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface Props {
   onBack: () => void;
@@ -12,8 +14,20 @@ export default function EditProfileView({ onBack }: Props) {
   const { currentUser, showToast } = useApp();
   const { saving, saveProfile } = useProfile();
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
-  const [photoDataUrl, setPhotoDataUrl] = useState(currentUser?.photoURL || '');
+  const [photoDataUrl, setPhotoDataUrl] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Load existing custom photo and name from Firestore
+  useEffect(() => {
+    if (!currentUser) return;
+    getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.profilePhoto) setPhotoDataUrl(data.profilePhoto);
+        if (data.displayName) setDisplayName(data.displayName);
+      }
+    });
+  }, [currentUser]);
 
   const handleSave = async () => {
     if (!currentUser) return;
@@ -21,7 +35,7 @@ export default function EditProfileView({ onBack }: Props) {
     haptic.medium();
     await saveProfile(currentUser, {
       displayName: displayName.trim(),
-      photoURL: photoDataUrl || undefined,
+      photoURL: photoDataUrl,
     });
     showToast('Profile saved!');
     onBack();
