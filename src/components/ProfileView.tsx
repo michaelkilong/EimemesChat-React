@@ -1,9 +1,11 @@
+// components/ProfileView.tsx — v2.0 (editable profile)
 import React, { useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { setDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useApp } from '../context/AppContext';
 import DeleteAccountModal from './modals/DeleteAccountModal';
+import EditProfileView from './EditProfileView';
 
 interface Props {
   onBack: () => void;
@@ -59,6 +61,7 @@ function SettingsSection({ title, children }: { title: string; children: React.R
 export default function ProfileView({ onBack, getUserConvsRef }: Props) {
   const { currentUser, showToast, showConfirm } = useApp();
   const [deleteVisible, setDeleteVisible] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
 
   const handleLogoutAll = async () => {
     if (!currentUser) return;
@@ -75,6 +78,13 @@ export default function ProfileView({ onBack, getUserConvsRef }: Props) {
       showToast('Something went wrong. Please try again.');
     }
   };
+
+  if (editingProfile) {
+    return <EditProfileView onBack={() => setEditingProfile(false)} />;
+  }
+
+  const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User';
+  const photoUrl = currentUser?.photoURL;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
@@ -98,6 +108,46 @@ export default function ProfileView({ onBack, getUserConvsRef }: Props) {
       </header>
 
       <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 40px' }}>
+
+        {/* Profile Card */}
+        <div style={{
+          background: 'var(--glass-2)', borderRadius: '18px',
+          border: '1px solid var(--border)', padding: '24px',
+          marginBottom: '24px', textAlign: 'center',
+        }}>
+          <div style={{
+            width: '72px', height: '72px', borderRadius: '50%',
+            margin: '0 auto 12px',
+            background: 'var(--accent-dim)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
+          }}>
+            {photoUrl ? (
+              <img src={photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="var(--accent)" stroke="none">
+                <circle cx="12" cy="8" r="4"/><path d="M12 14c-4.42 0-8 2.69-8 6h16c0-3.31-3.58-6-8-6z"/>
+              </svg>
+            )}
+          </div>
+          <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '4px' }}>
+            {displayName}
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '16px' }}>
+            {currentUser?.email}
+          </div>
+          <button
+            onClick={() => setEditingProfile(true)}
+            style={{
+              padding: '8px 20px', borderRadius: '10px',
+              background: 'var(--accent-dim)', color: 'var(--accent)',
+              fontWeight: 600, fontSize: '13px', fontFamily: 'inherit',
+              border: 'none', cursor: 'pointer',
+            }}
+          >
+            Edit Profile
+          </button>
+        </div>
 
         <SettingsSection title="Security">
           <SettingsRow
