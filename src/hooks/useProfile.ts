@@ -8,21 +8,26 @@ import type { User } from 'firebase/auth';
 export function useProfile() {
   const [saving, setSaving] = useState(false);
 
-  /** Save display name + photo URL to Firebase Auth and Firestore */
+  /** Save display name + photo URL to Firestore (and displayName to Auth) */
   const saveProfile = useCallback(async (
     user: User,
     updates: { displayName?: string; photoURL?: string }
   ) => {
     setSaving(true);
     try {
-      await updateProfile(user, updates);
-      // Persist to Firestore as well
-      await setDoc(doc(db, 'users', user.uid), {
-        displayName: updates.displayName || user.displayName || '',
-        photoURL: updates.photoURL || user.photoURL || '',
-        updatedAt: new Date(),
-      }, { merge: true });
-      // Force refresh the user object in context
+      // Always update displayName in Firebase Auth
+      if (updates.displayName !== undefined) {
+        await updateProfile(user, { displayName: updates.displayName });
+      }
+
+      // Store custom data in Firestore (profilePhoto + displayName)
+      const firestoreData: Record<string, any> = { updatedAt: new Date() };
+      if (updates.displayName !== undefined) firestoreData.displayName = updates.displayName;
+      if (updates.photoURL !== undefined) firestoreData.profilePhoto = updates.photoURL;
+
+      await setDoc(doc(db, 'users', user.uid), firestoreData, { merge: true });
+
+      // Reload user to reflect new displayName immediately
       await user.reload();
     } finally {
       setSaving(false);
