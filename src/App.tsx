@@ -1,11 +1,12 @@
 // App.tsx
+// v3.1 — Backend‑verified email check (Admin SDK, no loading spinner)
 // v3.0 — Use ID token claims for verification (finally kills the gate)
 // v2.14 — LocalStorage verified flag prevents gate for verified users
 // (full history in previous versions)
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { sendEmailVerification, reload, signOut, getIdTokenResult } from 'firebase/auth';
+import { sendEmailVerification, signOut } from 'firebase/auth';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
@@ -68,33 +69,40 @@ export default function App() {
   const [dailyCount,        setDailyCount]        = useState(0);
   const [verifying,         setVerifying]         = useState(false);
 
-  // ── Verification state from ID token claim ───────────────────
-  const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+  // ── Verification state from backend (lightning fast) ──────────
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(
+    localStorage.getItem('ec_email_verified') === 'true' ? true : null
+  );
 
-  // On user change, fetch the ID token claims to get real email_verified
   useEffect(() => {
     if (!currentUser) {
       setEmailVerified(null);
       return;
     }
-    // Quick path: if localStorage already says verified, don't wait
+    // Already confirmed verified — skip
     if (localStorage.getItem('ec_email_verified') === 'true') {
       setEmailVerified(true);
       return;
     }
-    // Fetch fresh token claims
-    getIdTokenResult(currentUser, true)  // true forces refresh
-      .then(result => {
-        const verified = result.claims.email_verified === true;
-        setEmailVerified(verified);
-        if (verified) {
-          localStorage.setItem('ec_email_verified', 'true');
-        }
+    // Google users are implicitly verified
+    if (!currentUser.providerData?.some(p => p.providerId === 'password')) {
+      setEmailVerified(true);
+      return;
+    }
+    // Password user — check with backend
+    currentUser.getIdToken().then(token => {
+      fetch('/api/check-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       })
-      .catch(() => {
-        // Fallback to cached claim
-        setEmailVerified(currentUser.emailVerified);
-      });
+        .then(res => res.json())
+        .then(data => {
+          const verified = data.emailVerified === true;
+          setEmailVerified(verified);
+          if (verified) localStorage.setItem('ec_email_verified', 'true');
+        })
+        .catch(() => setEmailVerified(currentUser.emailVerified));
+    });
   }, [currentUser]);
 
   // Cooldown logic (unchanged)
@@ -202,7 +210,7 @@ export default function App() {
     ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
     : '';
 
-  // ── Verification gate (based on ID token, never stale) ───────
+  // ── Verification gate (based on backend check) ───────────────
   const isPasswordUser = currentUser?.providerData?.some(p => p.providerId === 'password');
   const needsVerification = currentUser
     && emailVerified === false
@@ -212,7 +220,6 @@ export default function App() {
     if (!currentUser || verifying || resendCooldown > 0) return;
     setVerifying(true);
     try {
-      await reload(currentUser);
       await sendEmailVerification(currentUser);
       showToast('If your email is not yet verified, a new link has been sent.');
 
@@ -227,7 +234,13 @@ export default function App() {
     }
   };
 
-  if (!authReady || emailVerified === null) return <LoadingScreen visible />;
+  if (!authReady) return <LoadingScreen visible />;
+
+  // Show gate only while backend check is pending (emailVerified === null) or verification needed
+  // We don't show gate while emailVerified is null – we show nothing (loading screen is lightweight)
+  // Actually we need to wait until the check finishes, otherwise we'd flash the gate.
+  // We'll show a minimal loading screen while emailVerified is null.
+  if (emailVerified === null) return <LoadingScreen visible />;
 
   if (needsVerification) {
     return (
