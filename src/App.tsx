@@ -1,12 +1,13 @@
 // App.tsx
-// v3.2 — Instant verification check via ID token claims (no backend call)
-// v3.1 — Backend‑verified email check (Admin SDK, no loading spinner)
-// v3.0 — Use ID token claims for verification (finally kills the gate)
-// (full history in previous versions)
+// v2.9 — Timestamp‑based cooldown + troubleshooting hints + Google fallback
+// v2.8 — Fixed resend countdown (uses ref for interval)
+// v2.7 — Enforced email verification for password sign-ups + resend cooldown
+// v2.6 — Clean email verification gate + auto‑dismiss
+// v2.4 — Fixed regen doubling bug by using regenerate from useChat instead of handleSend
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { sendEmailVerification, signOut, getIdTokenResult } from 'firebase/auth';
+import { sendEmailVerification, reload, signOut } from 'firebase/auth';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
@@ -29,6 +30,7 @@ import type { Attachment }   from './types';
 const DAILY_LIMIT = 150;
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
+// Circular icon button (unchanged)
 function CircleBtn({ onClick, children, className }: { onClick: () => void; children: React.ReactNode; className?: string }) {
   const [pressed, setPressed] = useState(false);
   return (
@@ -62,44 +64,14 @@ export default function App() {
   useAuth();
   useTheme();
 
-  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen, showToast, setCurrentUser } = useApp();
+  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen, showToast } = useApp();
   const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
   const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
   const [dailyCount,        setDailyCount]        = useState(0);
   const [verifying,         setVerifying]         = useState(false);
 
-  // ── Verification state (lightning fast token check) ──────────
-  const [emailVerified, setEmailVerified] = useState<boolean | null>(
-    localStorage.getItem('ec_email_verified') === 'true' ? true : null
-  );
-
-  useEffect(() => {
-    if (!currentUser) {
-      setEmailVerified(null);
-      return;
-    }
-    // Already confirmed — done
-    if (localStorage.getItem('ec_email_verified') === 'true') {
-      setEmailVerified(true);
-      return;
-    }
-    // Google users are implicitly verified
-    if (!currentUser.providerData?.some(p => p.providerId === 'password')) {
-      setEmailVerified(true);
-      return;
-    }
-    // Check ID token claims (instant, no network)
-    getIdTokenResult(currentUser, false)
-      .then(result => {
-        const verified = result.claims.email_verified === true;
-        setEmailVerified(verified);
-        if (verified) localStorage.setItem('ec_email_verified', 'true');
-      })
-      .catch(() => setEmailVerified(currentUser.emailVerified));
-  }, [currentUser]);
-
-  // Cooldown logic
+  // ── Timestamp‑based cooldown (survives backgrounding) ────────
   const [cooldownUntil, setCooldownUntil] = useState<number>(() => {
     const stored = localStorage.getItem('ec_verify_cooldown');
     return stored ? parseInt(stored, 10) : 0;
@@ -107,6 +79,7 @@ export default function App() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Recalculate remaining cooldown every second
   useEffect(() => {
     const tick = () => {
       const remaining = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
@@ -122,7 +95,18 @@ export default function App() {
   }, [cooldownUntil]);
 
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
-  const { messages, setMessages, convTitle, setConvTitle, isStreamingRef } = useMessages(currentConvId);
+  const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
+
+  // Reload user when window gains focus – auto-dismisses verification gate once verified
+  useEffect(() => {
+    const onFocus = () => {
+      if (currentUser && !currentUser.emailVerified) {
+        reload(currentUser).catch(() => {});
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [currentUser]);
 
   const handleNewChat = useCallback(async () => {
     if (currentConvId) {
@@ -172,7 +156,7 @@ export default function App() {
     if (!convRef) return;
     const snap = await getDoc(convRef);
     if (!snap.exists()) return;
-    const msgs = snap.data().messages || [];
+    const msgs    = snap.data().messages || [];
     const trimmed = [...msgs];
     while (trimmed.length && trimmed[trimmed.length - 1].role === 'assistant') trimmed.pop();
     await updateDoc(convRef, { messages: trimmed, updatedAt: new Date() });
@@ -189,6 +173,7 @@ export default function App() {
     setCurrentConvId(null);
   }, [clearAllChats]);
 
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
@@ -204,18 +189,19 @@ export default function App() {
     ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
     : '';
 
-  // ── Verification gate (based on token claims, near‑instant) ──
-  const isPasswordUser = currentUser?.providerData?.some(p => p.providerId === 'password');
+  // ── Email verification gate (password accounts only) ─────────
   const needsVerification = currentUser
-    && emailVerified === false
-    && isPasswordUser;
+    && !currentUser.emailVerified
+    && currentUser.providerData?.some(p => p.providerId === 'password');
 
   const resendVerification = async () => {
     if (!currentUser || verifying || resendCooldown > 0) return;
     setVerifying(true);
     try {
+      await reload(currentUser);
+      if (currentUser.emailVerified) return;
       await sendEmailVerification(currentUser);
-      showToast('If your email is not yet verified, a new link has been sent.');
+      showToast('Verification email sent! Check your inbox.');
 
       const until = Date.now() + 60000;
       setCooldownUntil(until);
@@ -230,13 +216,11 @@ export default function App() {
 
   if (!authReady) return <LoadingScreen visible />;
 
-  // Tiny loading state while token claims are being read (a few ms at most)
-  if (emailVerified === null) return <LoadingScreen visible />;
-
   if (needsVerification) {
     return (
       <div style={{ display: 'flex', height: '100dvh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-a)', padding: '24px' }}>
         <div style={{ maxWidth: '420px', width: '100%', textAlign: 'center' }}>
+          {/* Mail icon */}
           <div style={{
             width: '72px', height: '72px', borderRadius: '50%',
             background: 'linear-gradient(135deg, #0a84ff22, #0a84ff0a)',
@@ -281,6 +265,7 @@ export default function App() {
             {verifying ? 'Sending…' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
           </button>
 
+          {/* ── Troubleshooting tips ────────────────────────────── */}
           <div style={{ marginTop: '24px', padding: '16px', background: 'var(--glass-2)', borderRadius: '14px', textAlign: 'left' }}>
             <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)', marginBottom: '8px' }}>
               Not seeing the email?
@@ -293,6 +278,7 @@ export default function App() {
             </ul>
           </div>
 
+          {/* ── Google fallback ─────────────────────────────────── */}
           <button
             onClick={async () => {
               if (currentUser) {
@@ -338,6 +324,7 @@ export default function App() {
     );
   }
 
+  // ── Main app (verified or Google user) ───────────────────────
   return (
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
       <LoadingScreen visible={false} />
@@ -354,8 +341,11 @@ export default function App() {
       />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* ── CHAT VIEW ── */}
         {view === 'chat' && (
           <>
+            {/* Topbar */}
             <header style={{
               flexShrink: 0, display: 'flex', alignItems: 'center',
               justifyContent: 'space-between',
@@ -371,6 +361,7 @@ export default function App() {
                   <line x1="3" y1="18" x2="21" y2="18"/>
                 </svg>
               </CircleBtn>
+
               <span style={{
                 position: 'absolute', left: '50%', transform: 'translateX(-50%)',
                 fontSize: '16px', fontWeight: 600, color: 'var(--text-1)',
@@ -379,6 +370,7 @@ export default function App() {
               }}>
                 {topbarTitle}
               </span>
+
               <CircleBtn onClick={handleNewChat} className="topbar-newchat">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>
@@ -386,6 +378,8 @@ export default function App() {
                 </svg>
               </CircleBtn>
             </header>
+
+            {/* MessageList fills remaining space; InputArea floats over it */}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <MessageList
                 messages={messages}
@@ -404,6 +398,7 @@ export default function App() {
                 onChipClick={handleSend}
                 onRegen={handleRegen}
               />
+              {/* InputArea positioned absolutely so messages scroll underneath it */}
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5 }}>
                 <InputArea
                   onSend={handleSend}
