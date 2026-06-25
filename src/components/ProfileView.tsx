@@ -1,7 +1,7 @@
-// components/ProfileView.tsx — v2.0 (editable profile)
-import React, { useState } from 'react';
+// components/ProfileView.tsx — v2.1 (custom photo from Firestore + editable profile)
+import React, { useState, useEffect } from 'react';
 import { signOut } from 'firebase/auth';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useApp } from '../context/AppContext';
 import DeleteAccountModal from './modals/DeleteAccountModal';
@@ -62,6 +62,20 @@ export default function ProfileView({ onBack, getUserConvsRef }: Props) {
   const { currentUser, showToast, showConfirm } = useApp();
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
+  const [customPhoto, setCustomPhoto] = useState<string | null>(null);
+  const [customDisplayName, setCustomDisplayName] = useState<string | null>(null);
+
+  // Fetch custom profile data from Firestore
+  useEffect(() => {
+    if (!currentUser) return;
+    getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.profilePhoto) setCustomPhoto(data.profilePhoto);
+        if (data.displayName) setCustomDisplayName(data.displayName);
+      }
+    });
+  }, [currentUser]);
 
   const handleLogoutAll = async () => {
     if (!currentUser) return;
@@ -83,8 +97,10 @@ export default function ProfileView({ onBack, getUserConvsRef }: Props) {
     return <EditProfileView onBack={() => setEditingProfile(false)} />;
   }
 
-  const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User';
-  const photoUrl = currentUser?.photoURL;
+  const displayName = customDisplayName || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User';
+  const photoUrl = (customPhoto !== null && customPhoto !== '')
+    ? customPhoto
+    : (currentUser?.photoURL || '');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
