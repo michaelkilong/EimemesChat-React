@@ -1,4 +1,4 @@
-// components/ProfileView.tsx — v2.2 (clean profile, no card)
+// components/ProfileView.tsx — v2.3 (refetch after edit)
 import React, { useState, useEffect } from 'react';
 import { signOut } from 'firebase/auth';
 import { setDoc, doc, getDoc } from 'firebase/firestore';
@@ -65,6 +65,7 @@ export default function ProfileView({ onBack, getUserConvsRef }: Props) {
   const [customPhoto, setCustomPhoto] = useState<string | null>(null);
   const [customDisplayName, setCustomDisplayName] = useState<string | null>(null);
 
+  // Fetch custom profile data – also runs when returning from edit screen
   useEffect(() => {
     if (!currentUser) return;
     getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
@@ -74,7 +75,7 @@ export default function ProfileView({ onBack, getUserConvsRef }: Props) {
         if (data.displayName) setCustomDisplayName(data.displayName);
       }
     });
-  }, [currentUser]);
+  }, [currentUser, editingProfile]);   // ← refetch when editingProfile changes
 
   const handleLogoutAll = async () => {
     if (!currentUser) return;
