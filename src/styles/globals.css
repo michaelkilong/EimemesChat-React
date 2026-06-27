@@ -1,4 +1,4 @@
-/* index.css — v2.3 — Added font size CSS variable for message text */
+/* index.css — v2.3 — Fix: Added font size CSS variable for message text */
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&display=swap');
 
 @tailwind base;
