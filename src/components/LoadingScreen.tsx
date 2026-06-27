@@ -11,27 +11,19 @@ export default function LoadingScreen({ visible }: { visible: boolean }) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '24px',
+        gap: '16px',
         zIndex: 999,
         opacity: visible ? 1 : 0,
         pointerEvents: visible ? 'all' : 'none',
         transition: 'opacity 0.4s ease',
       }}
     >
-      {/* Pulsing star icon */}
+      {/* Star + Brand name together */}
       <div
         style={{
-          fontSize: '40px',
-          animation: 'pulseStar 2s ease-in-out infinite',
-          filter: 'drop-shadow(0 0 20px rgba(94,156,255,0.4))',
-        }}
-      >
-        ✦
-      </div>
-
-      {/* Shimmering brand name */}
-      <div
-        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
           fontFamily: "'Bricolage Grotesque', sans-serif",
           fontSize: '24px',
           fontWeight: 700,
@@ -41,9 +33,11 @@ export default function LoadingScreen({ visible }: { visible: boolean }) {
           WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
           animation: 'shimmer 3s ease-in-out infinite',
+          filter: 'drop-shadow(0 0 20px rgba(94,156,255,0.4))',
         }}
       >
-        EimemesChat AI
+        <span style={{ fontSize: '28px', display: 'inline-block', animation: 'pulseStar 2s ease-in-out infinite' }}>✦</span>
+        <span>EimemesChat AI</span>
       </div>
 
       {/* Breathing dots */}
@@ -65,13 +59,13 @@ export default function LoadingScreen({ visible }: { visible: boolean }) {
 
       {/* Keyframes */}
       <style>{`
-        @keyframes pulseStar {
-          0%, 100% { transform: scale(1); opacity: 0.8; }
-          50% { transform: scale(1.1); opacity: 1; }
-        }
         @keyframes shimmer {
           0%, 100% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
+        }
+        @keyframes pulseStar {
+          0%, 100% { transform: scale(1); opacity: 0.8; }
+          50% { transform: scale(1.15); opacity: 1; }
         }
         @keyframes breatheDot {
           0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
