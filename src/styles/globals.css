@@ -323,9 +323,7 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 1px 4px rgba(0,0,0,0.25);
 }
 .toggle-switch.on .toggle-knob { transform: translateX(20px); }
-html.light .toggle-switch {
-  background: rgba(0,0,0,0.15);
-}
+
 
 /* ═══════════════════════════════════════════
    MODALS (signout, delete account)
