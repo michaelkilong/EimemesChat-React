@@ -18,26 +18,44 @@ export default function LoadingScreen({ visible }: { visible: boolean }) {
         transition: 'opacity 0.4s ease',
       }}
     >
-      {/* Star + Brand name together */}
+      {/* Star + Brand name – perfectly centred row */}
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontFamily: "'Bricolage Grotesque', sans-serif",
-          fontSize: '24px',
-          fontWeight: 700,
-          background: 'linear-gradient(135deg, #5e9cff 0%, #c96eff 50%, #5e9cff 100%)',
-          backgroundSize: '200% 200%',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          animation: 'shimmer 3s ease-in-out infinite',
-          filter: 'drop-shadow(0 0 20px rgba(94,156,255,0.4))',
+          alignItems: 'baseline',
+          justifyContent: 'center',
         }}
       >
-        <span style={{ fontSize: '28px', display: 'inline-block', animation: 'pulseStar 2s ease-in-out infinite' }}>✦</span>
-        <span>EimemesChat AI</span>
+        {/* Visible star (no gradient clip) */}
+        <span
+          style={{
+            fontSize: '28px',
+            lineHeight: 1,
+            color: '#ffffff',
+            animation: 'pulseStar 2s ease-in-out infinite',
+            filter: 'drop-shadow(0 0 12px rgba(94,156,255,0.6))',
+          }}
+        >
+          ✦
+        </span>
+
+        {/* Gradient brand name */}
+        <span
+          style={{
+            marginLeft: '8px',
+            fontFamily: "'Bricolage Grotesque', sans-serif",
+            fontSize: '24px',
+            fontWeight: 700,
+            background: 'linear-gradient(135deg, #5e9cff 0%, #c96eff 50%, #5e9cff 100%)',
+            backgroundSize: '200% 200%',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            animation: 'shimmer 3s ease-in-out infinite',
+          }}
+        >
+          EimemesChat AI
+        </span>
       </div>
 
       {/* Breathing dots */}
