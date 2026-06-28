@@ -1,6 +1,6 @@
 # ✦ EimemesChat AI
 
-**EimemesChat AI** is a free, privacy‑first AI assistant designed for everyone, with a special focus on the Thadou‑Kuki community of Northeast India. It supports voice input, real‑time streaming, web search, and works as a Progressive Web App (PWA) on iOS and Android.
+**EimemesChat AI** is a free, privacy‑first AI assistant designed for everyone, with a special focus on the Thadou‑Kuki community of Northeast India. It supports real‑time streaming, web search, and works as a Progressive Web App (PWA) on iOS and Android.
 
 <p align="center">
   <img src="https://eimemes-chat-ai.vercel.app/chat-logo.png" alt="EimemesChat AI logo" width="120" />
