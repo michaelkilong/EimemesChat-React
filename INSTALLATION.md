@@ -1,68 +1,98 @@
-# ✦ EimemesChat AI – Installation Guide
+# ✦ EimemesChat AI
+
+**EimemesChat AI** is a free, privacy‑first AI assistant designed for everyone, with a special focus on the Thadou‑Kuki community of Northeast India. It supports voice input, real‑time streaming, web search, and works as a Progressive Web App (PWA) on iOS and Android.
+
+<p align="center">
+  <img src="https://eimemes-chat-ai.vercel.app/chat-logo.png" alt="EimemesChat AI logo" width="120" />
+</p>
 
 ---
 
-## 📱 For Android Users
+## 📱 Installation
 
-**Step 1 – Download the APK**  
-Get the latest version from the official release:  
-[→ Download EimemesChat AI APK](https://github.com/michaelkilong/EimemesChat-React/releases/download/v4.0.0/EimemesChat.apk)
+### Android – APK
 
-**Step 2 – Allow unknown sources**  
-Open the downloaded `.apk` file. If a warning about “Install blocked” appears, tap **Settings** and grant permission for your browser or file manager.
+1. **Download the APK**  
+   [→ EimemesChat AI APK (v4.0.0)](https://github.com/michaelkilong/EimemesChat-React/releases/download/v4.0.0/EimemesChat.apk)
 
-**Step 3 – Install**  
-Tap **Install** and wait for the process to finish.
+2. **Allow unknown sources**  
+   Open the `.apk` file. If your phone shows “Install blocked”, go to **Settings** and allow your browser or file manager to install unknown apps.
 
-**Step 4 – Launch**  
-Tap **Open** to start using the app. The icon will be added to your home screen or app drawer.
+3. **Install & Open**  
+   Tap **Install** → **Open**. The app will be added to your home screen / app drawer.
 
 ---
 
-## 🍎 For iOS Users (PWA – Add to Home Screen)
+### iOS (PWA – Add to Home Screen)
 
-**Step 1 – Open in Safari**  
-Open **Safari** and go to:  
-[https://eimemes-chat-ai.vercel.app](https://eimemes-chat-ai.vercel.app)
+1. **Open Safari** and go to [https://eimemes-chat-ai.vercel.app](https://eimemes-chat-ai.vercel.app).
 
-**Step 2 – Tap the Share button**  
-Tap the **Share** button (square with an upward arrow) at the bottom of the screen.
+2. **Tap the Share button** (square with up arrow, at the bottom of the screen).
 
-![Tap Share](screenshots/page-1.png)
+   ![Tap Share](https://eimemes-chat-ai.vercel.app/screenshots/page-1.png)
 
-**Step 3 – Scroll down and tap “Add to Home Screen”**  
-In the Share menu, scroll down and select **Add to Home Screen**.
+3. **Scroll down and select “Add to Home Screen”**.
 
-![Add to Home Screen](screenshots/page-2.png)
+   ![Add to Home Screen](https://eimemes-chat-ai.vercel.app/screenshots/page-2.png)
 
-**Step 4 – Confirm and add**  
-Optionally edit the name (e.g., “EimemesChat”), then tap **Add**.
+4. **Confirm the name** (e.g., “EimemesChat”) and tap **Add**.
 
-![Confirm Add](screenshots/page-3.png)
+   ![Confirm Add](https://eimemes-chat-ai.vercel.app/screenshots/page-3.png)
 
-The app icon now appears on your home screen. Tap it to launch the full‑screen app.
+The app icon now appears on your home screen. Tap it to launch the full‑screen experience.
 
 ---
 
-## 💻 For Desktop Users (Web)
+### Desktop (Web)
 
-**Standard access**  
-Visit [https://eimemes-chat-ai.vercel.app](https://eimemes-chat-ai.vercel.app) in any modern browser (Chrome, Edge, Firefox, Safari).
+Visit [https://eimemes-chat-ai.vercel.app](https://eimemes-chat-ai.vercel.app) in any modern browser.
 
-**Install as standalone app** (Chromium‑based browsers only)  
-- Click the **install icon** (monitor with a down arrow) in the address bar, or  
-- Click the browser menu (three dots) → **Install EimemesChat AI…**
-
-The website works identically without installation.
+**Install as standalone app** (Chromium‑based browsers only):  
+Click the install icon in the address bar, or go to the browser menu → **Install EimemesChat AI…**
 
 ---
 
-## 🆘 Need help?
+## ✨ Features
 
-- **Support page (FAQ & contact form):**  
-  [https://app-eimemeschat.vercel.app/support.html](https://app-eimemeschat.vercel.app/support.html)
+- **Real‑time AI chat** powered by Groq & Google Gemini
+- **Voice input** – talk to the assistant directly
+- **Voice output** – hear responses (Web Speech API)
+- **Web search** – get live information on demand
+- **File upload** – PDF, images, documents
+- **Dark / Light theme** with customisable font size
+- **Email verification** to prevent dummy accounts
+- **PWA support** – install on iOS & Android like a native app
+- **Open source** – MIT licensed
 
-- **Direct email:**  
-  eimemeschatai@gmail.com
+---
 
-*Typical response time: 24–48 hours.*
+## 🛠 Tech Stack
+
+| Layer          | Technology                          |
+|----------------|-------------------------------------|
+| Frontend       | React, TypeScript, Vite             |
+| Backend        | Vercel serverless functions (Node.js) |
+| Database/Auth  | Firebase Firestore & Authentication |
+| AI Providers   | Groq (Llama 3.3), Google Gemini      |
+| Hosting        | Vercel                              |
+
+---
+
+## 📄 Legal
+
+- [Privacy Policy](https://app-eimemeschat.vercel.app/privacy.html)
+- [Terms of Use](https://app-eimemeschat.vercel.app/terms.html)
+- [About Us](https://app-eimemeschat.vercel.app/about.html)
+- [FAQ & Support](https://app-eimemeschat.vercel.app/support.html)
+
+---
+
+## 📬 Contact
+
+- **Email:** [eimemeschatai@gmail.com](mailto:eimemeschatai@gmail.com)
+- **GitHub:** [https://github.com/EimemesChat-AI](https://github.com/EimemesChat-AI)
+- **Instagram:** [@eimemes____](https://www.instagram.com/eimemes____?igsh=MXduZm5oc2p5ZWVhNA==)
+
+---
+
+© 2026 Michael Kilong · [MIT License](https://opensource.org/license/mit)
