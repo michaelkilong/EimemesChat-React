@@ -1,10 +1,8 @@
 // App.tsx
-// v2.11 — LoadingScreen as root overlay (no more animation restarts)
-// (all previous version history unchanged)
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+// v2.4 — Fixed regen doubling bug by using regenerate from useChat instead of handleSend
+import React, { useState, useCallback, useEffect } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db, auth } from './firebase';
-import { sendEmailVerification, reload, signOut } from 'firebase/auth';
+import { db } from './firebase';
 import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
@@ -27,6 +25,7 @@ import type { Attachment }   from './types';
 const DAILY_LIMIT = 150;
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
+// Circular icon button
 function CircleBtn({ onClick, children, className }: { onClick: () => void; children: React.ReactNode; className?: string }) {
   const [pressed, setPressed] = useState(false);
   return (
@@ -60,48 +59,14 @@ export default function App() {
   useAuth();
   useTheme();
 
-  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen, showToast, setCurrentUser } = useApp();
+  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen } = useApp();
   const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
   const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
   const [dailyCount,        setDailyCount]        = useState(0);
-  const [verifying,         setVerifying]         = useState(false);
-  const [emailVerifiedGateDismissed, setEmailVerifiedGateDismissed] = useState(false);
-
-  // ── Timestamp‑based cooldown ──────────────────────────────────
-  const [cooldownUntil, setCooldownUntil] = useState<number>(() => {
-    const stored = localStorage.getItem('ec_verify_cooldown');
-    return stored ? parseInt(stored, 10) : 0;
-  });
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    const tick = () => {
-      const remaining = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
-      setResendCooldown(remaining);
-      if (remaining <= 0) {
-        if (tickRef.current) clearInterval(tickRef.current);
-        localStorage.removeItem('ec_verify_cooldown');
-      }
-    };
-    tick();
-    tickRef.current = setInterval(tick, 1000);
-    return () => { if (tickRef.current) clearInterval(tickRef.current); };
-  }, [cooldownUntil]);
 
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
-
-  useEffect(() => {
-    const onFocus = () => {
-      if (currentUser && !currentUser.emailVerified) {
-        reload(currentUser).catch(() => {});
-      }
-    };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [currentUser]);
 
   const handleNewChat = useCallback(async () => {
     if (currentConvId) {
@@ -155,6 +120,7 @@ export default function App() {
     const trimmed = [...msgs];
     while (trimmed.length && trimmed[trimmed.length - 1].role === 'assistant') trimmed.pop();
     await updateDoc(convRef, { messages: trimmed, updatedAt: new Date() });
+    // Use regenerate to avoid duplicating the user message
     regenerate(originalMsg);
   }, [currentConvId, isSending, isStreaming, getConvRef, regenerate]);
 
@@ -168,6 +134,7 @@ export default function App() {
     setCurrentConvId(null);
   }, [clearAllChats]);
 
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
@@ -183,121 +150,134 @@ export default function App() {
     ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
     : '';
 
-  // ── Verification gate logic ───────────────────────────────────
-  const needsVerification = currentUser
-    && !currentUser.emailVerified
-    && currentUser.providerData?.some(p => p.providerId === 'password')
-    && !emailVerifiedGateDismissed;
-
-  const resendVerification = async () => {
-    if (!currentUser || verifying || resendCooldown > 0) return;
-    setVerifying(true);
-    try {
-      await reload(currentUser);
-      if (currentUser.emailVerified) return;
-      await sendEmailVerification(currentUser);
-      showToast('Verification email sent! Check your inbox.');
-      const until = Date.now() + 60000;
-      setCooldownUntil(until);
-      localStorage.setItem('ec_verify_cooldown', until.toString());
-      setResendCooldown(60);
-    } catch {
-      showToast('Failed to send. Please try again.');
-    } finally {
-      setVerifying(false);
-    }
-  };
+  if (!authReady) return <LoadingScreen visible />;
 
   return (
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
-      {/* Permanent root loading overlay – never unmounts */}
-      <LoadingScreen visible={!authReady} />
+      <LoadingScreen visible={false} />
 
-      {authReady && needsVerification && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-a)', padding: '24px' }}>
-          <div style={{ maxWidth: '420px', width: '100%', textAlign: 'center' }}>
-            <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #0a84ff22, #0a84ff0a)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="4" width="20" height="16" rx="2"/>
-                <path d="m22 4-10 8L2 4"/>
-              </svg>
+      <Sidebar
+        conversations={conversations}
+        currentConvId={currentConvId}
+        onNewChat={handleNewChat}
+        onSelectConv={id => { setCurrentConvId(id); setView('chat'); }}
+        onOpenSettings={() => { setView('settings'); setSidebarOpen(false); }}
+        onDeleteConv={handleDeleteConv}
+        dailyCount={dailyCount}
+        dailyLimit={DAILY_LIMIT}
+      />
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* ── CHAT VIEW ── */}
+        {view === 'chat' && (
+          <>
+            {/* Topbar */}
+            <header style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between',
+              height: 'calc(60px + var(--sat))',
+              padding: 'calc(var(--sat) + 10px) 16px 10px',
+              background: `linear-gradient(to bottom, var(--fade-top) 0%, var(--fade-top) 55%, transparent 100%)`,
+              position: 'relative', zIndex: 10,
+            }}>
+              <CircleBtn onClick={() => setSidebarOpen(true)} className="menu-btn-mobile">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6"/>
+                  <line x1="3" y1="12" x2="21" y2="12"/>
+                  <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </CircleBtn>
+
+              <span style={{
+                position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+                fontSize: '16px', fontWeight: 600, color: 'var(--text-1)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                maxWidth: 'calc(100% - 120px)',
+              }}>
+                {topbarTitle}
+              </span>
+
+              <CircleBtn onClick={handleNewChat} className="topbar-newchat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </CircleBtn>
+            </header>
+
+            {/* MessageList fills remaining space; InputArea floats over it */}
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <MessageList
+                messages={messages}
+                isTyping={isTyping}
+                isSearching={isSearching}
+                isStreaming={isStreaming}
+                streamText={streamText}
+                streamDone={streamDone}
+                streamModel={streamModel}
+                streamDisclaimer={streamDisclaimer}
+                streamSources={streamSources}
+                streamThinking={streamThinking}
+                isThinking={isThinking}
+                convId={currentConvId}
+                chipsUsed={chipsUsed}
+                onChipClick={handleSend}
+                onRegen={handleRegen}
+              />
+              {/* InputArea positioned absolutely so messages scroll underneath it */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5 }}>
+                <InputArea
+                  onSend={handleSend}
+                  onStop={stopStreaming}
+                  isSending={isSending}
+                  isStreaming={isStreaming}
+                  dailyLimitReached={dailyLimitReached}
+                />
+              </div>
             </div>
-            <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '24px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}>Check your email</h2>
-            <p style={{ fontSize: '15px', color: 'var(--text-2)', lineHeight: 1.6, marginBottom: '24px' }}>
-              We sent a verification link to <strong style={{ color: 'var(--text-1)' }}>{currentUser?.email}</strong>. Click the link, then tap continue.
-            </p>
-            <button
-              onClick={resendVerification}
-              disabled={verifying || resendCooldown > 0}
-              style={{ width: '100%', padding: '14px', borderRadius: '14px', background: 'var(--glass-2)', color: 'var(--text-1)', fontSize: '15px', fontWeight: 500, fontFamily: 'inherit', border: '1px solid var(--border)', cursor: (verifying || resendCooldown > 0) ? 'default' : 'pointer', opacity: (verifying || resendCooldown > 0) ? 0.6 : 1, transition: 'background 0.15s' }}
-            >
-              {verifying ? 'Sending…' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
-            </button>
-            <button
-              onClick={async () => {
-                if (!currentUser) return;
-                try {
-                  await reload(currentUser);
-                  setCurrentUser(auth.currentUser);
-                  if (auth.currentUser?.emailVerified) {
-                    localStorage.setItem('ec_email_verified', 'true');
-                    setEmailVerifiedGateDismissed(true);
-                  }
-                } catch {}
-              }}
-              style={{ width: '100%', padding: '14px', borderRadius: '14px', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: '15px', fontWeight: 600, fontFamily: 'inherit', border: '1px solid var(--accent)', cursor: 'pointer', marginTop: '12px' }}
-            >
-              I've verified – continue
-            </button>
-          </div>
-        </div>
-      )}
+          </>
+        )}
 
-      {authReady && !needsVerification && (
-        <>
-          <Sidebar
+        {view === 'settings' && (
+          <SettingsView
+            onBack={() => setView('chat')}
+            onOpenProfile={() => setView('profile')}
+            onOpenPersonalization={() => setView('personalization')}
+            onOpenAbout={() => setView('about')}
+            onClearChats={handleClearChats}
             conversations={conversations}
-            currentConvId={currentConvId}
-            onNewChat={handleNewChat}
-            onSelectConv={id => { setCurrentConvId(id); setView('chat'); }}
-            onOpenSettings={() => { setView('settings'); setSidebarOpen(false); }}
-            onDeleteConv={handleDeleteConv}
-            dailyCount={dailyCount}
-            dailyLimit={DAILY_LIMIT}
           />
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {view === 'chat' && (
-              <>
-                <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 'calc(60px + var(--sat))', padding: 'calc(var(--sat) + 10px) 16px 10px', background: `linear-gradient(to bottom, var(--fade-top) 0%, var(--fade-top) 55%, transparent 100%)`, position: 'relative', zIndex: 10 }}>
-                  <CircleBtn onClick={() => setSidebarOpen(true)} className="menu-btn-mobile">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-                    </svg>
-                  </CircleBtn>
-                  <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: '16px', fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 'calc(100% - 120px)' }}>{topbarTitle}</span>
-                  <CircleBtn onClick={handleNewChat} className="topbar-newchat">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                    </svg>
-                  </CircleBtn>
-                </header>
-                <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                  <MessageList messages={messages} isTyping={isTyping} isSearching={isSearching} isStreaming={isStreaming} streamText={streamText} streamDone={streamDone} streamModel={streamModel} streamDisclaimer={streamDisclaimer} streamSources={streamSources} streamThinking={streamThinking} isThinking={isThinking} convId={currentConvId} chipsUsed={chipsUsed} onChipClick={handleSend} onRegen={handleRegen} />
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5 }}>
-                    <InputArea onSend={handleSend} onStop={stopStreaming} isSending={isSending} isStreaming={isStreaming} dailyLimitReached={dailyLimitReached} />
-                  </div>
-                </div>
-              </>
-            )}
-            {view === 'settings' && <SettingsView onBack={() => setView('chat')} onOpenProfile={() => setView('profile')} onOpenPersonalization={() => setView('personalization')} onOpenAbout={() => setView('about')} onClearChats={handleClearChats} conversations={conversations} />}
-            {view === 'profile' && <ProfileView onBack={() => setView('settings')} getUserConvsRef={getUserConvsRef} />}
-            {view === 'personalization' && <PersonalizationView onBack={() => setView('settings')} />}
-            {view === 'about' && <AboutView onBack={() => setView('settings')} onOpenLicenses={() => setView('licenses')} />}
-            {view === 'licenses' && <LicensesView onBack={() => setView('about')} />}
-          </div>
-          <LoginModal visible={!currentUser} />
-        </>
-      )}
+        )}
+
+        {view === 'profile' && (
+          <ProfileView
+            onBack={() => setView('settings')}
+            getUserConvsRef={getUserConvsRef}
+          />
+        )}
+
+        {view === 'personalization' && (
+          <PersonalizationView
+            onBack={() => setView('settings')}
+          />
+        )}
+
+        {view === 'about' && (
+          <AboutView
+            onBack={() => setView('settings')}
+            onOpenLicenses={() => setView('licenses')}
+          />
+        )}
+
+        {view === 'licenses' && (
+          <LicensesView
+            onBack={() => setView('about')}
+          />
+        )}
+      </div>
+
+      <LoginModal visible={!currentUser} />
     </div>
   );
 }
