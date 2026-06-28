@@ -1,4 +1,5 @@
 // App.tsx
+// v2.10 — Removed duplicate LoadingScreen to prevent animation restarts
 // v2.9 — Timestamp‑based cooldown + troubleshooting hints + Google fallback
 // v2.8 — Fixed resend countdown (uses ref for interval)
 // v2.7 — Enforced email verification for password sign-ups + resend cooldown
@@ -327,7 +328,7 @@ export default function App() {
   // ── Main app (verified or Google user) ───────────────────────
   return (
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
-      <LoadingScreen visible={false} />
+      {/* Removed duplicate <LoadingScreen visible={false} /> */}
 
       <Sidebar
         conversations={conversations}
