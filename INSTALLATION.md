@@ -1,8 +1,8 @@
-# EimemesChat AI – Installation Guide
+# ✦ EimemesChat AI – Installation Guide
 
 ---
 
-## For Android User
+## 📱 For Android Users
 
 **Step 1 – Download the APK**  
 Get the latest version from the official release:  
@@ -19,26 +19,32 @@ Tap **Open** to start using the app. The icon will be added to your home screen 
 
 ---
 
-## For iOS User (PWA – Add to Home Screen)
+## 🍎 For iOS Users (PWA – Add to Home Screen)
 
-**Step 1 – Use Safari**  
-Open **Safari** (Chrome, Firefox, and Edge do not support PWA installation on iOS).
+**Step 1 – Open in Safari**  
+Open **Safari** and go to:  
+[https://eimemes-chat-ai.vercel.app](https://eimemes-chat-ai.vercel.app)
 
-**Step 2 – Visit the app**  
-Go to: [https://eimemes-chat-ai.vercel.app](https://eimemes-chat-ai.vercel.app)
-
-**Step 3 – Open Share menu**  
+**Step 2 – Tap the Share button**  
 Tap the **Share** button (square with an upward arrow) at the bottom of the screen.
 
-**Step 4 – Add to Home Screen**  
-Scroll down and tap **Add to Home Screen**. Optionally edit the name (e.g., “EimemesChat”), then tap **Add**.
+![Tap Share](screenshots/page-1.png)
 
-**Step 5 – Open**  
+**Step 3 – Scroll down and tap “Add to Home Screen”**  
+In the Share menu, scroll down and select **Add to Home Screen**.
+
+![Add to Home Screen](screenshots/page-2.png)
+
+**Step 4 – Confirm and add**  
+Optionally edit the name (e.g., “EimemesChat”), then tap **Add**.
+
+![Confirm Add](screenshots/page-3.png)
+
 The app icon now appears on your home screen. Tap it to launch the full‑screen app.
 
 ---
 
-## For Desktop User (Web)
+## 💻 For Desktop Users (Web)
 
 **Standard access**  
 Visit [https://eimemes-chat-ai.vercel.app](https://eimemes-chat-ai.vercel.app) in any modern browser (Chrome, Edge, Firefox, Safari).
@@ -51,7 +57,7 @@ The website works identically without installation.
 
 ---
 
-## Need help?
+## 🆘 Need help?
 
 - **Support page (FAQ & contact form):**  
   [https://app-eimemeschat.vercel.app/support.html](https://app-eimemeschat.vercel.app/support.html)
