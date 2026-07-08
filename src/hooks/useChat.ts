@@ -1,4 +1,5 @@
-// useChat.ts — v2.4 — Added isRegeneration flag to request body for backend deduplication
+// useChat.ts — v2.5 — Fixed typing indicator staying on after shield block
+// v2.4 — Added isRegeneration flag to request body for backend deduplication
 // v2.3 — Added regenerate function to prevent duplicate user messages on regen
 import { useState, useRef, useCallback } from 'react';
 import { arrayUnion, updateDoc, getDoc, doc } from 'firebase/firestore';
@@ -192,6 +193,7 @@ export function useChat(
             if (parsed.token)         { setIsTyping(false); setIsSearching(false); setIsThinking(false); fullText += parsed.token; enqueue(parsed.token); }
 
             if (parsed.outputBlocked && parsed.safeReply) {
+              setIsTyping(false);   // ← shield block turns off typing immediately
               fullText = parsed.safeReply;
               renderQueueRef.current = [];
               displayedRef.current   = fullText;
@@ -199,6 +201,7 @@ export function useChat(
             }
 
             if (parsed.done) {
+              setIsTyping(false);   // ← safety net when stream completes
               model      = parsed.model      || '';
               disclaimer = parsed.disclaimer || false;
               sources    = parsed.sources    || [];
@@ -382,6 +385,7 @@ export function useChat(
             if (parsed.token)         { setIsTyping(false); setIsSearching(false); setIsThinking(false); fullText += parsed.token; enqueue(parsed.token); }
 
             if (parsed.outputBlocked && parsed.safeReply) {
+              setIsTyping(false);   // ← shield block turns off typing
               fullText = parsed.safeReply;
               renderQueueRef.current = [];
               displayedRef.current   = fullText;
@@ -389,6 +393,7 @@ export function useChat(
             }
 
             if (parsed.done) {
+              setIsTyping(false);   // ← safety net
               model      = parsed.model      || '';
               disclaimer = parsed.disclaimer || false;
               sources    = parsed.sources    || [];
