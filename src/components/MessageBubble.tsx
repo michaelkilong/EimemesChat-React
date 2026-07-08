@@ -1,4 +1,4 @@
-// MessageBubble.tsx — v1.7 — Fixed bright spots on action icons (single‑path overlays)
+// MessageBubble.tsx — v1.7 — Original icons with rounded joins/caps + fixed regenerate arrow
 import React, { useEffect, useRef, useState } from 'react';
 import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
@@ -230,7 +230,7 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
         {/* Action bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0px', marginTop: '6px' }}>
 
-          {/* Copy — single path, no overlapping strokes */}
+          {/* Copy */}
           <ActionBtn
             title={copied ? 'Copied!' : 'Copy'}
             onClick={handleCopy}
@@ -239,16 +239,14 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
           >
             {copied
               ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1M9 21h10a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-1" />
-                </svg>
+              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             }
           </ActionBtn>
 
           {/* Voice */}
           <ActionBtn title={speaking ? 'Stop' : 'Read aloud'} onClick={handleSpeak} active={speaking} activeColor="var(--accent)">
             {speaking ? (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="4" y1="6" x2="4" y2="18" style={{ animation: 'bar1 0.8s ease-in-out infinite alternate' }}/>
                 <line x1="9" y1="3" x2="9" y2="21" style={{ animation: 'bar2 0.8s ease-in-out infinite alternate' }}/>
                 <line x1="14" y1="8" x2="14" y2="16" style={{ animation: 'bar3 0.8s ease-in-out infinite alternate' }}/>
@@ -256,36 +254,39 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
               </svg>
             ) : (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
               </svg>
             )}
           </ActionBtn>
 
-          {/* Thumb up — single path, no overlap */}
+          {/* Thumb up */}
           <ActionBtn title="Good response" onClick={() => { const was = thumbUp; haptic.success(); setThumbUp(!was); setThumbDown(false); if (!was) showToast('Thanks! 👍'); }} active={thumbUp} activeColor="#30d158">
             <svg width="15" height="15" viewBox="0 0 24 24" fill={thumbUp ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 22v-7H4a2 2 0 0 1-2-2v-1a2 2 0 0 1 2-2h3l4-9a3 3 0 0 1 3 3v4h5.28a2 2 0 0 1 2 1.7l1.38 9a2 2 0 0 1-2 2.3H7z" />
+              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+              <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
             </svg>
           </ActionBtn>
 
-          {/* Thumb down — single path, no overlap */}
+          {/* Thumb down */}
           <ActionBtn title="Bad response" onClick={() => { const was = thumbDown; haptic.medium(); setThumbDown(!was); setThumbUp(false); if (!was) showToast('Thanks for the feedback!'); }} active={thumbDown} activeColor="#ff6b6b">
             <svg width="15" height="15" viewBox="0 0 24 24" fill={thumbDown ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 2v7h3a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-3l-4 9a3 3 0 0 1-3-3v-4H4.72a2 2 0 0 1-2-1.7l-1.38-9a2 2 0 0 1 2-2.3H17z" />
+              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/>
+              <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
             </svg>
           </ActionBtn>
 
-          {/* Share — all parts now combined into one path */}
+          {/* Share */}
           <ActionBtn title="Share" onClick={handleShare}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="18" cy="5" r="3"/>
-              <circle cx="6" cy="12" r="3"/>
-              <circle cx="18" cy="19" r="3"/>
-              <path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" />
+              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
             </svg>
           </ActionBtn>
 
-          {/* Regenerate — fixed path, no bright spot */}
+          {/* Regenerate — fixed arrow intersection */}
           {isLast && (
             <ActionBtn title="Regenerate" onClick={() => { haptic.medium(); onRegen(lastUserMsg); }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
