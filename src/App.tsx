@@ -1,5 +1,4 @@
 // App.tsx
-// v2.5 — Chips appear every session; removed localStorage chip lock
 // v2.4.1 — Latched authReady to prevent loading screen flicker on token refresh
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -62,6 +61,7 @@ export default function App() {
 
   const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen } = useApp();
   const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
+  const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
   const [dailyCount,        setDailyCount]        = useState(0);
 
@@ -109,7 +109,10 @@ export default function App() {
   }, [currentUser]);
 
   const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean, useThinking?: boolean) => {
-    sendMessage(text, () => {}, attachment, useWebSearch, undefined, useThinking);
+    sendMessage(text, () => {
+      setChipsUsed(true);
+      localStorage.setItem('ec_chips_used', 'true');
+    }, attachment, useWebSearch, undefined, useThinking);
   }, [sendMessage]);
 
   const handleRegen = useCallback(async (originalMsg: string) => {
@@ -220,8 +223,7 @@ export default function App() {
                 streamThinking={streamThinking}
                 isThinking={isThinking}
                 convId={currentConvId}
-                chipsUsed={false}
-                conversations={conversations}
+                chipsUsed={chipsUsed}
                 onChipClick={handleSend}
                 onRegen={handleRegen}
               />
