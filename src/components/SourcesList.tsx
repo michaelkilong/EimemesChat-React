@@ -1,4 +1,4 @@
-// SourcesList.tsx — v1.2 — Added favicons for each search source
+// SourcesList.tsx — v1.3 — Fixed favicon layout shift (stable container)
 import React, { useState } from 'react';
 import type { Source } from '../types';
 
@@ -110,13 +110,18 @@ export default function SourcesList({ sources, msgKey }: Props) {
                     {i + 1}
                   </div>
 
-                  {/* Favicon */}
-                  <img
-                    src={faviconUrl}
-                    alt=""
-                    style={{ width: '20px', height: '20px', borderRadius: '4px', flexShrink: 0 }}
-                    onError={e => (e.currentTarget.style.display = 'none')}
-                  />
+                  {/* Favicon — fixed container prevents layout shift */}
+                  <div style={{
+                    width: '16px', height: '16px', borderRadius: '3px', flexShrink: 0,
+                    background: 'var(--glass-3)', overflow: 'hidden',
+                  }}>
+                    <img
+                      src={faviconUrl}
+                      alt=""
+                      style={{ width: '16px', height: '16px', display: 'block' }}
+                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
