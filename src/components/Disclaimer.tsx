@@ -16,7 +16,7 @@ export default function Disclaimer({ type }: Props) {
     <p
       style={{
         fontSize: '12px',
-        color: type === 'critical' ? '#f59e0b' : 'var(--text-3)',
+        color: type === 'critical' ? 'var(--text-2)' : 'var(--text-3)',
         margin: '8px 0 0',
         lineHeight: 1.5,
       }}
