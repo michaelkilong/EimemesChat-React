@@ -5,7 +5,7 @@ interface Props {
 }
 
 const MESSAGES = {
-  critical: 'For informational purposes only. Always consult a qualified professional.',
+  critical: 'This response is AI-generated, for reference only, okhey',
   web: 'Web results may be outdated. Verify from authoritative sources.',
 };
 
