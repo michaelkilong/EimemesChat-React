@@ -22,8 +22,7 @@ import AboutView             from './components/AboutView';
 import LicensesView          from './components/LicensesView';
 import ChangelogView         from './components/ChangelogView';   // ← new
 import LoginModal            from './components/modals/LoginModal';
-import type { Attachment }   from './types';
-import type { View }         from './types';                     // ← needed for setView
+import type { Attachment, View } from './types';                // ← combined
 
 const DAILY_LIMIT = 100;   // ← reduced from 150
 function todayStr() { return new Date().toISOString().slice(0, 10); }
