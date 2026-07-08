@@ -1,17 +1,14 @@
-// AboutView.tsx — v2.4 — Added "What's New" link to changelog
-// v2.3 — iOS-style inset separators, white labels/values, description white
+// AboutView.tsx — v2.3 — iOS-style inset separators, white labels/values, description white
 // v2.2 — Uses AppContext for theme, correct import
 // v2.1 — (previous history) …
 // v1.3 — Larger logo, removed duplicate brand name
 
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import type { View } from '../types';
 
 interface Props {
   onBack: () => void;
   onOpenLicenses: () => void;
-  setView: (v: View) => void;   // ← added
 }
 
 /** A thin horizontal line, inset to align with the row's text (like iOS). */
@@ -46,7 +43,7 @@ function InfoRow({ label, value, last }: { label: string; value: string; last?: 
   );
 }
 
-export default function AboutView({ onBack, onOpenLicenses, setView }: Props) {
+export default function AboutView({ onBack, onOpenLicenses }: Props) {
   const { isDark } = useApp();
 
   // Dark theme → original logo, Light theme → new light logo
@@ -226,54 +223,6 @@ export default function AboutView({ onBack, onOpenLicenses, setView }: Props) {
               }}
             >
               Third-party libraries used in this app
-            </div>
-          </div>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--text-3)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </div>
-
-        {/* ── What's New ────────────────────────────────────────── */}
-        <div
-          onClick={() => setView('changelog')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '16px',
-            borderRadius: '16px',
-            background: 'var(--glass-2)',
-            cursor: 'pointer',
-            marginBottom: '16px',
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: '15px',
-                fontWeight: 500,
-                color: 'var(--text-1)',
-              }}
-            >
-              What's New
-            </div>
-            <div
-              style={{
-                fontSize: '13px',
-                color: 'var(--text-3)',
-                marginTop: '2px',
-              }}
-            >
-              Recent updates and improvements
             </div>
           </div>
           <svg
