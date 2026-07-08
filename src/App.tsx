@@ -1,5 +1,5 @@
 // App.tsx
-// v2.6 — Daily limit 100 + real‑time usage counter + Changelog page
+// v2.6 — Daily limit 100 + real‑time usage counter
 // v2.4.1 — Latched authReady to prevent loading screen flicker on token refresh
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -20,9 +20,8 @@ import ProfileView           from './components/ProfileView';
 import PersonalizationView   from './components/PersonalizationView';
 import AboutView             from './components/AboutView';
 import LicensesView          from './components/LicensesView';
-import ChangelogView         from './components/ChangelogView';   // ← new
 import LoginModal            from './components/modals/LoginModal';
-import type { Attachment, View } from './types';                // ← combined
+import type { Attachment }   from './types';
 
 const DAILY_LIMIT = 100;   // ← reduced from 150
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -281,19 +280,11 @@ export default function App() {
           <AboutView
             onBack={() => setView('settings')}
             onOpenLicenses={() => setView('licenses')}
-            setView={setView}                           // ← pass setView down
           />
         )}
 
         {view === 'licenses' && (
           <LicensesView
-            onBack={() => setView('about')}
-          />
-        )}
-
-        {/* ── NEW: Changelog ─────────────────────────────────── */}
-        {view === 'changelog' && (
-          <ChangelogView
             onBack={() => setView('about')}
           />
         )}
