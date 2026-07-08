@@ -1,5 +1,5 @@
-// SettingsView.tsx — v2.2 (Visible dropdown chevron for Font Size)
-import React, { useState } from 'react';
+// SettingsView.tsx — v2.3 (Button‑style font size dropdown)
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import SignOutModal from './modals/SignOutModal';
@@ -116,6 +116,94 @@ function SettingsGroup({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Custom button‑style dropdown for font size */
+function FontSizeDropdown({ value, onChange }: { value: string; onChange: (v: 'small' | 'medium' | 'large') => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const options = [
+    { value: 'small', label: 'Small' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'large', label: 'Large' },
+  ];
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '6px 12px',
+          borderRadius: '8px',
+          background: 'var(--glass-3)',
+          border: '1px solid var(--border)',
+          color: 'var(--text-2)',
+          fontSize: '14px',
+          fontWeight: 500,
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+        }}
+      >
+        {options.find(o => o.value === value)?.label}
+        <svg
+          width="10" height="10" viewBox="0 0 24 24" fill="none"
+          stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{ flexShrink: 0 }}
+        >
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute',
+          right: 0,
+          top: '100%',
+          marginTop: '4px',
+          background: 'var(--glass-1)',
+          border: '1px solid var(--border)',
+          borderRadius: '10px',
+          boxShadow: 'var(--sh-md)',
+          zIndex: 10,
+          minWidth: '120px',
+          overflow: 'hidden',
+        }}>
+          {options.map(o => (
+            <button
+              key={o.value}
+              onClick={() => { onChange(o.value as 'small' | 'medium' | 'large'); setOpen(false); }}
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '10px 14px',
+                background: o.value === value ? 'var(--glass-3)' : 'transparent',
+                border: 'none',
+                color: 'var(--text-1)',
+                fontSize: '14px',
+                textAlign: 'left',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalization, onOpenAbout, onClearChats }: Props) {
   const { currentUser, showToast, showConfirm, fontSize, setFontSize } = useApp();
   const { isDark, toggleTheme } = useTheme();
@@ -124,20 +212,6 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
   const handleClearChats = async () => {
     const yes = await showConfirm("All chats can't be recovered. Clear everything?", 'Delete', 'Clear all chats?');
     if (yes) { onClearChats(); showToast('All chats cleared.'); }
-  };
-
-  // ── Font size dropdown style (no background arrow – we add one manually) ──
-  const selectStyle: React.CSSProperties = {
-    fontSize: '15px',
-    color: 'var(--text-2)',
-    background: 'transparent',
-    border: 'none',
-    outline: 'none',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    padding: '4px 8px 4px 8px',
-    appearance: 'none',
-    WebkitAppearance: 'none',
   };
 
   return (
@@ -243,7 +317,7 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
             toggleOn={isDark}
             onToggle={toggleTheme}
           />
-          {/* Font Size row with visible dropdown chevron */}
+          {/* Font Size row with button‑style dropdown */}
           <div
             style={{
               display: 'flex', alignItems: 'center', gap: '14px',
@@ -261,23 +335,7 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
               <div style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text-1)' }}>Font Size</div>
               <div style={{ fontSize: '13px', color: 'var(--text-3)', marginTop: '1px' }}>Adjust message text size</div>
             </div>
-            <select
-              value={fontSize}
-              onChange={e => setFontSize(e.target.value as 'small' | 'medium' | 'large')}
-              style={selectStyle}
-            >
-              <option value="small">Small</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-            </select>
-            {/* Downward chevron */}
-            <svg
-              width="12" height="12" viewBox="0 0 24 24" fill="none"
-              stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              style={{ flexShrink: 0, marginLeft: '-8px' }}
-            >
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
+            <FontSizeDropdown value={fontSize} onChange={setFontSize} />
           </div>
         </SettingsGroup>
 
