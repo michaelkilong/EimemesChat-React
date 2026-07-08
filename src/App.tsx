@@ -22,7 +22,7 @@ import LicensesView          from './components/LicensesView';
 import LoginModal            from './components/modals/LoginModal';
 import type { Attachment }   from './types';
 
-const DAILY_LIMIT = 150;
+const DAILY_LIMIT = 100;
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 // Circular icon button
