@@ -1,3 +1,4 @@
+// lib/markdown.ts — v1.6 — Disabled inline math ($...$) to prevent layout shifts from dollar signs
 import { marked } from 'marked';
 import katex from 'katex';
 import hljs from 'highlight.js';
@@ -14,11 +15,8 @@ export function renderMarkdown(text: string, msgKey?: string): string {
       .replace(/\$\$([\s\S]+?)\$\$/g, (_, eq: string) => {
         mathBlocks.push({ type: 'display', eq });
         return `%%MATH_DISPLAY_${mathBlocks.length - 1}%%`;
-      })
-      .replace(/\$([^\n$]+?)\$/g, (_, eq: string) => {
-        mathBlocks.push({ type: 'inline', eq });
-        return `%%MATH_INLINE_${mathBlocks.length - 1}%%`;
       });
+      // Inline math $...$ removed – dollar signs stay as literal text
 
     let html = marked.parse(protected_text) as string;
 
@@ -38,6 +36,7 @@ export function renderMarkdown(text: string, msgKey?: string): string {
           });
         } catch { return mathBlocks[Number(i)].eq; }
       })
+      // Inline replacement kept as a no‑op (will never match now)
       .replace(/%%MATH_INLINE_(\d+)%%/g, (_, i: string) => {
         try {
           return katex.renderToString(mathBlocks[Number(i)].eq, {
@@ -104,4 +103,3 @@ export function syncHljsTheme(isDark: boolean) {
   if (light) light.media = isDark ? 'not all' : 'all';
   if (dark)  dark.media  = isDark ? 'all' : 'not all';
 }
-        
