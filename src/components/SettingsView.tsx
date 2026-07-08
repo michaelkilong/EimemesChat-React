@@ -1,4 +1,4 @@
-// SettingsView.tsx — v2.1 (Dropdown font size selector, better icon)
+// SettingsView.tsx — v2.2 (Visible dropdown chevron for Font Size)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -126,7 +126,7 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
     if (yes) { onClearChats(); showToast('All chats cleared.'); }
   };
 
-  // ── Font size dropdown style ──────────────────────────────
+  // ── Font size dropdown style (no background arrow – we add one manually) ──
   const selectStyle: React.CSSProperties = {
     fontSize: '15px',
     color: 'var(--text-2)',
@@ -135,12 +135,9 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
     outline: 'none',
     cursor: 'pointer',
     fontFamily: 'inherit',
-    padding: '4px 24px 4px 8px',
+    padding: '4px 8px 4px 8px',
     appearance: 'none',
     WebkitAppearance: 'none',
-    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffffff55' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 4px center',
   };
 
   return (
@@ -246,7 +243,7 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
             toggleOn={isDark}
             onToggle={toggleTheme}
           />
-          {/* Font Size row with dropdown */}
+          {/* Font Size row with visible dropdown chevron */}
           <div
             style={{
               display: 'flex', alignItems: 'center', gap: '14px',
@@ -273,6 +270,14 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
               <option value="medium">Medium</option>
               <option value="large">Large</option>
             </select>
+            {/* Downward chevron */}
+            <svg
+              width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ flexShrink: 0, marginLeft: '-8px' }}
+            >
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
           </div>
         </SettingsGroup>
 
