@@ -1,4 +1,4 @@
-// InputArea.tsx — v2.14 — Placeholder at top, icons at bottom, full working file
+// InputArea.tsx — v2.15 — Clear daily-limit block (no input at all)
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
@@ -148,177 +148,206 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           minHeight: '100px',
           display: 'flex',
           flexDirection: 'column',
+          justifyContent: 'center',   // center the warning vertically
         }}>
 
-          {/* Textarea — pinned to top, placeholder always visible when empty */}
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={attachment ? 'Ask something about this file…' : 'Message Eimemes…'}
-            rows={1}
-            disabled={dailyLimitReached}
-            style={{
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              resize: 'none',
-              fontSize: '15.5px',
-              color: 'var(--text-1)',
-              lineHeight: 1.55,
-              minHeight: '26px',
-              maxHeight: '200px',
-              overflowY: 'auto',
-              fontFamily: 'inherit',
-              padding: 0,
-              flexShrink: 0,
-            }}
-          />
-
-          {/* Dedicated spacer — creates obvious gap */}
-          <div style={{ flex: 1 }} />
-
-          {/* ── Toolbar row (pinned to bottom) ── */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-
-            {/* Left: web search pill */}
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <button
-                onClick={() => { haptic.light(); setWebSearch(w => !w); }}
-                disabled={busy}
-                title={webSearch ? 'Web search on' : 'Web search off'}
+          {dailyLimitReached ? (
+            /* ── Daily limit reached message ── */
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+              padding: '8px 0',
+            }}>
+              {/* small clock icon or exclamation */}
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <div style={{
+                fontSize: '15px', fontWeight: 600, color: 'var(--text-2)',
+                textAlign: 'center',
+              }}>
+                Daily limit reached
+              </div>
+              <div style={{
+                fontSize: '13px', color: 'var(--text-3)',
+                textAlign: 'center',
+              }}>
+                Come back tomorrow! Your quota resets at midnight.
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Textarea — visible only when limit not reached */}
+              <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={e => setValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={attachment ? 'Ask something about this file…' : 'Message Eimemes…'}
+                rows={1}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  height: '30px',
-                  padding: '0 12px',
-                  borderRadius: '15px',
-                  background: webSearch ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)',
-                  border: webSearch ? '1px solid rgba(10,132,255,0.5)' : '1px solid var(--border)',
-                  color: webSearch ? '#0a84ff' : 'var(--text-2)',
-                  fontSize: '12.5px',
-                  fontWeight: 500,
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  resize: 'none',
+                  fontSize: '15.5px',
+                  color: 'var(--text-1)',
+                  lineHeight: 1.55,
+                  minHeight: '26px',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
                   fontFamily: 'inherit',
-                  cursor: busy ? 'default' : 'pointer',
-                  opacity: busy ? 0.4 : 1,
-                  transition: 'all 0.15s',
-                  whiteSpace: 'nowrap',
+                  padding: 0,
+                  flexShrink: 0,
                 }}
-                onMouseEnter={e => {
-                  if (!busy) {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.background = webSearch ? 'rgba(10,132,255,0.25)' : 'rgba(10,132,255,0.12)';
-                    el.style.borderColor = 'rgba(10,132,255,0.6)';
-                    el.style.color = '#0a84ff';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!busy) {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.background = webSearch ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)';
-                    el.style.borderColor = webSearch ? 'rgba(10,132,255,0.5)' : 'var(--border)';
-                    el.style.color = webSearch ? '#0a84ff' : 'var(--text-2)';
-                  }
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="2" y1="12" x2="22" y2="12"/>
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                </svg>
-                <span>Search</span>
-              </button>
-            </div>
+              />
 
-            {/* Right: attach + send/stop */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={busy || processing}
-                title="Attach file"
-                style={{
-                  width: '30px', height: '30px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '50%',
-                  background: attachment ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)',
-                  border: attachment ? '1px solid rgba(10,132,255,0.5)' : '1px solid var(--border)',
-                  color: attachment ? '#0a84ff' : 'var(--text-2)',
-                  cursor: (busy || processing) ? 'default' : 'pointer',
-                  opacity: (busy || processing) ? 0.4 : 1,
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => {
-                  if (!busy && !processing) {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.background = attachment ? 'rgba(10,132,255,0.25)' : 'rgba(10,132,255,0.12)';
-                    el.style.borderColor = 'rgba(10,132,255,0.6)';
-                    el.style.color = '#0a84ff';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!busy && !processing) {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.background = attachment ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)';
-                    el.style.borderColor = attachment ? 'rgba(10,132,255,0.5)' : 'var(--border)';
-                    el.style.color = attachment ? '#0a84ff' : 'var(--text-2)';
-                  }
-                }}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"/>
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-              </button>
+              {/* Dedicated spacer */}
+              <div style={{ flex: 1 }} />
 
-              {isStreaming ? (
-                <button
-                  onClick={onStop}
-                  title="Stop generating"
-                  style={{
-                    width: '30px', height: '30px', borderRadius: '50%',
-                    background: 'rgba(255,60,60,0.9)', border: 'none', color: 'white',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', boxShadow: '0 2px 10px rgba(255,50,50,0.35)', flexShrink: 0,
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                    <rect x="4" y="4" width="16" height="16" rx="2.5"/>
-                  </svg>
-                </button>
-              ) : (
-                <button
-                  onClick={handleSend}
-                  disabled={!canSend}
-                  title="Send message"
-                  style={{
-                    width: '30px', height: '30px', borderRadius: '50%',
-                    background: canSend ? 'var(--send-bg)' : 'var(--glass-3)',
-                    border: 'none',
-                    color: canSend ? 'var(--send-fg)' : 'var(--text-3)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: canSend ? 'pointer' : 'default',
-                    boxShadow: canSend ? '0 2px 12px rgba(10,132,255,0.3)' : 'none',
-                    flexShrink: 0,
-                    transition: 'background 0.15s, box-shadow 0.15s, color 0.15s',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="19" x2="12" y2="5"/>
-                    <polyline points="5 12 12 5 19 12"/>
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
+              {/* ── Toolbar row ── */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+
+                {/* Left: web search pill */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <button
+                    onClick={() => { haptic.light(); setWebSearch(w => !w); }}
+                    disabled={busy}
+                    title={webSearch ? 'Web search on' : 'Web search off'}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      height: '30px',
+                      padding: '0 12px',
+                      borderRadius: '15px',
+                      background: webSearch ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)',
+                      border: webSearch ? '1px solid rgba(10,132,255,0.5)' : '1px solid var(--border)',
+                      color: webSearch ? '#0a84ff' : 'var(--text-2)',
+                      fontSize: '12.5px',
+                      fontWeight: 500,
+                      fontFamily: 'inherit',
+                      cursor: busy ? 'default' : 'pointer',
+                      opacity: busy ? 0.4 : 1,
+                      transition: 'all 0.15s',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onMouseEnter={e => {
+                      if (!busy) {
+                        const el = e.currentTarget as HTMLButtonElement;
+                        el.style.background = webSearch ? 'rgba(10,132,255,0.25)' : 'rgba(10,132,255,0.12)';
+                        el.style.borderColor = 'rgba(10,132,255,0.6)';
+                        el.style.color = '#0a84ff';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!busy) {
+                        const el = e.currentTarget as HTMLButtonElement;
+                        el.style.background = webSearch ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)';
+                        el.style.borderColor = webSearch ? 'rgba(10,132,255,0.5)' : 'var(--border)';
+                        el.style.color = webSearch ? '#0a84ff' : 'var(--text-2)';
+                      }
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="2" y1="12" x2="22" y2="12"/>
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <span>Search</span>
+                  </button>
+                </div>
+
+                {/* Right: attach + send/stop */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={busy || processing}
+                    title="Attach file"
+                    style={{
+                      width: '30px', height: '30px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      borderRadius: '50%',
+                      background: attachment ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)',
+                      border: attachment ? '1px solid rgba(10,132,255,0.5)' : '1px solid var(--border)',
+                      color: attachment ? '#0a84ff' : 'var(--text-2)',
+                      cursor: (busy || processing) ? 'default' : 'pointer',
+                      opacity: (busy || processing) ? 0.4 : 1,
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      if (!busy && !processing) {
+                        const el = e.currentTarget as HTMLButtonElement;
+                        el.style.background = attachment ? 'rgba(10,132,255,0.25)' : 'rgba(10,132,255,0.12)';
+                        el.style.borderColor = 'rgba(10,132,255,0.6)';
+                        el.style.color = '#0a84ff';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!busy && !processing) {
+                        const el = e.currentTarget as HTMLButtonElement;
+                        el.style.background = attachment ? 'rgba(10,132,255,0.18)' : 'var(--glass-3)';
+                        el.style.borderColor = attachment ? 'rgba(10,132,255,0.5)' : 'var(--border)';
+                        el.style.color = attachment ? '#0a84ff' : 'var(--text-2)';
+                      }
+                    }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"/>
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                  </button>
+
+                  {isStreaming ? (
+                    <button
+                      onClick={onStop}
+                      title="Stop generating"
+                      style={{
+                        width: '30px', height: '30px', borderRadius: '50%',
+                        background: 'rgba(255,60,60,0.9)', border: 'none', color: 'white',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', boxShadow: '0 2px 10px rgba(255,50,50,0.35)', flexShrink: 0,
+                      }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="4" y="4" width="16" height="16" rx="2.5"/>
+                      </svg>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSend}
+                      disabled={!canSend}
+                      title="Send message"
+                      style={{
+                        width: '30px', height: '30px', borderRadius: '50%',
+                        background: canSend ? 'var(--send-bg)' : 'var(--glass-3)',
+                        border: 'none',
+                        color: canSend ? 'var(--send-fg)' : 'var(--text-3)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: canSend ? 'pointer' : 'default',
+                        boxShadow: canSend ? '0 2px 12px rgba(10,132,255,0.3)' : 'none',
+                        flexShrink: 0,
+                        transition: 'background 0.15s, box-shadow 0.15s, color 0.15s',
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="19" x2="12" y2="5"/>
+                        <polyline points="5 12 12 5 19 12"/>
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Footer ── */}
         <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-3)', marginTop: '7px', pointerEvents: 'none' }}>
           {dailyLimitReached
-            ? <span style={{ color: '#ff6b6b', fontWeight: 500 }}>Daily limit reached. Resets tomorrow.</span>
+            ? <span style={{ color: '#ff6b6b', fontWeight: 500 }}>Your daily quota has been used. Resets tomorrow.</span>
             : 'EimemesChat may make mistakes. Verify important information.'
           }
         </div>
