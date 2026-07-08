@@ -1,4 +1,4 @@
-/* index.css — v2.3 — Fix: Added font size CSS variable for message text */
+/* globals.css — v2.4 — Added landscape desktop mode overrides */
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&display=swap');
 
 @tailwind base;
@@ -324,7 +324,6 @@ a:hover { text-decoration: underline; }
 }
 .toggle-switch.on .toggle-knob { transform: translateX(20px); }
 
-
 /* ═══════════════════════════════════════════
    MODALS (signout, delete account)
 ═══════════════════════════════════════════ */
@@ -398,6 +397,20 @@ a:hover { text-decoration: underline; }
   .topbar-newchat  { display: flex !important; }
   .sidebar-mask    { display: none !important; }
 }
+
+/* ═══════════════════════════════════════════
+   LANDSCAPE DESKTOP MODE (phone sideways)
+═══════════════════════════════════════════ */
+html.landscape-desktop .sidebar-mask { display: none !important; }
+
+html.landscape-desktop aside[style*="fixed"] {
+  position: relative !important;
+  transform: none !important;
+  z-index: auto !important;
+}
+
+html.landscape-desktop .menu-btn-mobile { display: none !important; }
+html.landscape-desktop .topbar-newchat  { display: flex !important; }
 
 /* ═══════════════════════════════════════════
    CITATIONS & WEB SEARCH
