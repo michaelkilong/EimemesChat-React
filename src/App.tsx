@@ -26,7 +26,7 @@ import type { Attachment }   from './types';
 const DAILY_LIMIT = 100;   // ← reduced from 150
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
-// Circular icon button (unchanged)
+// Circular icon button
 function CircleBtn({ onClick, children, className }: { onClick: () => void; children: React.ReactNode; className?: string }) {
   const [pressed, setPressed] = useState(false);
   return (
@@ -75,7 +75,15 @@ export default function App() {
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
 
   const handleNewChat = useCallback(async () => {
-    // … unchanged
+    if (currentConvId) {
+      const currentConv = conversations.find(c => c.id === currentConvId);
+      if (!currentConv?.messages?.length) {
+        setView('chat');
+        return;
+      }
+    }
+    const id = await createNewChat();
+    if (id) { setCurrentConvId(id); setView('chat'); }
   }, [createNewChat, setView, currentConvId, conversations]);
 
   // ── Increment daily counter after each successful send ───────
@@ -119,20 +127,38 @@ export default function App() {
   }, [sendMessage]);
 
   const handleRegen = useCallback(async (originalMsg: string) => {
-    // … unchanged
+    if (!currentConvId || isSending || isStreaming) return;
+    const convRef = getConvRef(currentConvId);
+    if (!convRef) return;
+    const snap = await getDoc(convRef);
+    if (!snap.exists()) return;
+    const msgs    = snap.data().messages || [];
+    const trimmed = [...msgs];
+    while (trimmed.length && trimmed[trimmed.length - 1].role === 'assistant') trimmed.pop();
+    await updateDoc(convRef, { messages: trimmed, updatedAt: new Date() });
+    regenerate(originalMsg);
   }, [currentConvId, isSending, isStreaming, getConvRef, regenerate]);
 
   const handleDeleteConv = useCallback(async (id: string) => {
-    // … unchanged
+    await deleteConv(id);
+    if (currentConvId === id) setCurrentConvId(null);
   }, [deleteConv, currentConvId]);
 
   const handleClearChats = useCallback(async () => {
-    // … unchanged
+    await clearAllChats();
+    setCurrentConvId(null);
   }, [clearAllChats]);
 
   // Keyboard shortcuts
   useEffect(() => {
-    // … unchanged
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key === 'n') { e.preventDefault(); handleNewChat(); }
+      if (mod && e.key === 'k') { e.preventDefault(); setSidebarOpen(true); window.dispatchEvent(new CustomEvent('focus-search')); }
+      if (e.key === 'Escape' && sidebarOpen) { setSidebarOpen(false); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleNewChat, sidebarOpen, setSidebarOpen]);
 
   const topbarTitle = currentConvId
@@ -153,7 +179,118 @@ export default function App() {
         dailyCount={dailyCount}
         dailyLimit={DAILY_LIMIT}
       />
-      {/* … rest of the UI unchanged */}
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* ── CHAT VIEW ── */}
+        {view === 'chat' && (
+          <>
+            {/* Topbar */}
+            <header style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between',
+              height: 'calc(60px + var(--sat))',
+              padding: 'calc(var(--sat) + 10px) 16px 10px',
+              background: `linear-gradient(to bottom, var(--fade-top) 0%, var(--fade-top) 55%, transparent 100%)`,
+              position: 'relative', zIndex: 10,
+            }}>
+              <CircleBtn onClick={() => setSidebarOpen(true)} className="menu-btn-mobile">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6"/>
+                  <line x1="3" y1="12" x2="21" y2="12"/>
+                  <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </CircleBtn>
+
+              <span style={{
+                position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+                fontSize: '16px', fontWeight: 600, color: 'var(--text-1)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                maxWidth: 'calc(100% - 120px)',
+              }}>
+                {topbarTitle}
+              </span>
+
+              <CircleBtn onClick={handleNewChat} className="topbar-newchat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </CircleBtn>
+            </header>
+
+            {/* MessageList fills remaining space; InputArea floats over it */}
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <MessageList
+                messages={messages}
+                isTyping={isTyping}
+                isSearching={isSearching}
+                isStreaming={isStreaming}
+                streamText={streamText}
+                streamDone={streamDone}
+                streamModel={streamModel}
+                streamDisclaimer={streamDisclaimer}
+                streamSources={streamSources}
+                streamThinking={streamThinking}
+                isThinking={isThinking}
+                convId={currentConvId}
+                chipsUsed={chipsUsed}
+                onChipClick={handleSend}
+                onRegen={handleRegen}
+              />
+              {/* InputArea positioned absolutely so messages scroll underneath it */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5 }}>
+                <InputArea
+                  onSend={handleSend}
+                  onStop={stopStreaming}
+                  isSending={isSending}
+                  isStreaming={isStreaming}
+                  dailyLimitReached={dailyLimitReached}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {view === 'settings' && (
+          <SettingsView
+            onBack={() => setView('chat')}
+            onOpenProfile={() => setView('profile')}
+            onOpenPersonalization={() => setView('personalization')}
+            onOpenAbout={() => setView('about')}
+            onClearChats={handleClearChats}
+            conversations={conversations}
+          />
+        )}
+
+        {view === 'profile' && (
+          <ProfileView
+            onBack={() => setView('settings')}
+            getUserConvsRef={getUserConvsRef}
+          />
+        )}
+
+        {view === 'personalization' && (
+          <PersonalizationView
+            onBack={() => setView('settings')}
+          />
+        )}
+
+        {view === 'about' && (
+          <AboutView
+            onBack={() => setView('settings')}
+            onOpenLicenses={() => setView('licenses')}
+          />
+        )}
+
+        {view === 'licenses' && (
+          <LicensesView
+            onBack={() => setView('about')}
+          />
+        )}
+      </div>
+
+      <LoginModal visible={!currentUser} />
     </div>
   );
 }
