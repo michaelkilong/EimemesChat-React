@@ -19,6 +19,7 @@ export default function Disclaimer({ type }: Props) {
         color: type === 'critical' ? 'var(--text-2)' : 'var(--text-3)',
         margin: '8px 0 0',
         lineHeight: 1.5,
+        fontStyle: 'italic',
       }}
     >
       {MESSAGES[type]}
