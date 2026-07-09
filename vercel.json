@@ -9,3 +9,11 @@
   },
   "alias": ["eimemes-chat-ai.vercel.app"]
 }
+
+{
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": "prompts/**"
+    }
+  }
+}
