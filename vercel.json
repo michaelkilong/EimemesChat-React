@@ -1,12 +1,9 @@
 {
   "functions": {
     "api/chat.js": {
-      "maxDuration": 60
-    },
-    "api/title.js": {
-      "maxDuration": 15
+      "maxDuration": 60,
+      "includeFiles": "prompts/**"
     }
   },
   "alias": ["eimemes-chat-ai.vercel.app"]
 }
-
