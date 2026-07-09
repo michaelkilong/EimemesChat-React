@@ -7,13 +7,17 @@
 //                       the actual system prompt sent to the model.
 // prompts/security/*  → NOT sent to the model. Used only to build the
 //                       leak-detection fingerprint (see shield.js).
+//
+// NOTE: uses process.cwd() instead of import.meta.url on purpose —
+// this file gets transpiled to CommonJS by Vercel's build step, and
+// import.meta.url doesn't survive that transform. process.cwd() works
+// identically either way and is Vercel's documented pattern for
+// resolving files added via vercel.json's "includeFiles".
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __dirname   = path.dirname(fileURLToPath(import.meta.url));
-const PROMPTS_DIR = path.join(__dirname, "..", "prompts");
+const PROMPTS_DIR = path.join(process.cwd(), "prompts");
 const CORE_DIR    = path.join(PROMPTS_DIR, "core");
 
 function readModule(filePath) {
