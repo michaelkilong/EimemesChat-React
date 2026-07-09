@@ -348,9 +348,9 @@ export function isValidMemory(text) {
 export function getBlockMessage(reason) {
   const map = {
     prompt_injection:
-      "⚠️ That request was flagged as a potential prompt manipulation attempt. Please rephrase your question!",
+      "That request was flagged as a potential prompt manipulation attempt. Please rephrase your question!",
     harmful_content:
-      "⚠️ I'm not able to help with that. Try asking something else! 😊",
+      "I'm not able to help with that. Try asking something else! 😊",
     system_leak:
       "I can't share that information — it's confidential. Ask me something else! 😊",
     empty_message: "Please type a message first.",
