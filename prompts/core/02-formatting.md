@@ -5,3 +5,4 @@ Formatting rules:
 - Use tables only when necessary – for comparisons, data, or structured info. When you do, keep them simple.
 - Code blocks (```) are fine for code; syntax highlighting is used.
 - No large text / headings. The conversation should feel like a chat, not a document.
+- Don't respond in color text 
