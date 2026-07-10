@@ -1,4 +1,5 @@
 // App.tsx
+// v2.7 — Gated authenticated UI behind mandatory email verification (VerificationModal)
 // v2.6 — Daily limit 100 + real‑time usage counter + landscape desktop mode
 // v2.4.1 — Latched authReady to prevent loading screen flicker on token refresh
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -21,6 +22,7 @@ import PersonalizationView   from './components/PersonalizationView';
 import AboutView             from './components/AboutView';
 import LicensesView          from './components/LicensesView';
 import LoginModal            from './components/modals/LoginModal';
+import VerificationModal     from './components/modals/VerificationModal';
 import type { Attachment }   from './types';
 
 const DAILY_LIMIT = 100;
@@ -80,7 +82,7 @@ export default function App() {
     };
   }, []);
 
-  const { currentUser, authReady, view, setView, sidebarOpen, setSidebarOpen } = useApp();
+  const { currentUser, authReady, emailVerified, view, setView, sidebarOpen, setSidebarOpen } = useApp();
   const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
   const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
   const [dailyLimitReached, setDailyLimitReached] = useState(false);
@@ -89,6 +91,10 @@ export default function App() {
   const authWasReady = useRef(false);
   if (authReady) authWasReady.current = true;
   const showLoading = !authReady && !authWasReady.current;
+
+  // Only true when the user is both signed in AND verified — this is the
+  // single gate for the entire authenticated UI + its hooks/side effects.
+  const showApp = !!currentUser && emailVerified;
 
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
@@ -168,6 +174,7 @@ export default function App() {
   }, [clearAllChats]);
 
   useEffect(() => {
+    if (!showApp) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key === 'n') { e.preventDefault(); handleNewChat(); }
@@ -176,7 +183,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNewChat, sidebarOpen, setSidebarOpen]);
+  }, [handleNewChat, sidebarOpen, setSidebarOpen, showApp]);
 
   const topbarTitle = currentConvId
     ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
@@ -186,74 +193,79 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
-      <Sidebar
-        conversations={conversations}
-        currentConvId={currentConvId}
-        onNewChat={handleNewChat}
-        onSelectConv={id => { setCurrentConvId(id); setView('chat'); }}
-        onOpenSettings={() => { setView('settings'); setSidebarOpen(false); }}
-        onDeleteConv={handleDeleteConv}
-        dailyCount={dailyCount}
-        dailyLimit={DAILY_LIMIT}
-      />
+      {showApp && (
+        <>
+          <Sidebar
+            conversations={conversations}
+            currentConvId={currentConvId}
+            onNewChat={handleNewChat}
+            onSelectConv={id => { setCurrentConvId(id); setView('chat'); }}
+            onOpenSettings={() => { setView('settings'); setSidebarOpen(false); }}
+            onDeleteConv={handleDeleteConv}
+            dailyCount={dailyCount}
+            dailyLimit={DAILY_LIMIT}
+          />
 
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {view === 'chat' && (
-          <>
-            <header style={{
-              flexShrink: 0, display: 'flex', alignItems: 'center',
-              justifyContent: 'space-between',
-              height: 'calc(60px + var(--sat))',
-              padding: 'calc(var(--sat) + 10px) 16px 10px',
-              background: `linear-gradient(to bottom, var(--fade-top) 0%, var(--fade-top) 55%, transparent 100%)`,
-              position: 'relative', zIndex: 10,
-            }}>
-              <CircleBtn onClick={() => setSidebarOpen(true)} className="menu-btn-mobile">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                  <line x1="3" y1="6" x2="21" y2="6"/>
-                  <line x1="3" y1="12" x2="21" y2="12"/>
-                  <line x1="3" y1="18" x2="21" y2="18"/>
-                </svg>
-              </CircleBtn>
-              <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: '16px', fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 'calc(100% - 120px)' }}>{topbarTitle}</span>
-              <CircleBtn onClick={handleNewChat} className="topbar-newchat">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"/>
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-              </CircleBtn>
-            </header>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <MessageList
-                messages={messages}
-                isTyping={isTyping}
-                isSearching={isSearching}
-                isStreaming={isStreaming}
-                streamText={streamText}
-                streamDone={streamDone}
-                streamModel={streamModel}
-                streamDisclaimer={streamDisclaimer}
-                streamSources={streamSources}
-                streamThinking={streamThinking}
-                isThinking={isThinking}
-                convId={currentConvId}
-                chipsUsed={chipsUsed}
-                onChipClick={handleSend}
-                onRegen={handleRegen}
-              />
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5 }}>
-                <InputArea onSend={handleSend} onStop={stopStreaming} isSending={isSending} isStreaming={isStreaming} dailyLimitReached={dailyLimitReached} />
-              </div>
-            </div>
-          </>
-        )}
-        {view === 'settings' && <SettingsView onBack={() => setView('chat')} onOpenProfile={() => setView('profile')} onOpenPersonalization={() => setView('personalization')} onOpenAbout={() => setView('about')} onClearChats={handleClearChats} conversations={conversations} />}
-        {view === 'profile' && <ProfileView onBack={() => setView('settings')} getUserConvsRef={getUserConvsRef} />}
-        {view === 'personalization' && <PersonalizationView onBack={() => setView('settings')} />}
-        {view === 'about' && <AboutView onBack={() => setView('settings')} onOpenLicenses={() => setView('licenses')} />}
-        {view === 'licenses' && <LicensesView onBack={() => setView('about')} />}
-      </div>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {view === 'chat' && (
+              <>
+                <header style={{
+                  flexShrink: 0, display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between',
+                  height: 'calc(60px + var(--sat))',
+                  padding: 'calc(var(--sat) + 10px) 16px 10px',
+                  background: `linear-gradient(to bottom, var(--fade-top) 0%, var(--fade-top) 55%, transparent 100%)`,
+                  position: 'relative', zIndex: 10,
+                }}>
+                  <CircleBtn onClick={() => setSidebarOpen(true)} className="menu-btn-mobile">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                      <line x1="3" y1="6" x2="21" y2="6"/>
+                      <line x1="3" y1="12" x2="21" y2="12"/>
+                      <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                  </CircleBtn>
+                  <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: '16px', fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 'calc(100% - 120px)' }}>{topbarTitle}</span>
+                  <CircleBtn onClick={handleNewChat} className="topbar-newchat">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"/>
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                  </CircleBtn>
+                </header>
+                <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  <MessageList
+                    messages={messages}
+                    isTyping={isTyping}
+                    isSearching={isSearching}
+                    isStreaming={isStreaming}
+                    streamText={streamText}
+                    streamDone={streamDone}
+                    streamModel={streamModel}
+                    streamDisclaimer={streamDisclaimer}
+                    streamSources={streamSources}
+                    streamThinking={streamThinking}
+                    isThinking={isThinking}
+                    convId={currentConvId}
+                    chipsUsed={chipsUsed}
+                    onChipClick={handleSend}
+                    onRegen={handleRegen}
+                  />
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5 }}>
+                    <InputArea onSend={handleSend} onStop={stopStreaming} isSending={isSending} isStreaming={isStreaming} dailyLimitReached={dailyLimitReached} />
+                  </div>
+                </div>
+              </>
+            )}
+            {view === 'settings' && <SettingsView onBack={() => setView('chat')} onOpenProfile={() => setView('profile')} onOpenPersonalization={() => setView('personalization')} onOpenAbout={() => setView('about')} onClearChats={handleClearChats} conversations={conversations} />}
+            {view === 'profile' && <ProfileView onBack={() => setView('settings')} getUserConvsRef={getUserConvsRef} />}
+            {view === 'personalization' && <PersonalizationView onBack={() => setView('settings')} />}
+            {view === 'about' && <AboutView onBack={() => setView('settings')} onOpenLicenses={() => setView('licenses')} />}
+            {view === 'licenses' && <LicensesView onBack={() => setView('about')} />}
+          </div>
+        </>
+      )}
       <LoginModal visible={!currentUser} />
+      <VerificationModal visible={!!currentUser && !emailVerified} />
     </div>
   );
 }

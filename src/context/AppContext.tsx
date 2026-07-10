@@ -1,3 +1,4 @@
+// context/AppContext.tsx — v1.1 (added emailVerified state for mandatory email verification gate)
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import type { User } from 'firebase/auth';
 import type { View } from '../types';
@@ -7,6 +8,8 @@ interface AppContextType {
   setCurrentUser: (u: User | null) => void;
   authReady: boolean;
   setAuthReady: (r: boolean) => void;
+  emailVerified: boolean;
+  setEmailVerified: (v: boolean) => void;
   view: View;
   setView: (v: View) => void;
   showToast: (msg: string, dur?: number) => void;
@@ -25,6 +28,7 @@ export const useApp = () => useContext(AppContext);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady,   setAuthReady]   = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [view,        setView_]       = useState<View>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark,      setIsDark]      = useState(true);
@@ -111,6 +115,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider value={{
       currentUser, setCurrentUser,
       authReady, setAuthReady,
+      emailVerified, setEmailVerified,
       view, setView,
       showToast,
       showConfirm,

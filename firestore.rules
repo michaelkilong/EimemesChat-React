@@ -11,6 +11,20 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == userId;
     }
 
+    // Mirrors the client-side "emailVerified === true" gate. Relies on
+    // request.auth.token.email_verified, which comes from the ID token's
+    // claims at mint time — NOT a live read of the Auth user record. The
+    // client must force a token refresh (getIdToken(true)) immediately
+    // after detecting verification, or this will keep rejecting requests
+    // with a stale "false" claim. See VerificationModal.tsx.
+    function isVerified() {
+      return isAuth() && request.auth.token.email_verified == true;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isOwner(userId) && isVerified();
+    }
+
     function isValidConversation() {
       let data = request.resource.data;
       return data.keys().hasAll(['title', 'createdAt', 'updatedAt', 'messages'])
@@ -32,6 +46,10 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
+      // Profile doc stays gated on ownership only, not verification.
+      // It has to: the auto display-name flow in useProfile runs the
+      // moment a user signs up, while still unverified, and account
+      // deletion must stay available to unverified users too.
       allow read: if isOwner(userId);
 
       allow create: if isOwner(userId);
@@ -48,19 +66,22 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
 
       match /conversations/{convId} {
-        allow get:  if isOwner(userId);
-        allow list: if isOwner(userId);
+        // Conversations are the actual protected app content — AI-generated
+        // chat history behind paid API calls — so these require a verified
+        // email on top of ownership.
+        allow get:  if isVerifiedOwner(userId);
+        allow list: if isVerifiedOwner(userId);
 
-        allow create: if isOwner(userId)
+        allow create: if isVerifiedOwner(userId)
                       && isValidConversation()
                       && request.resource.data.messages.size() == 0;
 
-        allow update: if isOwner(userId)
+        allow update: if isVerifiedOwner(userId)
                       && (isMessagesUpdate() || isMetaUpdate())
                       && (!('title' in request.resource.data) || request.resource.data.title.size() <= 200)
                       && (!('messages' in request.resource.data) || request.resource.data.messages.size() <= 100);
 
-        allow delete: if isOwner(userId);
+        allow delete: if isVerifiedOwner(userId);
       }
     }
 

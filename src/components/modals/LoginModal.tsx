@@ -1,4 +1,4 @@
-// components/modals/LoginModal.tsx — v1.4 (password visibility toggle + strength indicator)
+// components/modals/LoginModal.tsx — v1.5 (uses shared friendlyAuthError from utils/authErrors)
 import React, { useState } from 'react';
 import {
   signInWithPopup,
@@ -10,26 +10,12 @@ import {
 } from 'firebase/auth';
 import { auth, gauth } from '../../firebase';
 import { useApp } from '../../context/AppContext';
+import { friendlyAuthError } from '../../utils/authErrors';
 
 declare global {
   interface Window {
     ReactNativeWebView?: { postMessage: (msg: string) => void };
   }
-}
-
-function friendlyAuthError(code: string): string {
-  return ({
-    'auth/email-already-in-use':    'This email is already registered. Try signing in instead.',
-    'auth/invalid-email':           'Please enter a valid email address.',
-    'auth/user-not-found':          'No account found with that email.',
-    'auth/wrong-password':          'Incorrect password. Please try again.',
-    'auth/invalid-credential':      'Incorrect email or password.',
-    'auth/weak-password':           'Password must be at least 6 characters.',
-    'auth/too-many-requests':       'Too many attempts. Please wait a moment.',
-    'auth/network-request-failed':  'Network error. Check your connection.',
-    'auth/popup-closed-by-user':    'Sign-in window was closed. Please try again.',
-    'auth/cancelled-popup-request': '',
-  } as Record<string, string>)[code] ?? 'Authentication failed. Please try again.';
 }
 
 function isWebView(): boolean {
