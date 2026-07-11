@@ -1,4 +1,4 @@
-// useChat.ts — v2.9 — Fixed setMessages type error (array instead of updater function)
+// useChat.ts — v2.9 — Fixed: replaced undefined 'messages' with conversations lookup; build passes
 // v2.8 — Abort-after-block: save partial response on stream abort
 // v2.7 — Empty‑response fallback: never save blank assistant messages
 // v2.6 — Fixed blank screen on leak detection: fallback when safeReply is empty
@@ -266,7 +266,8 @@ export function useChat(
         if (fullText) {
           const aiMsg: Message = { role: 'assistant', content: fullText, time: getTime(), model, disclaimer, ...(sources.length && { sources }) };
           await updateDoc(getConvDocRef(activeConvId)!, { messages: arrayUnion(aiMsg), updatedAt: new Date() }).catch(() => {});
-          setMessages([...messages, aiMsg]);
+          const convMsgs = conversations.find(c => c.id === activeConvId)?.messages || [];
+          setMessages([...convMsgs, aiMsg]);
         }
         setIsSending(false); return;
       }
@@ -283,7 +284,7 @@ export function useChat(
     } finally {
       setIsSending(false);
     }
-  }, [isSending, currentUser, convId, conversations, createNewChat, setConvId, setConvTitle, messages,
+  }, [isSending, currentUser, convId, conversations, createNewChat, setConvId, setConvTitle,
       isStreamingRef, setMessages, showToast, getConvDocRef, enqueue, onMessageSent]);
 
   const stopStreaming = useCallback(() => {
@@ -467,7 +468,8 @@ export function useChat(
         if (fullText) {
           const aiMsg: Message = { role: 'assistant', content: fullText, time: getTime(), model, disclaimer, ...(sources.length && { sources }) };
           await updateDoc(getConvDocRef(activeConvId)!, { messages: arrayUnion(aiMsg), updatedAt: new Date() }).catch(() => {});
-          setMessages([...messages, aiMsg]);
+          const convMsgs = conversations.find(c => c.id === activeConvId)?.messages || [];
+          setMessages([...convMsgs, aiMsg]);
         }
         setIsSending(false); return;
       }
@@ -484,7 +486,7 @@ export function useChat(
     } finally {
       setIsSending(false);
     }
-  }, [isSending, currentUser, convId, conversations, getConvDocRef, setConvTitle, messages,
+  }, [isSending, currentUser, convId, conversations, getConvDocRef, setConvTitle,
       isStreamingRef, setMessages, showToast, enqueue]);
 
   return {
