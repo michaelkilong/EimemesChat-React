@@ -1,4 +1,5 @@
-// useChat.ts — v2.6 — Fixed blank screen on leak detection: fallback when safeReply is empty
+// useChat.ts — v2.7 — Empty‑response fallback: never save blank assistant messages
+// v2.6 — Fixed blank screen on leak detection: fallback when safeReply is empty
 // v2.5 — Real‑time daily count update via onMessageSent
 // v2.4 — Added isRegeneration flag to request body for backend deduplication
 // v2.3 — Added regenerate function to prevent duplicate user messages on regen
@@ -195,7 +196,7 @@ export function useChat(
 
             if (parsed.token)         { setIsTyping(false); setIsSearching(false); setIsThinking(false); fullText += parsed.token; enqueue(parsed.token); }
 
-            // ── FIX: handle outputBlocked even if safeReply is empty ──
+            // Fix: handle outputBlocked even if safeReply is empty
             if (parsed.outputBlocked) {
               const safeReply = parsed.safeReply || "I can't respond to that request.";
               setIsTyping(false);
@@ -227,6 +228,11 @@ export function useChat(
       setStreamModel(model);
       setStreamDisclaimer(disclaimer);
       setStreamDone(true);
+
+      // Fallback when the model returns zero tokens (empty response)
+      if (!fullText) {
+        fullText = "I'm sorry, I couldn't generate a response. Please try again.";
+      }
 
       const aiMsg: Message = {
         role: 'assistant', content: fullText,
@@ -388,7 +394,7 @@ export function useChat(
 
             if (parsed.token)         { setIsTyping(false); setIsSearching(false); setIsThinking(false); fullText += parsed.token; enqueue(parsed.token); }
 
-            // ── FIX: handle outputBlocked even if safeReply is empty ──
+            // Fix: handle outputBlocked even if safeReply is empty
             if (parsed.outputBlocked) {
               const safeReply = parsed.safeReply || "I can't respond to that request.";
               setIsTyping(false);
@@ -420,6 +426,11 @@ export function useChat(
       setStreamModel(model);
       setStreamDisclaimer(disclaimer);
       setStreamDone(true);
+
+      // Fallback when the model returns zero tokens (empty response)
+      if (!fullText) {
+        fullText = "I'm sorry, I couldn't generate a response. Please try again.";
+      }
 
       const aiMsg: Message = {
         role: 'assistant', content: fullText,
