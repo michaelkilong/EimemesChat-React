@@ -1,8 +1,4 @@
-// components/modals/LoginModal.tsx — v1.6 (sends welcome email via /api/send-welcome-email on signup)
-// Changelog:
-//   v1.6 - Added fire-and-forget call to /api/send-welcome-email after successful signup.
-//          Sends welcome email from own Gmail via nodemailer, independent of Firebase's
-//          built-in verification email.
+// components/modals/LoginModal.tsx — v1.5 (uses shared friendlyAuthError from utils/authErrors)
 import React, { useState } from 'react';
 import {
   signInWithPopup,
@@ -131,15 +127,6 @@ export default function LoginModal({ visible }: Props) {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await sendEmailVerification(result.user);
-
-      // Fire-and-forget welcome email (sent from our own Gmail via nodemailer,
-      // separate from Firebase's verification email). Never blocks signup.
-      fetch('/api/send-welcome-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: result.user.email }),
-      }).catch(err => console.error('Welcome email request failed:', err));
-
       showToast('Account created! Check your email to verify your address.');
     } catch (e: any) {
       setError(friendlyAuthError(e.code));
