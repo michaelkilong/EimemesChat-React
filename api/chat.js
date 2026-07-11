@@ -1,4 +1,5 @@
 // api/chat.js
+// v5.14 — Moved all prompt strings to prompts/apiPrompts.js; code‑only file
 // v5.13 — Web‑search now considers recent conversation context; image handling robust
 // v5.12 — Fixed image handling: detect images by mimeType, bypass truncation; Groq path ignores image content
 // v5.11 — Hardened safeReply fallback: never send an empty safeReply to the frontend
@@ -16,6 +17,11 @@
 import admin from "firebase-admin";
 import { buildFingerprint, createStreamScanner, shieldInput, getBlockMessage } from "../shield.js";
 import { BEHAVIORAL_PROMPT, FINGERPRINT_PROMPT } from "../src/lib/promptLoader.js";
+import {
+  buildMemoryExtractionPrompt,
+  buildSearchOptimizationPrompt,
+  buildTitlePrompt,
+} from "../prompts/apiPrompts.js";
 
 /* ── Firebase Admin ───────────────────────────────────────────── */
 if (!admin.apps.length) {
@@ -91,11 +97,9 @@ function toGeminiHistory(history) {
     }));
 }
 
-/* ── Web search query optimisation (now with conversation context) ── */
+/* ── Web search query optimisation ────────────────────────────── */
 async function optimizeSearchQuery(message, geminiApiKey, groqApiKey, historyContext = '') {
-  const prompt = historyContext
-    ? `Conversation so far:\n${historyContext}\n\nLatest user message: "${message}"\n\nConvert the user's intent into an optimal web search query (a few keywords). Output ONLY the query.`
-    : `Convert the user message into an optimal web search query. Output ONLY the search query — no explanation, no quotes, no punctuation at the end.`;
+  const prompt = buildSearchOptimizationPrompt(message, historyContext);
 
   if (geminiApiKey) {
     try {
@@ -244,29 +248,7 @@ async function extractAndUpdateMemories(uid, userMsg, aiReply, geminiApiKey) {
     ? 'Existing memories:\n' + existing.map((m, i) => `[${i}] (${m.category}) ${m.text}`).join('\n')
     : 'No existing memories yet.';
 
-  const extractionPrompt = `You are a memory manager for an AI assistant. Analyse this conversation exchange and decide what to remember about the user.
-
-${existingBlock}
-
-New conversation:
-User: "${safeUserMsg}"
-AI: "${safeAiReply}"
-
-Rules:
-- Extract facts, preferences, communication style, interests, and context about the USER only
-- Categories: fact (name/job/location/age), preference (likes/dislikes/habits), style (tone/language/communication), interest (hobbies/topics), context (current situation/goals)
-- If new info UPDATES an existing memory, use action UPDATE with the existing memory index
-- If new info CONTRADICTS an existing memory, use DELETE the old index then ADD new
-- If already captured, use NONE
-- Be specific and concise — max 12 words per memory
-- Capture communication style: casual language, slang, preferred response length, tone
-- If nothing meaningful, return NONE
-
-Respond ONLY with valid JSON, no markdown, no explanation:
-{"action":"ADD","category":"fact","text":"User is a software engineer"}
-OR {"action":"UPDATE","index":2,"text":"Updated memory text"}
-OR {"action":"DELETE","index":2}
-OR {"action":"NONE"}`;
+  const extractionPrompt = buildMemoryExtractionPrompt(existingBlock, safeUserMsg, safeAiReply);
 
   try {
     let raw = null;
@@ -509,7 +491,7 @@ async function streamGroq({ apiKey, messages, maxTokens, res, scanner }) {
 
 /* ── Title generation ─────────────────────────────────────────── */
 async function generateTitle({ geminiApiKey, groqApiKey, safeMessage, fullText, res }) {
-  const prompt = `User: "${safeMessage.slice(0, 200)}"\nAI: "${fullText.slice(0, 200)}"\n\nGenerate an ultra-short chat title — 2-5 words, no punctuation, no quotes. Output ONLY the title.`;
+  const prompt = buildTitlePrompt(safeMessage, fullText);
 
   try {
     if (geminiApiKey) {
@@ -636,7 +618,6 @@ export default async function handler(req, res) {
   let searchResults = null;
   let searchContext = '';
   if (shouldSearch) {
-    // Build context from the last few messages to improve the search query
     let historyContext = '';
     if (trimmedHistory.length) {
       historyContext = trimmedHistory
