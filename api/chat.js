@@ -1,4 +1,6 @@
 // api/chat.js
+// v5.12 — Fixed image handling: detect images by mimeType, bypass truncation; Groq path ignores image content
+// v5.11 — Hardened safeReply fallback: never send an empty safeReply to the frontend
 // v5.10 — Fixed: daily limit error aborts request, attachment truncation, history duplicate removal,
 //         image‑only queries allowed, displayName/nickname deduplication, memory extraction note.
 // v5.9 — Use user's display name from Firestore; removed hardcoded "Melhoi"
@@ -8,19 +10,7 @@
 //        fingerprint prompt built from same content for leak protection.
 // v5.5 — Regeneration fix: strip last user message from history to avoid doubling
 // v5.4 — Native Gemini REST API with proper thinkingConfig; Groq fallback stays OpenAI format
-// Changelog:
-//   v5.10 — Daily limit failure → 500; truncate attachment content; fix history pop logic;
-//          allow image-only query; deduplicate name instruction.
-//   v5.9 — Read user's displayName from Firestore and use it in the system prompt
-//   v5.8 — Fixed disclaimer: sends 'critical' or 'web' string instead of boolean true
-//   v5.7 — Always remove trailing user message from history (current message sent separately)
-//   v5.6 — Moved complete instructions into BEHAVIORAL_PROMPT; fingerprint covers everything
-//   v5.5 — When isRegeneration is true, remove trailing user message from history so AI sees fresh request
-//   v5.4 — Migrated Gemini to native REST API (/v1beta/models/...); thinking via thinkingConfig; parts-based response
-//   v5.3 — Thinking mode attempt via OpenAI-compat (failed — unknown field)
-//   v5.2 — gemini-2.5-flash primary; Groq llama-3.3-70b-versatile fallback
-//   v5.1 — Switched to Google Gemini 2.0 Flash; removed Groq fallbacks
-//   v5.0 — Tavily web search; auto-detect sensitive topics; inline source citations
+// v5.0 — Tavily web search; auto-detect sensitive topics; inline source citations
 
 import admin from "firebase-admin";
 import { buildFingerprint, createStreamScanner, shieldInput, getBlockMessage } from "../shield.js";
@@ -429,7 +419,8 @@ async function streamGemini({ apiKey, systemPrompt, contents, maxTokens, enableT
           const leakGram = scanner.checkChunk(part.text);
           if (leakGram) {
             leaked = true;
-            const safeReply = getBlockMessage("system_leak");
+            let safeReply = getBlockMessage("system_leak");
+            if (!safeReply) safeReply = "I can't respond to that request.";
             sseEvent(res, { outputBlocked: true, safeReply });
             sseEvent(res, { done: true, model: GEMINI_MODEL, reply: safeReply });
             res.end(); break streamLoop;
@@ -495,7 +486,8 @@ async function streamGroq({ apiKey, messages, maxTokens, res, scanner }) {
         const leakGram = scanner.checkChunk(token);
         if (leakGram) {
           leaked = true;
-          const safeReply = getBlockMessage("system_leak");
+          let safeReply = getBlockMessage("system_leak");
+          if (!safeReply) safeReply = "I can't respond to that request.";
           sseEvent(res, { outputBlocked: true, safeReply });
           sseEvent(res, { done: true, model: GROQ_MODEL, reply: safeReply });
           res.end(); break streamLoop;
@@ -582,7 +574,6 @@ export default async function handler(req, res) {
   if (!GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: "No AI API key configured." });
 
   const { message, history, isFirstMessage, attachment, useWebSearch, useThinking, isRegeneration } = req.body;
-  // Allow image‑only query (no message text)
   if (!message && !attachment) return res.status(400).json({ error: "Message or attachment required" });
 
   const inputCheck = shieldInput(message || "");
@@ -604,7 +595,6 @@ export default async function handler(req, res) {
     ? history.slice(-8).map(({ role, content }) => ({ role, content }))
     : [];
 
-  // Remove last user message only if it duplicates the current one
   if (
     trimmedHistory.length &&
     trimmedHistory[trimmedHistory.length - 1].role === 'user' &&
@@ -624,7 +614,6 @@ export default async function handler(req, res) {
       const prefs = data.preferences || {};
       const parts = [];
 
-      // Use nickname if set, else displayName (only one instruction)
       if (prefs.nickname) {
         parts.push(`Call the user "${prefs.nickname}".`);
       } else if (data.displayName) {
@@ -653,9 +642,11 @@ export default async function handler(req, res) {
   const memoryPrompt = await buildMemoryPrompt(uid);
   const FULL_SYSTEM_PROMPT = BEHAVIORAL_PROMPT + userPrefsPrompt + memoryPrompt;
 
-  /* ── Build user message part (with attachment truncation) ─────── */
+  /* ── Build user message part (with image safety) ──────────────── */
+  const isImage = attachment?.type === 'image' || attachment?.mimeType?.startsWith('image/');
+
   let userParts;
-  if (attachment?.type === 'image') {
+  if (isImage) {
     const base64 = attachment.content.split(',')[1] || attachment.content;
     userParts = [
       { inlineData: { mimeType: attachment.mimeType, data: base64 } },
@@ -673,13 +664,17 @@ export default async function handler(req, res) {
     { role: "user", parts: userParts },
   ];
 
+  // Groq fallback: for images, omit the raw base64 – it can't process it anyway
+  const openaiUserContent = attachment?.content
+    ? (isImage
+        ? safeMessage + searchContext  // ignore image content for Groq
+        : `[Attached file: ${attachment.name}]\n\n${truncateAttachmentContent(attachment.content)}\n\n---\nUser question: ${safeMessage}${searchContext}`)
+    : safeMessage + searchContext;
+
   const openaiMessages = [
     { role: "system", content: FULL_SYSTEM_PROMPT },
     ...trimmedHistory,
-    { role: "user", content: attachment?.content
-        ? `[Attached file: ${attachment.name}]\n\n${truncateAttachmentContent(attachment.content)}\n\n---\nUser question: ${safeMessage}${searchContext}`
-        : safeMessage + searchContext
-    },
+    { role: "user", content: openaiUserContent },
   ];
 
   const scanner = createStreamScanner(PROMPT_FINGERPRINT);
@@ -743,8 +738,6 @@ export default async function handler(req, res) {
   res.end();
 
   /* ── Silent background memory extraction (best‑effort) ── */
-  // Note: on serverless platforms this may not always complete.
-  // For guaranteed execution, consider a Firestore onCreate trigger on the conversations collection.
   if (result.fullText && GEMINI_API_KEY) {
     extractAndUpdateMemories(uid, safeMessage, result.fullText, GEMINI_API_KEY)
       .catch(err => console.warn('[memory] Background extraction error:', err.message));
