@@ -1,4 +1,5 @@
 // App.tsx
+// v2.8 — iOS keyboard offset: input lifts when soft keyboard appears
 // v2.7 — Gated authenticated UI behind mandatory email verification (VerificationModal)
 // v2.6 — Daily limit 100 + real‑time usage counter + landscape desktop mode
 // v2.4.1 — Latched authReady to prevent loading screen flicker on token refresh
@@ -60,6 +61,28 @@ function CircleBtn({ onClick, children, className }: { onClick: () => void; chil
 export default function App() {
   useAuth();
   useTheme();
+
+  // ── iOS keyboard offset ──────────────────────────────────────
+  const [kbOffset, setKbOffset] = useState(0);
+
+  useEffect(() => {
+    const handle = () => {
+      const viewport = window.visualViewport;
+      if (!viewport) return;
+      const offset = window.innerHeight - viewport.height;
+      setKbOffset(offset > 0 ? offset : 0);
+    };
+
+    window.visualViewport?.addEventListener('resize', handle);
+    window.visualViewport?.addEventListener('scroll', handle);
+    // initial call
+    handle();
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handle);
+      window.visualViewport?.removeEventListener('scroll', handle);
+    };
+  }, []);
 
   // ── Landscape desktop mode ──────────────────────────────────
   useEffect(() => {
@@ -250,7 +273,13 @@ export default function App() {
                     onChipClick={handleSend}
                     onRegen={handleRegen}
                   />
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 5 }}>
+                  {/* ── input wrapper with keyboard offset ── */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: kbOffset,              // lifts on iOS when keyboard opens
+                    left: 0, right: 0, zIndex: 5,
+                    transition: 'bottom 0.15s ease-out',
+                  }}>
                     <InputArea onSend={handleSend} onStop={stopStreaming} isSending={isSending} isStreaming={isStreaming} dailyLimitReached={dailyLimitReached} />
                   </div>
                 </div>
