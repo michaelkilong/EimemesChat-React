@@ -1,4 +1,4 @@
-// api/welcome-email.js — v2.2 — Premium welcome email
+// api/welcome-email.js — v2.3 — Premium dark welcome email
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -54,25 +54,27 @@ export default async function handler(req, res) {
 <title>Welcome to EimemesChat</title>
 </head>
 
-<body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
 
-<table width="100%" cellpadding="0" cellspacing="0">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;">
 <tr>
-<td align="center" style="padding:56px 24px;">
+<td align="center" style="padding:64px 24px;">
 
 <table width="460" cellpadding="0" cellspacing="0" style="max-width:460px;width:100%;">
 
-<!-- Wordmark -->
+<!-- Logo -->
 <tr>
-<td style="padding-bottom:40px;">
-<span style="color:#0d0d0d;font-size:15px;font-weight:700;letter-spacing:-0.2px;">EimemesChat</span>
+<td align="center" style="padding-bottom:40px;">
+<a href="https://eimemes-chat-ai.vercel.app" target="_blank">
+<img src="https://i.postimg.cc/VLwLSYtF/F4601C8F-006B-4327-ABED-2B46FA7366AF.png" alt="EimemesChat" width="56" height="56" style="display:block;border:0;border-radius:12px;">
+</a>
 </td>
 </tr>
 
 <!-- Heading -->
 <tr>
-<td style="padding-bottom:16px;">
-<h1 style="margin:0;color:#0d0d0d;font-size:24px;line-height:1.35;font-weight:700;letter-spacing:-0.3px;">
+<td align="center" style="padding-bottom:16px;">
+<h1 style="margin:0;color:#ffffff;font-size:24px;line-height:1.35;font-weight:700;letter-spacing:-0.3px;">
 Welcome, ${greetingName}
 </h1>
 </td>
@@ -80,22 +82,22 @@ Welcome, ${greetingName}
 
 <!-- Body -->
 <tr>
-<td style="padding-bottom:14px;">
-<p style="margin:0;color:#5a5a5a;font-size:15px;line-height:1.7;">
+<td align="center" style="padding-bottom:14px;">
+<p style="margin:0;color:#a3a3a3;font-size:15px;line-height:1.7;">
 Thanks for creating an account. EimemesChat is an AI assistant built to help you think, write, search, and get things done — through natural conversation, in English or Kuki, however you prefer to talk.
 </p>
 </td>
 </tr>
 <tr>
-<td style="padding-bottom:14px;">
-<p style="margin:0;color:#5a5a5a;font-size:15px;line-height:1.7;">
+<td align="center" style="padding-bottom:14px;">
+<p style="margin:0;color:#a3a3a3;font-size:15px;line-height:1.7;">
 There's nothing to configure. Sign in, ask a question, and it's ready to go — whether that's drafting something, searching the web, or just talking something through.
 </p>
 </td>
 </tr>
 <tr>
-<td style="padding-bottom:36px;">
-<p style="margin:0;color:#5a5a5a;font-size:15px;line-height:1.7;">
+<td align="center" style="padding-bottom:36px;">
+<p style="margin:0;color:#a3a3a3;font-size:15px;line-height:1.7;">
 Glad to have you here.
 </p>
 </td>
@@ -103,9 +105,9 @@ Glad to have you here.
 
 <!-- Button -->
 <tr>
-<td style="padding-bottom:44px;">
+<td align="center" style="padding-bottom:44px;">
 <a href="https://eimemes-chat-ai.vercel.app"
-style="background:#0d0d0d;color:#ffffff;text-decoration:none;font-size:14.5px;font-weight:600;padding:13px 28px;border-radius:8px;display:inline-block;">
+style="background:#ffffff;color:#0a0a0a;text-decoration:none;font-size:14.5px;font-weight:600;padding:13px 30px;border-radius:8px;display:inline-block;">
 Open EimemesChat
 </a>
 </td>
@@ -113,8 +115,8 @@ Open EimemesChat
 
 <!-- Footer -->
 <tr>
-<td style="border-top:1px solid #ececec;padding-top:24px;">
-<p style="margin:0;color:#9a9a9a;font-size:12.5px;line-height:1.6;">
+<td align="center" style="border-top:1px solid #232323;padding-top:24px;">
+<p style="margin:0;color:#5c5c5c;font-size:12.5px;line-height:1.6;">
 © 2026 EimemesChat AI · MIT License
 </p>
 </td>
