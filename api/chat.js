@@ -1,4 +1,6 @@
 // api/chat.js
+// v5.10 — Fixed: daily limit error aborts request, attachment truncation, history duplicate removal,
+//         image‑only queries allowed, displayName/nickname deduplication, memory extraction note.
 // v5.9 — Use user's display name from Firestore; removed hardcoded "Melhoi"
 // v5.8 — Fixed disclaimer rendering: now sends 'critical' or 'web' string to frontend
 // v5.7 — Always strip last user message from history to prevent double input
@@ -7,7 +9,9 @@
 // v5.5 — Regeneration fix: strip last user message from history to avoid doubling
 // v5.4 — Native Gemini REST API with proper thinkingConfig; Groq fallback stays OpenAI format
 // Changelog:
-//   v5.9 — Read user's displayName from Firestore and use it in the system prompt; removed "Call the user Melhoi"
+//   v5.10 — Daily limit failure → 500; truncate attachment content; fix history pop logic;
+//          allow image-only query; deduplicate name instruction.
+//   v5.9 — Read user's displayName from Firestore and use it in the system prompt
 //   v5.8 — Fixed disclaimer: sends 'critical' or 'web' string instead of boolean true
 //   v5.7 — Always remove trailing user message from history (current message sent separately)
 //   v5.6 — Moved complete instructions into BEHAVIORAL_PROMPT; fingerprint covers everything
@@ -35,13 +39,12 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 /* ── Behavioral & fingerprint prompts ─────────────────────────── */
-/* Now loaded from /prompts via lib/promptLoader.js — see that file  */
-/* and prompts/README.md to add new modules (knowledge.md, skills.md). */
 const PROMPT_FINGERPRINT = buildFingerprint(FINGERPRINT_PROMPT);
 
 /* ── Constants ────────────────────────────────────────────────── */
 const DAILY_LIMIT      = 100;
 const MODEL_TIMEOUT_MS = 25000;
+const MAX_ATTACHMENT_LENGTH = 8000;
 
 /* ── Model config ─────────────────────────────────────────────── */
 const GEMINI_MODEL = "gemini-2.5-flash";
@@ -78,6 +81,13 @@ function adaptiveMaxTokens(message, hasAttachment) {
   if (/\b(list|enumerate|steps?|explain|describe|summarise?|summarize|compare)\b/i.test(message)) return 1800;
   if (len > 300) return 1800;
   return 1200;
+}
+
+function truncateAttachmentContent(content) {
+  if (typeof content !== 'string') return '';
+  return content.length > MAX_ATTACHMENT_LENGTH
+    ? content.slice(0, MAX_ATTACHMENT_LENGTH) + '…[truncated]'
+    : content;
 }
 
 /* ── Convert OpenAI-style history to Gemini native format ─────── */
@@ -562,16 +572,20 @@ export default async function handler(req, res) {
   try {
     const allowed = await checkAndIncrementDailyCount(uid);
     if (!allowed) return res.status(429).json({ error: "Daily limit reached. Your quota resets tomorrow." });
-  } catch (err) { console.error("Daily limit check failed:", err.message); }
+  } catch (err) {
+    console.error("Daily limit check failed:", err.message);
+    return res.status(500).json({ error: "Service temporarily unavailable. Please try again." });
+  }
 
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
   const GROQ_API_KEY   = process.env.GROQ_API_KEY;
   if (!GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: "No AI API key configured." });
 
   const { message, history, isFirstMessage, attachment, useWebSearch, useThinking, isRegeneration } = req.body;
-  if (!message) return res.status(400).json({ error: "Message required" });
+  // Allow image‑only query (no message text)
+  if (!message && !attachment) return res.status(400).json({ error: "Message or attachment required" });
 
-  const inputCheck = shieldInput(message);
+  const inputCheck = shieldInput(message || "");
   if (inputCheck.blocked) {
     setSSEHeaders(res);
     const msg = getBlockMessage(inputCheck.reason);
@@ -590,9 +604,12 @@ export default async function handler(req, res) {
     ? history.slice(-8).map(({ role, content }) => ({ role, content }))
     : [];
 
-  // The current user message is already sent separately – remove it from history
-  // to prevent the AI from seeing the same input twice.
-  if (trimmedHistory.length && trimmedHistory[trimmedHistory.length - 1].role === 'user') {
+  // Remove last user message only if it duplicates the current one
+  if (
+    trimmedHistory.length &&
+    trimmedHistory[trimmedHistory.length - 1].role === 'user' &&
+    trimmedHistory[trimmedHistory.length - 1].content === safeMessage
+  ) {
     trimmedHistory.pop();
   }
 
@@ -607,13 +624,14 @@ export default async function handler(req, res) {
       const prefs = data.preferences || {};
       const parts = [];
 
-      // User's display name (from Firestore, set by profile)
-      if (data.displayName) {
+      // Use nickname if set, else displayName (only one instruction)
+      if (prefs.nickname) {
+        parts.push(`Call the user "${prefs.nickname}".`);
+      } else if (data.displayName) {
         parts.push(`Call the user "${data.displayName}".`);
       }
 
       if (prefs.tone)               parts.push(`Respond in a ${prefs.tone.toLowerCase()} tone.`);
-      if (prefs.nickname)           parts.push(`Call the user "${prefs.nickname}".`);
       if (prefs.occupation)         parts.push(`User is a ${prefs.occupation}.`);
       if (prefs.customInstructions) parts.push(prefs.customInstructions);
       if (parts.length) userPrefsPrompt = '\n\n' + parts.join(' ');
@@ -635,7 +653,7 @@ export default async function handler(req, res) {
   const memoryPrompt = await buildMemoryPrompt(uid);
   const FULL_SYSTEM_PROMPT = BEHAVIORAL_PROMPT + userPrefsPrompt + memoryPrompt;
 
-  /* ── Build user message part ──────────────────────────────────── */
+  /* ── Build user message part (with attachment truncation) ─────── */
   let userParts;
   if (attachment?.type === 'image') {
     const base64 = attachment.content.split(',')[1] || attachment.content;
@@ -644,7 +662,8 @@ export default async function handler(req, res) {
       { text: safeMessage || "Describe this image in detail." },
     ];
   } else if (attachment?.content) {
-    userParts = [{ text: `[Attached file: ${attachment.name}]\n\n${attachment.content}\n\n---\nUser question: ${safeMessage}${searchContext}` }];
+    const truncatedContent = truncateAttachmentContent(attachment.content);
+    userParts = [{ text: `[Attached file: ${attachment.name}]\n\n${truncatedContent}\n\n---\nUser question: ${safeMessage}${searchContext}` }];
   } else {
     userParts = [{ text: safeMessage + searchContext }];
   }
@@ -658,7 +677,7 @@ export default async function handler(req, res) {
     { role: "system", content: FULL_SYSTEM_PROMPT },
     ...trimmedHistory,
     { role: "user", content: attachment?.content
-        ? `[Attached file: ${attachment.name}]\n\n${attachment.content}\n\n---\nUser question: ${safeMessage}${searchContext}`
+        ? `[Attached file: ${attachment.name}]\n\n${truncateAttachmentContent(attachment.content)}\n\n---\nUser question: ${safeMessage}${searchContext}`
         : safeMessage + searchContext
     },
   ];
@@ -706,7 +725,6 @@ export default async function handler(req, res) {
 
   if (result.leaked) return;
 
-  // Determine the correct disclaimer type
   const finalDisclaimer = needsDisclaimer ? 'critical' : (shouldSearch ? 'web' : false);
 
   sseEvent(res, {
@@ -724,7 +742,9 @@ export default async function handler(req, res) {
 
   res.end();
 
-  // ── Silent async memory extraction ──
+  /* ── Silent background memory extraction (best‑effort) ── */
+  // Note: on serverless platforms this may not always complete.
+  // For guaranteed execution, consider a Firestore onCreate trigger on the conversations collection.
   if (result.fullText && GEMINI_API_KEY) {
     extractAndUpdateMemories(uid, safeMessage, result.fullText, GEMINI_API_KEY)
       .catch(err => console.warn('[memory] Background extraction error:', err.message));
