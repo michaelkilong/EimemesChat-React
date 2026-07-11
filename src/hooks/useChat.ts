@@ -1,8 +1,6 @@
-// useChat.ts — v2.7 — Empty‑response fallback: never save blank assistant messages
+// useChat.ts — v2.8 — Abort-after-block: save partial response on stream abort
+// v2.7 — Empty‑response fallback: never save blank assistant messages
 // v2.6 — Fixed blank screen on leak detection: fallback when safeReply is empty
-// v2.5 — Real‑time daily count update via onMessageSent
-// v2.4 — Added isRegeneration flag to request body for backend deduplication
-// v2.3 — Added regenerate function to prevent duplicate user messages on regen
 import { useState, useRef, useCallback } from 'react';
 import { arrayUnion, updateDoc, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -129,6 +127,11 @@ export function useChat(
     const controller = streamController.current;
     const timer = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
+    let fullText   = '';
+    let model      = '';
+    let disclaimer: 'critical' | 'web' | false = false;
+    let sources: { title: string; url: string }[] = [];
+
     try {
       const convMsgs = conversations.find(c => c.id === activeConvId)?.messages || [];
       const history = [...convMsgs, userMsg].slice(-20);
@@ -172,10 +175,6 @@ export function useChat(
       const reader  = res.body!.getReader();
       const decoder = new TextDecoder();
       let buf        = '';
-      let fullText   = '';
-      let model      = '';
-      let disclaimer: 'critical' | 'web' | false = false;
-      let sources: { title: string; url: string }[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -196,7 +195,6 @@ export function useChat(
 
             if (parsed.token)         { setIsTyping(false); setIsSearching(false); setIsThinking(false); fullText += parsed.token; enqueue(parsed.token); }
 
-            // Fix: handle outputBlocked even if safeReply is empty
             if (parsed.outputBlocked) {
               const safeReply = parsed.safeReply || "I can't respond to that request.";
               setIsTyping(false);
@@ -225,11 +223,11 @@ export function useChat(
       }
 
       await drainQueue();
+      if (displayedRef.current) setStreamText(displayedRef.current);
       setStreamModel(model);
       setStreamDisclaimer(disclaimer);
       setStreamDone(true);
 
-      // Fallback when the model returns zero tokens (empty response)
       if (!fullText) {
         fullText = "I'm sorry, I couldn't generate a response. Please try again.";
       }
@@ -241,7 +239,6 @@ export function useChat(
       };
       await updateDoc(convRef, { messages: arrayUnion(aiMsg), updatedAt: new Date() });
 
-      // Force-fetch latest messages before clearing streaming to prevent blank gap
       try {
         const freshSnap = await getDoc(convRef);
         if (freshSnap.exists()) {
@@ -249,7 +246,7 @@ export function useChat(
           setMessages(freshData.messages || []);
           setConvTitle(freshData.title || '');
         }
-      } catch { /* fallback to snapshot */ }
+      } catch { /* fallback */ }
 
       isStreamingRef.current = false;
       setIsStreaming(false);
@@ -263,7 +260,15 @@ export function useChat(
       setIsStreaming(false);
       streamController.current = null;
 
-      if (err.name === 'AbortError') { setIsSending(false); return; }
+      if (err.name === 'AbortError') {
+        // If we already have a reply (e.g. from outputBlocked), save it
+        if (fullText) {
+          const aiMsg: Message = { role: 'assistant', content: fullText, time: getTime(), model, disclaimer, ...(sources.length && { sources }) };
+          await updateDoc(getConvDocRef(activeConvId)!, { messages: arrayUnion(aiMsg), updatedAt: new Date() }).catch(() => {});
+          setMessages(prev => [...prev, aiMsg]);
+        }
+        setIsSending(false); return;
+      }
 
       const errorMsg = err.code === 'permission-denied'
         ? 'Permission denied. Please sign out and back in.'
@@ -285,7 +290,6 @@ export function useChat(
     streamController.current = null;
   }, []);
 
-  // Regenerate — skips saving the user message (already in Firestore)
   const regenerate = useCallback(async (originalMsg: string) => {
     if (!originalMsg.trim() || isSending || !currentUser) return;
 
@@ -304,7 +308,6 @@ export function useChat(
       setIsSending(false); return;
     }
 
-    // Build history WITHOUT the last assistant message
     const fullHistory = conv.messages || [];
     const cleanedHistory = [...fullHistory];
     while (cleanedHistory.length && cleanedHistory[cleanedHistory.length - 1].role === 'assistant') {
@@ -312,7 +315,6 @@ export function useChat(
     }
     const history = cleanedHistory.slice(-20);
 
-    // Reset stream state
     renderQueueRef.current = [];
     displayedRef.current   = '';
     if (renderTimerRef.current) { clearTimeout(renderTimerRef.current); renderTimerRef.current = null; }
@@ -330,6 +332,11 @@ export function useChat(
     streamController.current = new AbortController();
     const controller = streamController.current;
     const timer = setTimeout(() => controller.abort(), AI_TIMEOUT);
+
+    let fullText   = '';
+    let model      = '';
+    let disclaimer: 'critical' | 'web' | false = false;
+    let sources: { title: string; url: string }[] = [];
 
     try {
       const body: Record<string, unknown> = {
@@ -370,10 +377,6 @@ export function useChat(
       const reader  = res.body!.getReader();
       const decoder = new TextDecoder();
       let buf        = '';
-      let fullText   = '';
-      let model      = '';
-      let disclaimer: 'critical' | 'web' | false = false;
-      let sources: { title: string; url: string }[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -394,7 +397,6 @@ export function useChat(
 
             if (parsed.token)         { setIsTyping(false); setIsSearching(false); setIsThinking(false); fullText += parsed.token; enqueue(parsed.token); }
 
-            // Fix: handle outputBlocked even if safeReply is empty
             if (parsed.outputBlocked) {
               const safeReply = parsed.safeReply || "I can't respond to that request.";
               setIsTyping(false);
@@ -423,11 +425,11 @@ export function useChat(
       }
 
       await drainQueue();
+      if (displayedRef.current) setStreamText(displayedRef.current);
       setStreamModel(model);
       setStreamDisclaimer(disclaimer);
       setStreamDone(true);
 
-      // Fallback when the model returns zero tokens (empty response)
       if (!fullText) {
         fullText = "I'm sorry, I couldn't generate a response. Please try again.";
       }
@@ -439,7 +441,6 @@ export function useChat(
       };
       await updateDoc(convRef, { messages: arrayUnion(aiMsg), updatedAt: new Date() });
 
-      // Force-fetch latest messages before clearing streaming
       try {
         const freshSnap = await getDoc(convRef);
         if (freshSnap.exists()) {
@@ -461,7 +462,14 @@ export function useChat(
       setIsStreaming(false);
       streamController.current = null;
 
-      if (err.name === 'AbortError') { setIsSending(false); return; }
+      if (err.name === 'AbortError') {
+        if (fullText) {
+          const aiMsg: Message = { role: 'assistant', content: fullText, time: getTime(), model, disclaimer, ...(sources.length && { sources }) };
+          await updateDoc(getConvDocRef(activeConvId)!, { messages: arrayUnion(aiMsg), updatedAt: new Date() }).catch(() => {});
+          setMessages(prev => [...prev, aiMsg]);
+        }
+        setIsSending(false); return;
+      }
 
       const errorMsg = err.code === 'permission-denied'
         ? 'Permission denied. Please sign out and back in.'
