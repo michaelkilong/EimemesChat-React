@@ -1,6 +1,6 @@
-// components/modals/DeleteAccountModal.tsx — v1.1 (cleaned UI)
+// components/modals/DeleteAccountModal.tsx — v1.2 (sign-out after delete)
 import React, { useState } from 'react';
-import { deleteUser } from 'firebase/auth';
+import { deleteUser, signOut } from 'firebase/auth';
 import { writeBatch, getDocs, doc } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
@@ -21,16 +21,18 @@ export default function DeleteAccountModal({ visible, onClose, getUserConvsRef }
     try {
       const convsRef = getUserConvsRef();
       if (convsRef) {
-        const snap  = await getDocs(convsRef);
+        const snap = await getDocs(convsRef);
         const batch = writeBatch(db);
         snap.docs.forEach(d => batch.delete(d.ref));
         batch.delete(doc(db, 'users', currentUser.uid));
         await batch.commit();
       }
       await deleteUser(currentUser);
+      await signOut(auth); // force immediate UI sign‑out
       onClose();
       showToast('Account deleted. Goodbye!');
     } catch (err: any) {
+      console.error('Deletion error', err);
       setLoading(false);
       onClose();
       if (err.code === 'auth/requires-recent-login') {
@@ -80,11 +82,14 @@ export default function DeleteAccountModal({ visible, onClose, getUserConvsRef }
         </button>
         <button
           onClick={onClose}
+          disabled={loading}
           style={{
             width: '100%', padding: '14px', borderRadius: '40px',
             border: '1px solid var(--border)', background: 'var(--glass-3)',
             color: 'var(--text-2)', fontSize: '15px', fontWeight: 500,
-            cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            fontFamily: 'inherit', transition: 'background 0.15s',
+            opacity: loading ? 0.6 : 1,
           }}
         >
           Cancel
