@@ -1,4 +1,4 @@
-// components/modals/LoginModal.tsx — v1.6 (sends welcome email after sign‑up)
+// components/modals/LoginModal.tsx — v1.7 (welcome email for both Google + email sign-up)
 import React, { useState } from 'react';
 import {
   signInWithPopup,
@@ -7,6 +7,7 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
   fetchSignInMethodsForEmail,
+  getAdditionalUserInfo,
 } from 'firebase/auth';
 import { auth, gauth } from '../../firebase';
 import { useApp } from '../../context/AppContext';
@@ -60,6 +61,23 @@ export default function LoginModal({ visible }: Props) {
   const anyLoading = loadingGoogle || loadingEmail;
   const strength = isSignUp ? evaluatePasswordStrength(password) : { score: 0, label: '', color: 'var(--text-3)' };
 
+  const sendWelcomeEmail = async (user: any) => {
+    try {
+      const token = await user.getIdToken();
+      fetch('/api/welcome-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: user.email,
+          displayName: user.displayName || '',
+        }),
+      }).catch(() => {});
+    } catch {}
+  };
+
   const handleGoogle = async () => {
     if (!agreed) { setError('Please agree to the terms first.'); return; }
     setLoadingGoogle(true);
@@ -72,7 +90,11 @@ export default function LoginModal({ visible }: Props) {
             `redirectUrl=${encodeURIComponent('https://eimemes-chat-ai.vercel.app')}`
         }));
       } else {
-        await signInWithPopup(auth, gauth);
+        const result = await signInWithPopup(auth, gauth);
+        const info = getAdditionalUserInfo(result);
+        if (info?.isNewUser) {
+          await sendWelcomeEmail(result.user);
+        }
       }
     } catch (e: any) {
       setError(friendlyAuthError(e.code));
@@ -126,23 +148,7 @@ export default function LoginModal({ visible }: Props) {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await sendEmailVerification(result.user);
-
-      // ── Send welcome email (fire‑and‑forget, won't block UI) ──
-      try {
-        const token = await result.user.getIdToken();
-        fetch('/api/welcome-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            email: result.user.email,
-            displayName: result.user.displayName || '',
-          }),
-        }).catch(() => {});
-      } catch {}
-
+      await sendWelcomeEmail(result.user);
       showToast('Account created! Check your email to verify your address.');
     } catch (e: any) {
       setError(friendlyAuthError(e.code));
