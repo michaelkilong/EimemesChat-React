@@ -1,4 +1,4 @@
-// api/welcome-email.js — v1.4 — Gmail via dynamic nodemailer import
+// api/welcome-email.js — v2.2 — Premium welcome email
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -42,6 +42,9 @@ export default async function handler(req, res) {
       },
     });
 
+    const firstName = (displayName || email.split('@')[0]).trim();
+    const greetingName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+
     const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -51,80 +54,72 @@ export default async function handler(req, res) {
 <title>Welcome to EimemesChat</title>
 </head>
 
-<body style="margin:0;padding:0;background:#f6f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
 
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f4f0;">
-<tr>
-<td align="center" style="padding:64px 20px;">
-
-<table width="460" cellpadding="0" cellspacing="0" style="max-width:460px;width:100%;background:#ffffff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.04),0 12px 40px rgba(0,0,0,0.06);">
-<tr>
-<td style="padding:56px 48px 48px;">
-
-<!-- Mark -->
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr>
-<td align="center" style="padding-bottom:36px;">
-<div style="width:44px;height:44px;border:1.5px solid #0d0d0d;border-radius:50%;line-height:41px;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:19px;color:#0d0d0d;">E</div>
+<td align="center" style="padding:56px 24px;">
+
+<table width="460" cellpadding="0" cellspacing="0" style="max-width:460px;width:100%;">
+
+<!-- Wordmark -->
+<tr>
+<td style="padding-bottom:40px;">
+<span style="color:#0d0d0d;font-size:15px;font-weight:700;letter-spacing:-0.2px;">EimemesChat</span>
 </td>
 </tr>
-</table>
 
-<!-- Eyebrow -->
-<p style="margin:0 0 18px;text-align:center;color:#a39a8a;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;">
-A note for you
-</p>
-
-<!-- Note -->
-<p style="margin:0 0 22px;color:#1a1a1a;font-family:Georgia,'Times New Roman',serif;font-size:19px;line-height:1.6;text-align:center;">
-Welcome to EimemesChat.
-</p>
-
-<p style="margin:0 0 22px;color:#4a4a4a;font-size:15px;line-height:1.85;text-align:center;">
-We built this for conversations that feel natural — in English, in Kuki, in whatever way you think best. No manuals, no friction. Just open it and talk.
-</p>
-
-<p style="margin:0 0 40px;color:#4a4a4a;font-size:15px;line-height:1.85;text-align:center;">
-That's really it. We're glad you're here.
-</p>
-
-<!-- CTA -->
-<table width="100%" cellpadding="0" cellspacing="0">
+<!-- Heading -->
 <tr>
-<td align="center" style="padding-bottom:40px;">
+<td style="padding-bottom:16px;">
+<h1 style="margin:0;color:#0d0d0d;font-size:24px;line-height:1.35;font-weight:700;letter-spacing:-0.3px;">
+Welcome, ${greetingName}
+</h1>
+</td>
+</tr>
+
+<!-- Body -->
+<tr>
+<td style="padding-bottom:14px;">
+<p style="margin:0;color:#5a5a5a;font-size:15px;line-height:1.7;">
+Thanks for creating an account. EimemesChat is an AI assistant built to help you think, write, search, and get things done — through natural conversation, in English or Kuki, however you prefer to talk.
+</p>
+</td>
+</tr>
+<tr>
+<td style="padding-bottom:14px;">
+<p style="margin:0;color:#5a5a5a;font-size:15px;line-height:1.7;">
+There's nothing to configure. Sign in, ask a question, and it's ready to go — whether that's drafting something, searching the web, or just talking something through.
+</p>
+</td>
+</tr>
+<tr>
+<td style="padding-bottom:36px;">
+<p style="margin:0;color:#5a5a5a;font-size:15px;line-height:1.7;">
+Glad to have you here.
+</p>
+</td>
+</tr>
+
+<!-- Button -->
+<tr>
+<td style="padding-bottom:44px;">
 <a href="https://eimemes-chat-ai.vercel.app"
-style="background:#0d0d0d;color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:0.3px;padding:14px 32px;border-radius:100px;display:inline-block;">
-Start a conversation
+style="background:#0d0d0d;color:#ffffff;text-decoration:none;font-size:14.5px;font-weight:600;padding:13px 28px;border-radius:8px;display:inline-block;">
+Open EimemesChat
 </a>
 </td>
 </tr>
-</table>
-
-<!-- Signature -->
-<table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #f0ede8;padding-top:28px;">
-<tr>
-<td align="center">
-<p style="margin:0;color:#1a1a1a;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:15px;line-height:1.6;">
-— The EimemesChat team
-</p>
-</td>
-</tr>
-</table>
-
-</td>
-</tr>
-</table>
 
 <!-- Footer -->
-<table width="460" cellpadding="0" cellspacing="0" style="max-width:460px;width:100%;">
 <tr>
-<td align="center" style="padding-top:32px;">
-<p style="margin:0;color:#b8b0a4;font-size:11.5px;line-height:1.8;">
-EimemesChat AI · Built for the Kuki community<br>
-© 2026 EimemesChat AI
+<td style="border-top:1px solid #ececec;padding-top:24px;">
+<p style="margin:0;color:#9a9a9a;font-size:12.5px;line-height:1.6;">
+© 2026 EimemesChat AI · MIT License
 </p>
 </td>
 </tr>
+
 </table>
 
 </td>
@@ -135,11 +130,23 @@ EimemesChat AI · Built for the Kuki community<br>
 </html>
 `;
 
+    const text = `Welcome, ${greetingName}
+
+Thanks for creating an account. EimemesChat is an AI assistant built to help you think, write, search, and get things done — through natural conversation, in English or Kuki, however you prefer to talk.
+
+There's nothing to configure. Sign in, ask a question, and it's ready to go — whether that's drafting something, searching the web, or just talking something through.
+
+Glad to have you here.
+
+Open EimemesChat: https://eimemes-chat-ai.vercel.app
+
+© 2026 EimemesChat AI · MIT License`;
+
     await transporter.sendMail({
       from: `"EimemesChat AI" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'Welcome to EimemesChat',
-      text: "Welcome to EimemesChat. We built this for conversations that feel natural — in English, in Kuki, in whatever way you think best. We're glad you're here. — The EimemesChat team",
+      text,
       html,
     });
 
