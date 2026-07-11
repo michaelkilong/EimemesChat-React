@@ -1,4 +1,5 @@
 // api/chat.js
+// v5.13 — Web‑search now considers recent conversation context; image handling robust
 // v5.12 — Fixed image handling: detect images by mimeType, bypass truncation; Groq path ignores image content
 // v5.11 — Hardened safeReply fallback: never send an empty safeReply to the frontend
 // v5.10 — Fixed: daily limit error aborts request, attachment truncation, history duplicate removal,
@@ -90,16 +91,20 @@ function toGeminiHistory(history) {
     }));
 }
 
-/* ── Tavily web search ────────────────────────────────────────── */
-async function optimizeSearchQuery(message, geminiApiKey, groqApiKey) {
+/* ── Web search query optimisation (now with conversation context) ── */
+async function optimizeSearchQuery(message, geminiApiKey, groqApiKey, historyContext = '') {
+  const prompt = historyContext
+    ? `Conversation so far:\n${historyContext}\n\nLatest user message: "${message}"\n\nConvert the user's intent into an optimal web search query (a few keywords). Output ONLY the query.`
+    : `Convert the user message into an optimal web search query. Output ONLY the search query — no explanation, no quotes, no punctuation at the end.`;
+
   if (geminiApiKey) {
     try {
       const res = await fetch(GEMINI_GEN_URL, {
         method: "POST",
         headers: { "x-goog-api-key": geminiApiKey, "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: message }] }],
-          systemInstruction: { parts: [{ text: "Convert the user message into an optimal web search query. Output ONLY the search query — no explanation, no quotes, no punctuation at the end." }] },
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          systemInstruction: { parts: [{ text: prompt }] },
           generationConfig: { maxOutputTokens: 40, temperature: 0.2 },
         }),
       });
@@ -118,8 +123,8 @@ async function optimizeSearchQuery(message, geminiApiKey, groqApiKey) {
         body: JSON.stringify({
           model: GROQ_MODEL, max_tokens: 40, temperature: 0.2,
           messages: [
-            { role: "system", content: "Convert the user message into an optimal web search query. Output ONLY the search query." },
-            { role: "user",   content: message },
+            { role: "system", content: "You are a search query optimizer. Output ONLY the query." },
+            { role: "user",   content: prompt },
           ],
         }),
       });
@@ -631,7 +636,15 @@ export default async function handler(req, res) {
   let searchResults = null;
   let searchContext = '';
   if (shouldSearch) {
-    const optimizedQuery = await optimizeSearchQuery(safeMessage, GEMINI_API_KEY, GROQ_API_KEY);
+    // Build context from the last few messages to improve the search query
+    let historyContext = '';
+    if (trimmedHistory.length) {
+      historyContext = trimmedHistory
+        .slice(-4)
+        .map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content.slice(0, 200)}`)
+        .join('\n');
+    }
+    const optimizedQuery = await optimizeSearchQuery(safeMessage, GEMINI_API_KEY, GROQ_API_KEY, historyContext);
     searchResults = await searchWeb(optimizedQuery);
     if (searchResults?.length) {
       searchContext = buildSearchContext(searchResults);
@@ -664,10 +677,9 @@ export default async function handler(req, res) {
     { role: "user", parts: userParts },
   ];
 
-  // Groq fallback: for images, omit the raw base64 – it can't process it anyway
   const openaiUserContent = attachment?.content
     ? (isImage
-        ? safeMessage + searchContext  // ignore image content for Groq
+        ? safeMessage + searchContext
         : `[Attached file: ${attachment.name}]\n\n${truncateAttachmentContent(attachment.content)}\n\n---\nUser question: ${safeMessage}${searchContext}`)
     : safeMessage + searchContext;
 
