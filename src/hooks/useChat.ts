@@ -1,4 +1,5 @@
-// useChat.ts — v2.5 — Real‑time daily count update via onMessageSent
+// useChat.ts — v2.6 — Fixed blank screen on leak detection: fallback when safeReply is empty
+// v2.5 — Real‑time daily count update via onMessageSent
 // v2.4 — Added isRegeneration flag to request body for backend deduplication
 // v2.3 — Added regenerate function to prevent duplicate user messages on regen
 import { useState, useRef, useCallback } from 'react';
@@ -19,7 +20,7 @@ export function useChat(
   setConvTitle: (t: string) => void,
   isStreamingRef: React.MutableRefObject<boolean>,
   setMessages: (msgs: Message[]) => void,
-  onMessageSent?: () => void,   // ← new optional callback
+  onMessageSent?: () => void,
 ) {
   const { currentUser, showToast } = useApp();
 
@@ -94,14 +95,13 @@ export function useChat(
       setConvTitle(tempTitle);
     }
 
-    // Save user message — include attachment name/type for display
     const userMsg: Message = {
       role: 'user', content: text, time: getTime(),
       ...(attachment && { attachment: { name: attachment.name, type: attachment.type } }),
     };
     try {
       await updateDoc(convRef, { messages: arrayUnion(userMsg), updatedAt: new Date() });
-      onMessageSent?.();   // ← increment the local counter immediately
+      onMessageSent?.();
     } catch (err: any) {
       showToast(err.code === 'permission-denied'
         ? 'Permission denied. Please sign out and back in.'
@@ -192,18 +192,21 @@ export function useChat(
             if (parsed.searching)     { setIsTyping(false); setIsSearching(true); }
             if (parsed.thinking)      { setIsTyping(false); setIsThinking(true); setStreamThinking(t => t + parsed.thinking); }
             if (parsed.error)         { setIsTyping(false); setIsSearching(false); fullText = parsed.error; enqueue(parsed.error); showToast(parsed.error); }
+
             if (parsed.token)         { setIsTyping(false); setIsSearching(false); setIsThinking(false); fullText += parsed.token; enqueue(parsed.token); }
 
-            if (parsed.outputBlocked && parsed.safeReply) {
-              setIsTyping(false);   // ← shield block turns off typing immediately
-              fullText = parsed.safeReply;
+            // ── FIX: handle outputBlocked even if safeReply is empty ──
+            if (parsed.outputBlocked) {
+              const safeReply = parsed.safeReply || "I can't respond to that request.";
+              setIsTyping(false);
+              fullText = safeReply;
               renderQueueRef.current = [];
               displayedRef.current   = fullText;
               setStreamText(fullText);
             }
 
             if (parsed.done) {
-              setIsTyping(false);   // ← safety net when stream completes
+              setIsTyping(false);
               model      = parsed.model      || '';
               disclaimer = parsed.disclaimer || false;
               sources    = parsed.sources    || [];
@@ -225,7 +228,6 @@ export function useChat(
       setStreamDisclaimer(disclaimer);
       setStreamDone(true);
 
-      // Save AI message
       const aiMsg: Message = {
         role: 'assistant', content: fullText,
         time: getTime(), model, disclaimer,
@@ -278,7 +280,6 @@ export function useChat(
   }, []);
 
   // Regenerate — skips saving the user message (already in Firestore)
-  // Sends isRegeneration flag so backend strips duplicate from history
   const regenerate = useCallback(async (originalMsg: string) => {
     if (!originalMsg.trim() || isSending || !currentUser) return;
 
@@ -331,7 +332,7 @@ export function useChat(
         isFirstMessage: false,
         useWebSearch: false,
         modelMode: 'smart',
-        isRegeneration: true, // tells backend to strip duplicate user message from history
+        isRegeneration: true,
       };
 
       const res = await fetch('/api/chat', {
@@ -384,18 +385,21 @@ export function useChat(
             if (parsed.searching)     { setIsTyping(false); setIsSearching(true); }
             if (parsed.thinking)      { setIsTyping(false); setIsThinking(true); setStreamThinking(t => t + parsed.thinking); }
             if (parsed.error)         { setIsTyping(false); setIsSearching(false); fullText = parsed.error; enqueue(parsed.error); showToast(parsed.error); }
+
             if (parsed.token)         { setIsTyping(false); setIsSearching(false); setIsThinking(false); fullText += parsed.token; enqueue(parsed.token); }
 
-            if (parsed.outputBlocked && parsed.safeReply) {
-              setIsTyping(false);   // ← shield block turns off typing
-              fullText = parsed.safeReply;
+            // ── FIX: handle outputBlocked even if safeReply is empty ──
+            if (parsed.outputBlocked) {
+              const safeReply = parsed.safeReply || "I can't respond to that request.";
+              setIsTyping(false);
+              fullText = safeReply;
               renderQueueRef.current = [];
               displayedRef.current   = fullText;
               setStreamText(fullText);
             }
 
             if (parsed.done) {
-              setIsTyping(false);   // ← safety net
+              setIsTyping(false);
               model      = parsed.model      || '';
               disclaimer = parsed.disclaimer || false;
               sources    = parsed.sources    || [];
@@ -417,7 +421,6 @@ export function useChat(
       setStreamDisclaimer(disclaimer);
       setStreamDone(true);
 
-      // Save AI message
       const aiMsg: Message = {
         role: 'assistant', content: fullText,
         time: getTime(), model, disclaimer,
