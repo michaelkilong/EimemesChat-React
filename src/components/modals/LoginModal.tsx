@@ -1,4 +1,4 @@
-// components/modals/LoginModal.tsx — v1.5 (uses shared friendlyAuthError from utils/authErrors)
+// components/modals/LoginModal.tsx — v1.6 (sends welcome email after sign‑up)
 import React, { useState } from 'react';
 import {
   signInWithPopup,
@@ -24,7 +24,6 @@ function isWebView(): boolean {
     (ua.includes('Android') && !ua.includes('Chrome/'));
 }
 
-/** Evaluate password strength: returns a score 0–4 and a label */
 function evaluatePasswordStrength(pw: string): { score: number; label: string; color: string } {
   if (!pw) return { score: 0, label: '', color: 'var(--text-3)' };
   let score = 0;
@@ -127,6 +126,23 @@ export default function LoginModal({ visible }: Props) {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await sendEmailVerification(result.user);
+
+      // ── Send welcome email (fire‑and‑forget, won't block UI) ──
+      try {
+        const token = await result.user.getIdToken();
+        fetch('/api/welcome-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            email: result.user.email,
+            displayName: result.user.displayName || '',
+          }),
+        }).catch(() => {});
+      } catch {}
+
       showToast('Account created! Check your email to verify your address.');
     } catch (e: any) {
       setError(friendlyAuthError(e.code));
@@ -212,7 +228,6 @@ export default function LoginModal({ visible }: Props) {
             value={password}
             onChange={e => { setPassword(e.target.value); setError(''); }}
           />
-          {/* Eye toggle */}
           <button
             type="button"
             onClick={() => setShowPassword(p => !p)}
@@ -224,7 +239,6 @@ export default function LoginModal({ visible }: Props) {
             aria-label={showPassword ? 'Hide password' : 'Show password'}
           >
             {showPassword ? (
-              /* Eye off */
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
                 <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
@@ -232,7 +246,6 @@ export default function LoginModal({ visible }: Props) {
                 <line x1="1" y1="1" x2="23" y2="23"/>
               </svg>
             ) : (
-              /* Eye */
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                 <circle cx="12" cy="12" r="3"/>
@@ -241,7 +254,7 @@ export default function LoginModal({ visible }: Props) {
           </button>
         </div>
 
-        {/* Password strength bar (only in sign‑up mode) */}
+        {/* Password strength bar */}
         {isSignUp && password && (
           <div style={{ marginBottom: '8px', padding: '0 4px' }}>
             <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
@@ -262,17 +275,12 @@ export default function LoginModal({ visible }: Props) {
           </div>
         )}
 
-        {/* Forgot password link (only in sign‑in mode) */}
+        {/* Forgot password link */}
         {!isSignUp && (
           <div style={{ textAlign: 'right', marginBottom: '8px' }}>
             <span
               onClick={handleForgotPassword}
-              style={{
-                color: linkBlue,
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: 500,
-              }}
+              style={{ color: linkBlue, cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}
             >
               Forgot password?
             </span>
