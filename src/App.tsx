@@ -1,6 +1,6 @@
 // App.tsx
+// v2.10 — Removed landscape desktop mode effect; iOS‑only keyboard lift still present
 // v2.9  — iOS‑only keyboard lift (Android/desktop stays at bottom:0)
-// v2.8  — Added iOS keyboard offset to lift input when soft keyboard appears
 // v2.7  — Gated authenticated UI behind mandatory email verification (VerificationModal)
 // v2.6  — Daily limit 100 + real‑time usage counter + landscape desktop mode
 // v2.4.1 — Latched authReady to prevent loading screen flicker on token refresh
@@ -87,27 +87,6 @@ export default function App() {
       window.visualViewport?.removeEventListener('scroll', handle);
     };
   }, [isIOS]);
-
-  // ── Landscape desktop mode ──────────────────────────────────
-  useEffect(() => {
-    const html = document.documentElement;
-    const update = () => {
-      const landscape = window.matchMedia('(orientation: landscape)').matches;
-      const narrow    = window.innerWidth <= 768;
-      if (landscape && narrow) {
-        html.classList.add('landscape-desktop');
-      } else {
-        html.classList.remove('landscape-desktop');
-      }
-    };
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('orientationchange', update);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('orientationchange', update);
-    };
-  }, []);
 
   const { currentUser, authReady, emailVerified, view, setView, sidebarOpen, setSidebarOpen } = useApp();
   const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
