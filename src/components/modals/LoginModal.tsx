@@ -1,7 +1,11 @@
-// components/modals/LoginModal.tsx — v1.7 (welcome email for both Google + email sign-up)
-import React, { useState } from 'react';
+// components/modals/LoginModal.tsx — v1.8
+// v1.8 — Fixed isWebView() (UA spoof was defeating it); wired native Google Sign-In credential handoff
+// v1.7 — welcome email for both Google + email sign-up
+import React, { useState, useEffect } from 'react';
 import {
   signInWithPopup,
+  signInWithCredential,
+  GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -16,13 +20,12 @@ import { friendlyAuthError } from '../../utils/authErrors';
 declare global {
   interface Window {
     ReactNativeWebView?: { postMessage: (msg: string) => void };
+    __handleNativeGoogleAuth?: (idToken: string) => void;
   }
 }
 
 function isWebView(): boolean {
-  const ua = navigator.userAgent;
-  return /wv|WebView/.test(ua) ||
-    (ua.includes('Android') && !ua.includes('Chrome/'));
+  return typeof window !== 'undefined' && !!window.ReactNativeWebView;
 }
 
 function evaluatePasswordStrength(pw: string): { score: number; label: string; color: string } {
@@ -78,23 +81,43 @@ export default function LoginModal({ visible }: Props) {
     } catch {}
   };
 
-  const handleGoogle = async () => {
-    if (!agreed) { setError('Please agree to the terms first.'); return; }
-    setLoadingGoogle(true);
-    try {
-      if (isWebView() && window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'GOOGLE_AUTH',
-          url: `https://chat-eimeme.firebaseapp.com/__/auth/handler?` +
-            `providerId=google.com&` +
-            `redirectUrl=${encodeURIComponent('https://eimemes-chat-ai.vercel.app')}`
-        }));
-      } else {
-        const result = await signInWithPopup(auth, gauth);
+  // ── Receives the ID token the wrapper got from native Google Sign-In ────
+  useEffect(() => {
+    window.__handleNativeGoogleAuth = async (idToken: string) => {
+      try {
+        const credential = GoogleAuthProvider.credential(idToken);
+        const result = await signInWithCredential(auth, credential);
         const info = getAdditionalUserInfo(result);
         if (info?.isNewUser) {
           await sendWelcomeEmail(result.user);
         }
+      } catch (e: any) {
+        setError(friendlyAuthError(e.code));
+      } finally {
+        setLoadingGoogle(false);
+      }
+    };
+    return () => {
+      delete window.__handleNativeGoogleAuth;
+    };
+  }, []);
+
+  const handleGoogle = async () => {
+    if (!agreed) { setError('Please agree to the terms first.'); return; }
+
+    if (isWebView() && window.ReactNativeWebView) {
+      setError('');
+      setLoadingGoogle(true);
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'NATIVE_GOOGLE_SIGNIN' }));
+      return; // loadingGoogle is cleared inside __handleNativeGoogleAuth once it resolves
+    }
+
+    setLoadingGoogle(true);
+    try {
+      const result = await signInWithPopup(auth, gauth);
+      const info = getAdditionalUserInfo(result);
+      if (info?.isNewUser) {
+        await sendWelcomeEmail(result.user);
       }
     } catch (e: any) {
       setError(friendlyAuthError(e.code));
@@ -225,7 +248,6 @@ export default function LoginModal({ visible }: Props) {
 
         <input style={inputStyle} type="email" placeholder="Email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} />
 
-        {/* Password field with eye toggle */}
         <div style={{ position: 'relative' }}>
           <input
             style={inputStyle}
@@ -260,7 +282,6 @@ export default function LoginModal({ visible }: Props) {
           </button>
         </div>
 
-        {/* Password strength bar */}
         {isSignUp && password && (
           <div style={{ marginBottom: '8px', padding: '0 4px' }}>
             <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
@@ -281,7 +302,6 @@ export default function LoginModal({ visible }: Props) {
           </div>
         )}
 
-        {/* Forgot password link */}
         {!isSignUp && (
           <div style={{ textAlign: 'right', marginBottom: '8px' }}>
             <span
