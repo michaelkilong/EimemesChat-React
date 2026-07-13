@@ -1,4 +1,4 @@
-// api/bug-report.js — v1.0 — sends bug report to support email
+// api/bug-report.js — v1.1 — shows email instead of UID
 import admin from 'firebase-admin';
 import nodemailer from 'nodemailer';
 
@@ -21,7 +21,6 @@ const transporter = nodemailer.createTransport({
 });
 
 export default async function handler(req, res) {
-  // CORS
   const origin = req.headers.origin || '';
   const allowedOrigins = [
     'https://eimemes-chat-ai.vercel.app',
@@ -36,7 +35,6 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Auth check – user must be logged in
   const authHeader = req.headers.authorization || '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
@@ -44,16 +42,15 @@ export default async function handler(req, res) {
   try {
     await admin.auth().verifyIdToken(idToken);
 
-    const { message, reporterName, reporterEmail, reporterUid } = req.body;
+    const { message, reporterName, reporterEmail } = req.body;
     if (!message) return res.status(400).json({ error: 'Message is required' });
 
-    const name = reporterName || 'Anonymous';
+    // Use display name if available, otherwise fall back to email
+    const name = reporterName?.trim() || reporterEmail?.split('@')[0] || 'User';
 
     const html = `
       <h2>New Bug Report</h2>
-      <p><strong>From:</strong> ${name}</p>
-      <p><strong>Email:</strong> ${reporterEmail || 'N/A'}</p>
-      <p><strong>User ID:</strong> ${reporterUid || 'N/A'}</p>
+      <p><strong>From:</strong> ${name}${reporterEmail ? ` (${reporterEmail})` : ''}</p>
       <hr/>
       <p>${message.replace(/\n/g, '<br/>')}</p>
     `;
@@ -62,7 +59,6 @@ export default async function handler(req, res) {
 
 Name: ${name}
 Email: ${reporterEmail || 'N/A'}
-User ID: ${reporterUid || 'N/A'}
 
 Message:
 ${message}`;
