@@ -1,4 +1,4 @@
-// ReportBugView.tsx — v2.0 (full-width send button, no confirmation text)
+// ReportBugView.tsx — v2.1 (blue send button, visible in both themes)
 import React, { useState } from 'react';
 import { haptic } from '../lib/haptic';
 
@@ -40,12 +40,11 @@ export default function ReportBugView({ onBack }: Props) {
     const subject = encodeURIComponent('Bug Report – EimemesChat');
     const body = encodeURIComponent(message);
     window.location.href = `mailto:support.eimemeschat@gmail.com?subject=${subject}&body=${body}`;
-    // No visual confirmation – the email app opens immediately.
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
-      {/* Header – only back + title */}
+      {/* Header */}
       <header style={{
         display: 'flex',
         alignItems: 'center',
@@ -91,14 +90,14 @@ export default function ReportBugView({ onBack }: Props) {
           </div>
         </div>
 
-        {/* Full‑width Send button with right arrow */}
+        {/* Blue Send button — clearly visible in both dark & light themes */}
         <button
           onClick={handleSend}
           disabled={!message.trim()}
           style={{
             width: '100%',
             padding: '14px 0',
-            background: message.trim() ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
+            background: message.trim() ? '#3b82f6' : 'rgba(59, 130, 246, 0.25)',
             color: 'white',
             border: 'none',
             borderRadius: '14px',
@@ -106,7 +105,7 @@ export default function ReportBugView({ onBack }: Props) {
             fontWeight: 600,
             fontFamily: 'inherit',
             cursor: message.trim() ? 'pointer' : 'default',
-            opacity: message.trim() ? 1 : 0.6,
+            opacity: message.trim() ? 1 : 0.7,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
