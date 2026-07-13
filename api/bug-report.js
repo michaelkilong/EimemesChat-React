@@ -1,4 +1,4 @@
-// api/bug-report.js — v1.1 — shows email instead of UID
+// api/bug-report.js — v1.2 (rate‑limited per user, 1/min, 10/day)
 import admin from 'firebase-admin';
 import nodemailer from 'nodemailer';
 
@@ -12,6 +12,7 @@ if (!admin.apps.length) {
   });
 }
 
+const db = admin.firestore();
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -21,59 +22,70 @@ const transporter = nodemailer.createTransport({
 });
 
 export default async function handler(req, res) {
+  // CORS
   const origin = req.headers.origin || '';
-  const allowedOrigins = [
-    'https://eimemes-chat-ai.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000',
-  ];
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
+  const allowed = ['https://eimemes-chat-ai.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
+  if (allowed.includes(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // Auth
   const authHeader = req.headers.authorization || '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    await admin.auth().verifyIdToken(idToken);
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const uid = decoded.uid;
 
     const { message, reporterName, reporterEmail } = req.body;
     if (!message) return res.status(400).json({ error: 'Message is required' });
 
-    // Use display name if available, otherwise fall back to email
+    // ── Rate limiting ──────────────────────────────
+    const userRef = db.collection('bugReportCounters').doc(uid);
+    const now = Date.now();
+    const today = new Date().toISOString().slice(0, 10);
+
+    const doc = await userRef.get();
+    const data = doc.exists ? doc.data() : {};
+
+    const lastTimestamp = data.lastReportAt || 0;
+    const countToday = data.date === today ? (data.count || 0) : 0;
+
+    // 1 minute cooldown
+    if (now - lastTimestamp < 60_000) {
+      return res.status(429).json({ error: 'Please wait a moment before sending another report.' });
+    }
+
+    // 10 reports per day
+    if (countToday >= 10) {
+      return res.status(429).json({ error: 'You have reached the daily report limit. Please try again tomorrow.' });
+    }
+
+    // Update counter
+    await userRef.set({
+      lastReportAt: now,
+      date: today,
+      count: countToday + 1,
+    }, { merge: true });
+    // ───────────────────────────────────────────────
+
+    // Send email (same as before)
     const name = reporterName?.trim() || reporterEmail?.split('@')[0] || 'User';
-
-    const html = `
-      <h2>New Bug Report</h2>
-      <p><strong>From:</strong> ${name}${reporterEmail ? ` (${reporterEmail})` : ''}</p>
-      <hr/>
-      <p>${message.replace(/\n/g, '<br/>')}</p>
-    `;
-
-    const text = `New bug report submitted by:
-
-Name: ${name}
-Email: ${reporterEmail || 'N/A'}
-
-Message:
-${message}`;
 
     await transporter.sendMail({
       from: `"EimemesChat Bug Report" <${process.env.EMAIL_USER}>`,
       to: 'support.eimemeschat@gmail.com',
       subject: `Bug Report from ${name}`,
-      text,
-      html,
+      text: `New bug report submitted by:\n\nName: ${name}\nEmail: ${reporterEmail || 'N/A'}\n\nMessage:\n${message}`,
+      html: `<h2>New Bug Report</h2><p><strong>From:</strong> ${name}${reporterEmail ? ` (${reporterEmail})` : ''}</p><hr/><p>${message.replace(/\n/g, '<br/>')}</p>`,
     });
 
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error('[bug-report] Error:', err.message);
-    return res.status(500).json({ error: 'Failed to send bug report' });
+    return res.status(500).json({ error: 'Failed to send report' });
   }
 }
