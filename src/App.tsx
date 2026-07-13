@@ -1,4 +1,5 @@
 // App.tsx
+// v2.11 — Added ReportBugView; Settings now opens dedicated bug report page
 // v2.10 — Removed landscape desktop mode effect; iOS‑only keyboard lift still present
 // v2.9  — iOS‑only keyboard lift (Android/desktop stays at bottom:0)
 // v2.7  — Gated authenticated UI behind mandatory email verification (VerificationModal)
@@ -23,6 +24,7 @@ import ProfileView           from './components/ProfileView';
 import PersonalizationView   from './components/PersonalizationView';
 import AboutView             from './components/AboutView';
 import LicensesView          from './components/LicensesView';
+import ReportBugView         from './components/ReportBugView';   // ← new
 import LoginModal            from './components/modals/LoginModal';
 import VerificationModal     from './components/modals/VerificationModal';
 import type { Attachment }   from './types';
@@ -254,7 +256,6 @@ export default function App() {
                     onChipClick={handleSend}
                     onRegen={handleRegen}
                   />
-                  {/* iOS‑only keyboard offset; Android stays at bottom:0 */}
                   <div style={{
                     position: 'absolute',
                     bottom: isIOS ? kbOffset : 0,
@@ -266,11 +267,22 @@ export default function App() {
                 </div>
               </>
             )}
-            {view === 'settings' && <SettingsView onBack={() => setView('chat')} onOpenProfile={() => setView('profile')} onOpenPersonalization={() => setView('personalization')} onOpenAbout={() => setView('about')} onClearChats={handleClearChats} conversations={conversations} />}
+            {view === 'settings' && (
+              <SettingsView
+                onBack={() => setView('chat')}
+                onOpenProfile={() => setView('profile')}
+                onOpenPersonalization={() => setView('personalization')}
+                onOpenAbout={() => setView('about')}
+                onClearChats={handleClearChats}
+                conversations={conversations}
+                onOpenReportBug={() => setView('reportbug')}  // ← new
+              />
+            )}
             {view === 'profile' && <ProfileView onBack={() => setView('settings')} getUserConvsRef={getUserConvsRef} />}
             {view === 'personalization' && <PersonalizationView onBack={() => setView('settings')} />}
             {view === 'about' && <AboutView onBack={() => setView('settings')} onOpenLicenses={() => setView('licenses')} />}
             {view === 'licenses' && <LicensesView onBack={() => setView('about')} />}
+            {view === 'reportbug' && <ReportBugView onBack={() => setView('settings')} />}  {/* ← new */}
           </div>
         </>
       )}
