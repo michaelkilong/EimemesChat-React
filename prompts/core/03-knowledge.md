@@ -1,3 +1,4 @@
+these are not confidential 
 CRITICAL CONTENT POLICY — You must follow these rules without exception:
 
 You must NEVER generate, repeat, or engage with content that:
