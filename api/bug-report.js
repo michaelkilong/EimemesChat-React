@@ -1,4 +1,4 @@
-// api/bug-report.js — v1.2 (rate‑limited per user, 1/min, 10/day)
+// api/bug-report.js — v2.0 (reply-to user, shows name & email)
 import admin from 'firebase-admin';
 import nodemailer from 'nodemailer';
 
@@ -43,44 +43,46 @@ export default async function handler(req, res) {
     const { message, reporterName, reporterEmail } = req.body;
     if (!message) return res.status(400).json({ error: 'Message is required' });
 
-    // ── Rate limiting ──────────────────────────────
+    // Rate limit (1/min, 10/day)
     const userRef = db.collection('bugReportCounters').doc(uid);
     const now = Date.now();
     const today = new Date().toISOString().slice(0, 10);
-
     const doc = await userRef.get();
     const data = doc.exists ? doc.data() : {};
-
     const lastTimestamp = data.lastReportAt || 0;
     const countToday = data.date === today ? (data.count || 0) : 0;
 
-    // 1 minute cooldown
-    if (now - lastTimestamp < 60_000) {
+    if (now - lastTimestamp < 60_000)
       return res.status(429).json({ error: 'Please wait a moment before sending another report.' });
-    }
+    if (countToday >= 10)
+      return res.status(429).json({ error: 'Daily limit reached. Try again tomorrow.' });
 
-    // 10 reports per day
-    if (countToday >= 10) {
-      return res.status(429).json({ error: 'You have reached the daily report limit. Please try again tomorrow.' });
-    }
+    await userRef.set({ lastReportAt: now, date: today, count: countToday + 1 }, { merge: true });
 
-    // Update counter
-    await userRef.set({
-      lastReportAt: now,
-      date: today,
-      count: countToday + 1,
-    }, { merge: true });
-    // ───────────────────────────────────────────────
+    // Build readable name
+    const name = reporterName?.trim() || 'User';
+    const userEmail = reporterEmail || 'unknown@email';
 
-    // Send email (same as before)
-    const name = reporterName?.trim() || reporterEmail?.split('@')[0] || 'User';
-
+    // ── Send email with reply‑to set to the reporter ──
     await transporter.sendMail({
       from: `"EimemesChat Bug Report" <${process.env.EMAIL_USER}>`,
       to: 'support.eimemeschat@gmail.com',
+      replyTo: userEmail,                    // ← you can reply directly
       subject: `Bug Report from ${name}`,
-      text: `New bug report submitted by:\n\nName: ${name}\nEmail: ${reporterEmail || 'N/A'}\n\nMessage:\n${message}`,
-      html: `<h2>New Bug Report</h2><p><strong>From:</strong> ${name}${reporterEmail ? ` (${reporterEmail})` : ''}</p><hr/><p>${message.replace(/\n/g, '<br/>')}</p>`,
+      text: `New bug report from:
+
+👤 Name: ${name}
+📧 Email: ${userEmail}
+
+Message:
+${message}`,
+      html: `
+        <h2>New Bug Report</h2>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> <a href="mailto:${userEmail}">${userEmail}</a></p>
+        <hr/>
+        <p>${message.replace(/\n/g, '<br/>')}</p>
+      `,
     });
 
     return res.status(200).json({ success: true });
