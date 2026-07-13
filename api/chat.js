@@ -1,4 +1,6 @@
 // api/chat.js
+// v5.17 — Memory extraction now uses Hugging Face free tier (flan-t5-large)
+// v5.16 — Memory extraction used Llama 3.3 70B (Groq) via separate API key
 // v5.14 — Moved all prompt strings to prompts/apiPrompts.js; code‑only file
 // v5.13 — Web‑search now considers recent conversation context; image handling robust
 // v5.12 — Fixed image handling: detect images by mimeType, bypass truncation; Groq path ignores image content
@@ -50,6 +52,9 @@ const GEMINI_GEN_URL    = `https://generativelanguage.googleapis.com/v1beta/mode
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions";
+
+/* ── Memory extraction model (Hugging Face free tier) ─────────── */
+const HF_MEMORY_MODEL = "google/flan-t5-large";
 
 const CRITICAL_PATTERNS = /\b(health|medical|medicine|doctor|diagnosis|symptom|disease|drug|medication|dosage|treatment|therapy|mental health|depression|anxiety|suicide|cancer|infection|pain|legal|law|lawsuit|attorney|lawyer|court|rights|contract|financial|invest|stock|crypto|tax|loan|debt|insurance)\b/i;
 
@@ -235,7 +240,7 @@ async function loadMemories(uid) {
   } catch { return []; }
 }
 
-async function extractAndUpdateMemories(uid, userMsg, aiReply, geminiApiKey) {
+async function extractAndUpdateMemories(uid, userMsg, aiReply, hfApiToken) {
   if (!shouldExtractMemory(userMsg, aiReply)) return;
 
   const safeUserMsg = sanitizeForMemory(userMsg);
@@ -251,43 +256,30 @@ async function extractAndUpdateMemories(uid, userMsg, aiReply, geminiApiKey) {
   const extractionPrompt = buildMemoryExtractionPrompt(existingBlock, safeUserMsg, safeAiReply);
 
   try {
-    let raw = null;
-
-    if (geminiApiKey) {
-      const res = await fetch(GEMINI_GEN_URL, {
+    const res = await fetch(
+      `https://api-inference.huggingface.co/models/${HF_MEMORY_MODEL}`,
+      {
         method: 'POST',
-        headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${hfApiToken}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
-          generationConfig: { maxOutputTokens: 80, temperature: 0.1 },
+          inputs: extractionPrompt,
+          parameters: { max_new_tokens: 80, temperature: 0.1 },
         }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
       }
+    );
+
+    if (!res.ok) {
+      console.warn(`[memory] HF API error: ${res.status}`);
+      return;
     }
 
-    const GROQ_API_KEY = process.env.GROQ_API_KEY;
-    if (!raw && GROQ_API_KEY) {
-      const res = await fetch(GROQ_URL, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: GROQ_MODEL,
-          max_tokens: 80,
-          temperature: 0.1,
-          messages: [
-            { role: 'system', content: 'You are a memory extraction assistant. Output ONLY valid JSON, no markdown, no explanation.' },
-            { role: 'user', content: extractionPrompt },
-          ],
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        raw = data.choices?.[0]?.message?.content?.trim() || null;
-      }
-    }
+    const data = await res.json();
+    const raw = Array.isArray(data)
+      ? data[0]?.generated_text?.trim()
+      : data?.generated_text?.trim();
 
     if (!raw) return;
 
@@ -730,9 +722,10 @@ export default async function handler(req, res) {
 
   res.end();
 
-  /* ── Silent background memory extraction (best‑effort) ── */
-  if (result.fullText && GEMINI_API_KEY) {
-    extractAndUpdateMemories(uid, safeMessage, result.fullText, GEMINI_API_KEY)
+  /* ── Silent background memory extraction (Hugging Face free tier) ── */
+  const HF_API_TOKEN = process.env.HF_API_TOKEN;
+  if (result.fullText && HF_API_TOKEN) {
+    extractAndUpdateMemories(uid, safeMessage, result.fullText, HF_API_TOKEN)
       .catch(err => console.warn('[memory] Background extraction error:', err.message));
   }
 }
