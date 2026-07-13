@@ -1,4 +1,4 @@
-// SettingsView.tsx — v2.4 (fixed invisible chevron on light theme)
+// SettingsView.tsx — v2.5 (fixed chevron & toggle visibility in light theme)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -78,7 +78,8 @@ function GroupRow({
             onClick={e => { e.stopPropagation(); onToggle?.(); }}
             style={{
               width: '51px', height: '31px', borderRadius: '999px', flexShrink: 0,
-              background: toggleOn ? '#30d158' : 'rgba(255,255,255,0.2)',
+              // Off‑state now uses a neutral gray visible in both light & dark themes
+              background: toggleOn ? '#30d158' : 'rgba(120,120,120,0.35)',
               position: 'relative', cursor: 'pointer',
               transition: 'background 0.22s',
             }}
@@ -94,6 +95,7 @@ function GroupRow({
           </div>
         )}
         {!toggle && (
+          // Chevron now uses theme‑aware color
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
