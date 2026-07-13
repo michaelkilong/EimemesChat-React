@@ -1,4 +1,5 @@
-// LicensesView.tsx — v1.0
+// LicensesView.tsx — v1.1
+// v1.1 — Added native wrapper dependencies (React Native, Expo, WebView, NetInfo, Google Sign-In)
 import React, { useState } from 'react';
 
 interface Props {
@@ -78,6 +79,46 @@ const LICENSES: License[] = [
     author: 'Evan You',
     url: 'github.com/vitejs/vite',
     text: 'Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction.',
+  },
+  {
+    name: 'React Native',
+    version: '0.74.5',
+    license: 'MIT',
+    author: 'Meta Platforms, Inc.',
+    url: 'github.com/facebook/react-native',
+    text: 'Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.',
+  },
+  {
+    name: 'Expo',
+    version: '51.0.0',
+    license: 'MIT',
+    author: '650 Industries, Inc.',
+    url: 'github.com/expo/expo',
+    text: 'Includes the Expo SDK core, status bar, web browser, haptics, and notifications modules. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files, to deal in the Software without restriction.',
+  },
+  {
+    name: 'react-native-webview',
+    version: '13.10.5',
+    license: 'MIT',
+    author: 'React Native WebView Contributors',
+    url: 'github.com/react-native-webview/react-native-webview',
+    text: 'Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction.',
+  },
+  {
+    name: 'React Native NetInfo',
+    version: '11.3.1',
+    license: 'MIT',
+    author: 'React Native Community',
+    url: 'github.com/react-native-netinfo/react-native-netinfo',
+    text: 'Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction.',
+  },
+  {
+    name: 'Google Sign-In for React Native',
+    version: '13.0.0',
+    license: 'MIT',
+    author: 'Apptailor',
+    url: 'github.com/react-native-google-signin/google-signin',
+    text: 'Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.',
   },
 ];
 
