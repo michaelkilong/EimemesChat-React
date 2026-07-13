@@ -1,6 +1,6 @@
 // api/chat.js
+// v5.18 — Memory extraction now awaited (before res.end) to keep Vercel alive
 // v5.17 — Memory extraction now uses Hugging Face free tier (flan-t5-large)
-// v5.16 — Memory extraction used Llama 3.3 70B (Groq) via separate API key
 // v5.14 — Moved all prompt strings to prompts/apiPrompts.js; code‑only file
 // v5.13 — Web‑search now considers recent conversation context; image handling robust
 // v5.12 — Fixed image handling: detect images by mimeType, bypass truncation; Groq path ignores image content
@@ -720,12 +720,19 @@ export default async function handler(req, res) {
     await generateTitle({ geminiApiKey: GEMINI_API_KEY, groqApiKey: GROQ_API_KEY, safeMessage, fullText: result.fullText, res });
   }
 
-  res.end();
-
-  /* ── Silent background memory extraction (Hugging Face free tier) ── */
+  /* ── Memory extraction (awaited, so Vercel keeps function alive) ── */
   const HF_API_TOKEN = process.env.HF_API_TOKEN;
+  console.log('[memory] Attempting extraction…');
+  console.log('[memory] HF_API_TOKEN exists:', !!HF_API_TOKEN);
   if (result.fullText && HF_API_TOKEN) {
-    extractAndUpdateMemories(uid, safeMessage, result.fullText, HF_API_TOKEN)
-      .catch(err => console.warn('[memory] Background extraction error:', err.message));
+    try {
+      await extractAndUpdateMemories(uid, safeMessage, result.fullText, HF_API_TOKEN);
+    } catch (err) {
+      console.warn('[memory] Background extraction error:', err.message);
+    }
+  } else {
+    console.log('[memory] Skipped — no fullText or no HF_API_TOKEN');
   }
+
+  res.end();
 }
