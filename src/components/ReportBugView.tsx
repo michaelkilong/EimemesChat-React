@@ -1,4 +1,4 @@
-// ReportBugView.tsx — v5.1 (sends auth token, shows error on failure)
+// ReportBugView.tsx — v5.2 (professional success icon)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -45,7 +45,6 @@ export default function ReportBugView({ onBack }: Props) {
     setError('');
 
     try {
-      // Get the Firebase ID token for authentication
       const token = await currentUser?.getIdToken();
       if (!token) throw new Error('Not authenticated');
 
@@ -75,7 +74,6 @@ export default function ReportBugView({ onBack }: Props) {
     } catch (err: any) {
       console.error('Bug report failed:', err);
       setError(err.message || 'Something went wrong. Please try again.');
-      haptic.error?.(); // if your haptic lib supports it; otherwise remove
     } finally {
       setSending(false);
     }
@@ -131,7 +129,6 @@ export default function ReportBugView({ onBack }: Props) {
               </div>
             </div>
 
-            {/* Error message */}
             {error && (
               <div style={{
                 background: 'rgba(255,75,75,0.15)',
@@ -145,7 +142,6 @@ export default function ReportBugView({ onBack }: Props) {
               </div>
             )}
 
-            {/* Send button */}
             <button
               onClick={handleSend}
               disabled={!message.trim() || sending}
@@ -191,16 +187,37 @@ export default function ReportBugView({ onBack }: Props) {
           </>
         ) : (
           <div style={{
-            textAlign: 'center', padding: '60px 20px',
-            color: 'var(--text-2)', fontSize: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '60px 20px',
+            textAlign: 'center',
           }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-            <p style={{ fontWeight: 600, color: 'var(--text-1)', marginBottom: '8px' }}>Thanks for your report!</p>
-            <p>We'll review it as soon as possible.</p>
+            {/* Professional checkmark icon */}
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(48, 209, 88, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '24px',
+            }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#30d158" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <p style={{ fontWeight: 600, color: 'var(--text-1)', fontSize: '18px', marginBottom: '8px' }}>
+              Thanks for your report!
+            </p>
+            <p style={{ color: 'var(--text-2)', fontSize: '15px', marginBottom: '32px' }}>
+              We'll review it as soon as possible.
+            </p>
             <button
               onClick={onBack}
               style={{
-                marginTop: '24px',
                 padding: '10px 24px',
                 background: 'var(--accent-dim)',
                 color: 'var(--accent)',
