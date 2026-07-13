@@ -1,4 +1,4 @@
-// SettingsView.tsx — v2.5 (fixed chevron & toggle visibility in light theme)
+// SettingsView.tsx — v2.6 (smoothed toggle animation)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -78,10 +78,9 @@ function GroupRow({
             onClick={e => { e.stopPropagation(); onToggle?.(); }}
             style={{
               width: '51px', height: '31px', borderRadius: '999px', flexShrink: 0,
-              // Off‑state now uses a neutral gray visible in both light & dark themes
               background: toggleOn ? '#30d158' : 'rgba(120,120,120,0.35)',
               position: 'relative', cursor: 'pointer',
-              transition: 'background 0.22s',
+              transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
             <div style={{
@@ -90,12 +89,12 @@ function GroupRow({
               width: '27px', height: '27px', borderRadius: '50%',
               background: 'white',
               boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-              transition: 'left 0.22s',
+              transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              pointerEvents: 'none',
             }} />
           </div>
         )}
         {!toggle && (
-          // Chevron now uses theme‑aware color
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
