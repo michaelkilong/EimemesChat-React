@@ -1,4 +1,4 @@
-// SettingsView.tsx — v2.3 (Added Report a Bug row with dedicated view navigation)
+// SettingsView.tsx — v2.4 (fixed invisible chevron on light theme)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -12,7 +12,7 @@ interface Props {
   onOpenAbout: () => void;
   onClearChats: () => void;
   conversations: Conversation[];
-  onOpenReportBug: () => void;   // ← new
+  onOpenReportBug: () => void;
 }
 
 function RoundIcon({ color, children }: { color?: string; children: React.ReactNode }) {
@@ -94,7 +94,7 @@ function GroupRow({
           </div>
         )}
         {!toggle && (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
         )}
@@ -124,7 +124,7 @@ export default function SettingsView({
   onOpenAbout, 
   onClearChats,
   conversations,
-  onOpenReportBug   // ← new
+  onOpenReportBug
 }: Props) {
   const { currentUser, showToast, showConfirm, fontSize, setFontSize } = useApp();
   const { isDark, toggleTheme } = useTheme();
@@ -305,7 +305,6 @@ export default function SettingsView({
             label="Help & Support"
             desc="FAQ and contact"
           />
-          {/* ── Report a Bug ── */}
           <GroupRow
             onClick={onOpenReportBug}
             iconColor="var(--accent-dim)"
