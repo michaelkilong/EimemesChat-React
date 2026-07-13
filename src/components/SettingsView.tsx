@@ -1,4 +1,4 @@
-// SettingsView.tsx — v2.2 (Visible dropdown chevron for Font Size)
+// SettingsView.tsx — v2.3 (Added Report a Bug row with dedicated view navigation)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -12,6 +12,7 @@ interface Props {
   onOpenAbout: () => void;
   onClearChats: () => void;
   conversations: Conversation[];
+  onOpenReportBug: () => void;   // ← new
 }
 
 function RoundIcon({ color, children }: { color?: string; children: React.ReactNode }) {
@@ -116,7 +117,15 @@ function SettingsGroup({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalization, onOpenAbout, onClearChats }: Props) {
+export default function SettingsView({ 
+  onBack, 
+  onOpenProfile, 
+  onOpenPersonalization, 
+  onOpenAbout, 
+  onClearChats,
+  conversations,
+  onOpenReportBug   // ← new
+}: Props) {
   const { currentUser, showToast, showConfirm, fontSize, setFontSize } = useApp();
   const { isDark, toggleTheme } = useTheme();
   const [signOutVisible, setSignOutVisible] = useState(false);
@@ -126,7 +135,6 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
     if (yes) { onClearChats(); showToast('All chats cleared.'); }
   };
 
-  // ── Font size dropdown style (no background arrow – we add one manually) ──
   const selectStyle: React.CSSProperties = {
     fontSize: '15px',
     color: 'var(--text-2)',
@@ -243,7 +251,7 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
             toggleOn={isDark}
             onToggle={toggleTheme}
           />
-          {/* Font Size row with visible dropdown chevron */}
+          {/* Font Size row */}
           <div
             style={{
               display: 'flex', alignItems: 'center', gap: '14px',
@@ -270,7 +278,6 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
               <option value="medium">Medium</option>
               <option value="large">Large</option>
             </select>
-            {/* Downward chevron */}
             <svg
               width="12" height="12" viewBox="0 0 24 24" fill="none"
               stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
@@ -297,6 +304,20 @@ export default function SettingsView({ onBack, onOpenProfile, onOpenPersonalizat
             icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}
             label="Help & Support"
             desc="FAQ and contact"
+          />
+          {/* ── Report a Bug ── */}
+          <GroupRow
+            onClick={onOpenReportBug}
+            iconColor="var(--accent-dim)"
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 8v4m0 4h.01" />
+                <path d="M4.93 4.93a10 10 0 0 1 14.14 14.14l-1.41-1.41a8 8 0 1 0-11.32-11.32L4.93 4.93z" />
+                <path d="M20 4l-4 4" />
+              </svg>
+            }
+            label="Report a Bug"
+            desc="Tell us what’s broken"
           />
           <GroupRow
             onClick={onOpenAbout}
