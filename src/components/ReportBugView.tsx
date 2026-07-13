@@ -1,4 +1,4 @@
-// ReportBugView.tsx — v5.0 (sends reporter info with bug report)
+// ReportBugView.tsx — v5.1 (sends auth token, shows error on failure)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -37,12 +37,18 @@ export default function ReportBugView({ onBack }: Props) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSend = async () => {
     if (!message.trim() || sending) return;
     setSending(true);
+    setError('');
+
     try {
-      // Include reporter details from the logged‑in user
+      // Get the Firebase ID token for authentication
+      const token = await currentUser?.getIdToken();
+      if (!token) throw new Error('Not authenticated');
+
       const body = {
         message: message.trim(),
         reporterName: currentUser?.displayName || 'Anonymous',
@@ -52,14 +58,24 @@ export default function ReportBugView({ onBack }: Props) {
 
       const res = await fetch('/api/bug-report', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Failed to send report');
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Request failed (${res.status})`);
+      }
+
       haptic.success();
       setSent(true);
-    } catch (error) {
-      console.error('Bug report failed:', error);
+    } catch (err: any) {
+      console.error('Bug report failed:', err);
+      setError(err.message || 'Something went wrong. Please try again.');
+      haptic.error?.(); // if your haptic lib supports it; otherwise remove
     } finally {
       setSending(false);
     }
@@ -114,6 +130,20 @@ export default function ReportBugView({ onBack }: Props) {
                 {message.length}/2000
               </div>
             </div>
+
+            {/* Error message */}
+            {error && (
+              <div style={{
+                background: 'rgba(255,75,75,0.15)',
+                color: '#ff6b6b',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                fontSize: '14px',
+                marginBottom: '16px',
+              }}>
+                {error}
+              </div>
+            )}
 
             {/* Send button */}
             <button
