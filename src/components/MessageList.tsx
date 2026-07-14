@@ -1,4 +1,4 @@
-// MessageList.tsx — v1.5 — Perf: memo + scroll fixes for low-end devices
+// MessageList.tsx — v1.6 — Streaming class toggle + will-change for WebView perf
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import MessageBubble from './MessageBubble';
 import StreamingBubble from './StreamingBubble';
@@ -58,20 +58,17 @@ const MessageList = React.memo(function MessageList({
     clearTimeout(scrollTimer.current);
   }, []);
 
-  // ── Scroll to bottom (used by button & automatic triggers) ──
+  // ── Scroll to bottom ──
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     programmaticScrolling.current = true;
     clearTimeout(scrollTimer.current);
-
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-
-    // Fallback if scrollend not supported
     scrollTimer.current = setTimeout(endProgrammaticScroll, 500);
   }, [endProgrammaticScroll]);
 
-  // ── Listen for scrollend to reliably clear the flag ──
+  // ── Listen for scrollend ──
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -79,25 +76,21 @@ const MessageList = React.memo(function MessageList({
     return () => el.removeEventListener('scrollend', endProgrammaticScroll);
   }, [endProgrammaticScroll]);
 
-  // ── Scroll to bottom on new message / typing (only if near bottom) ──
+  // ── Scroll on new message / typing ──
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    if (isNearBottom) {
-      scrollToBottom();
-    }
+    if (isNearBottom) scrollToBottom();
     userScrolledUp.current = !isNearBottom;
   }, [messages.length, isTyping, scrollToBottom]);
 
-  // ── Auto‑scroll during streaming (throttled with rAF) ──
+  // ── Auto‑scroll during streaming (throttled) ──
   const rafId = useRef<number | null>(null);
   useEffect(() => {
     if (!isStreaming || userScrolledUp.current || programmaticScrolling.current) return;
     const el = scrollRef.current;
     if (!el) return;
-
-    // Throttle to once per frame
     if (rafId.current === null) {
       rafId.current = requestAnimationFrame(() => {
         if (el && !userScrolledUp.current && !programmaticScrolling.current) {
@@ -106,7 +99,6 @@ const MessageList = React.memo(function MessageList({
         rafId.current = null;
       });
     }
-
     return () => {
       if (rafId.current !== null) {
         cancelAnimationFrame(rafId.current);
@@ -115,9 +107,18 @@ const MessageList = React.memo(function MessageList({
     };
   }, [streamText, isStreaming]);
 
-  // ── Track user scrolls ──
+  // ── Toggle streaming class on body for CSS performance ──
+  useEffect(() => {
+    if (isStreaming) {
+      document.body.classList.add('streaming-active');
+    } else {
+      document.body.classList.remove('streaming-active');
+    }
+  }, [isStreaming]);
+
+  // ── Handle user scroll ──
   const handleScroll = useCallback(() => {
-    if (programmaticScrolling.current) return; // ignore programmatic scrolls
+    if (programmaticScrolling.current) return;
     const el = scrollRef.current;
     if (!el) return;
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -145,7 +146,8 @@ const MessageList = React.memo(function MessageList({
           WebkitOverflowScrolling: 'touch' as any,
           overscrollBehavior: 'none',
           background: 'transparent',
-          contain: 'strict', // performance: isolates layout
+          contain: 'strict',
+          willChange: isStreaming ? 'transform' : 'auto',
         }}
       >
         <div style={{
