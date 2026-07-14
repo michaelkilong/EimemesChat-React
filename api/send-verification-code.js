@@ -1,4 +1,4 @@
-// api/send-verification-code.js — v1.2 (plain full‑screen, blue/white/grey)
+// api/send-verification-code.js — v1.4 (larger logo)
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -87,9 +87,8 @@ export default async function handler(req, res) {
   <!-- Blue header -->
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#2563eb;">
     <tr>
-      <td align="center" style="padding:40px 24px 32px;">
+      <td align="center" style="padding:24px 24px 20px;">
         <img src="https://eimemes-chat-ai.vercel.app/chat-logo.png" alt="EimemesChat" width="56" height="56" style="display:block;margin:0 auto;">
-        <p style="margin:12px 0 0;color:#ffffff;font-size:16px;font-weight:600;">EimemesChat AI</p>
       </td>
     </tr>
   </table>
@@ -110,10 +109,23 @@ export default async function handler(req, res) {
     </tr>
   </table>
 
-  <!-- Grey footer -->
+  <!-- Grey footer with social icons -->
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;">
     <tr>
-      <td align="center" style="padding:20px 24px;color:#94a3b8;font-size:12px;">
+      <td align="center" style="padding:20px 24px 12px;">
+        <a href="https://instagram.com/eimemeschat" style="margin:0 8px;text-decoration:none;display:inline-block;">
+          <img src="https://cdn.jsdelivr.net/npm/simple-icons@9/icons/instagram.svg" alt="Instagram" width="20" height="20" style="display:block;">
+        </a>
+        <a href="https://x.com/eimemeschat" style="margin:0 8px;text-decoration:none;display:inline-block;">
+          <img src="https://cdn.jsdelivr.net/npm/simple-icons@9/icons/x.svg" alt="X" width="20" height="20" style="display:block;">
+        </a>
+        <a href="https://facebook.com/eimemeschat" style="margin:0 8px;text-decoration:none;display:inline-block;">
+          <img src="https://cdn.jsdelivr.net/npm/simple-icons@9/icons/facebook.svg" alt="Facebook" width="20" height="20" style="display:block;">
+        </a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" style="padding:0 24px 16px;color:#94a3b8;font-size:12px;">
         © 2026 EimemesChat AI
       </td>
     </tr>
