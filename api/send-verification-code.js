@@ -1,4 +1,4 @@
-// api/send-verification-code.js
+// api/send-verification-code.js — v1.1 (clean light theme, matching welcome email)
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -82,49 +82,49 @@ export default async function handler(req, res) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Verify your email — EimemesChat</title>
 </head>
-<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;">
-<tr>
-<td align="center" style="padding:64px 24px;">
-<table width="460" cellpadding="0" cellspacing="0" style="max-width:460px;width:100%;">
-<tr>
-<td align="center" style="padding-bottom:40px;">
-<img src="https://i.postimg.cc/VLwLSYfT/F4601C8F-006B-4327-ABED-2B46FA7366AF.png" alt="EimemesChat" width="56" height="56" style="display:block;border:0;border-radius:12px;">
-</td>
-</tr>
-<tr>
-<td align="center" style="padding-bottom:16px;">
-<h1 style="margin:0;color:#ffffff;font-size:24px;line-height:1.35;font-weight:700;">Your verification code</h1>
-</td>
-</tr>
-<tr>
-<td align="center" style="padding-bottom:14px;">
-<p style="margin:0;color:#a3a3a3;font-size:15px;line-height:1.7;">Use the 6‑digit code below to verify your email address and start using EimemesChat.</p>
-</td>
-</tr>
-<tr>
-<td align="center" style="padding-bottom:24px;">
-<div style="display:inline-block;background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:16px 40px;font-size:32px;font-weight:700;letter-spacing:8px;color:#ffffff;font-family:monospace;">${code}</div>
-</td>
-</tr>
-<tr>
-<td align="center" style="padding-bottom:36px;">
-<p style="margin:0;color:#5c5c5c;font-size:13px;">This code expires in 10 minutes.</p>
-</td>
-</tr>
-<tr>
-<td align="center" style="border-top:1px solid #232323;padding-top:24px;">
-<p style="margin:0;color:#5c5c5c;font-size:12.5px;">© 2026 EimemesChat AI</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
+<body style="margin:0;padding:0;background-color:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr>
+    <td align="center" style="padding:48px 24px;">
+      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+        <!-- Blue header -->
+        <tr>
+          <td style="background:#2563eb;padding:32px 24px;text-align:center;">
+            <img src="https://eimemes-chat-ai.vercel.app/chat-logo.png" alt="EimemesChat" width="48" height="48" style="display:block;margin:0 auto 16px;border-radius:12px;">
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Verify your email</h1>
+          </td>
+        </tr>
+
+        <!-- White body -->
+        <tr>
+          <td style="padding:32px 28px;color:#334155;font-size:15px;line-height:1.7;text-align:center;">
+            <p style="margin:0 0 24px;">Use the 6‑digit code below to verify your email address and start using EimemesChat.</p>
+
+            <!-- Code box -->
+            <div style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:12px;padding:20px 36px;display:inline-block;margin-bottom:24px;">
+              <span style="font-size:34px;font-weight:700;letter-spacing:10px;color:#1e293b;font-family:monospace;">${code}</span>
+            </div>
+
+            <p style="margin:0;color:#64748b;font-size:13px;">This code expires in 10 minutes.</p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="border-top:1px solid #e2e8f0;padding:20px 28px;text-align:center;color:#94a3b8;font-size:12px;">
+            © 2026 EimemesChat AI
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
 </table>
 </body>
 </html>`;
 
-  const text = `Your verification code for EimemesChat is: ${code}\n\nIt expires in 10 minutes.`;
+  const text = `Your verification code for EimemesChat is: ${code}\n\nIt expires in 10 minutes.\n\n© 2026 EimemesChat AI`;
 
   try {
     await transporter.sendMail({
