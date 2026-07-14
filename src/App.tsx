@@ -1,9 +1,9 @@
 // App.tsx
-// v2.15 — Fixed: navigateTo parameter typed as View to satisfy setView
+// v2.16 — Local View type ensures navigateTo is type-safe
 import React, { useState, useCallback, useEffect, useRef, Suspense, lazy } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import { useApp, View } from './context/AppContext';  // ← import View type
+import { useApp } from './context/AppContext';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import { useConversations } from './hooks/useConversations';
@@ -25,6 +25,9 @@ const PersonalizationView   = lazy(() => import('./components/PersonalizationVie
 const AboutView             = lazy(() => import('./components/AboutView'));
 const LicensesView          = lazy(() => import('./components/LicensesView'));
 const ReportBugView         = lazy(() => import('./components/ReportBugView'));
+
+// Local View type – exactly the strings used in the app
+type View = 'chat' | 'settings' | 'profile' | 'personalization' | 'about' | 'licenses' | 'reportbug';
 
 const DAILY_LIMIT = 100;
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -120,14 +123,14 @@ export default function App() {
     incrementDailyCount,
   );
 
-  // ── Navigation helper with correct type ──
+  // ── Navigation helper (typed correctly with local View) ──
   const navigateTo = useCallback((newView: View) => {
     document.body.classList.add('page-transitioning');
     setView(newView);
     setTimeout(() => document.body.classList.remove('page-transitioning'), 100);
   }, [setView]);
 
-  // ── Stable refs for callback identity ──
+  // ── Stable refs ──
   const sendMessageRef = useRef(sendMessage);
   sendMessageRef.current = sendMessage;
   const regenerateRef = useRef(regenerate);
