@@ -1,4 +1,5 @@
-// StreamingBubble.tsx — v1.6 — Smooth throttled text updates (rAF-batched)
+// StreamingBubble.tsx — v1.7 — Progressive markdown streaming (formatted text appears as it streams)
+// v1.6 — Smooth throttled text updates (rAF-batched)
 // v1.5 — Incremental text update for WebView performance
 // v1.4 — Font size via CSS variable
 import React, { useEffect, useRef, useState } from 'react';
@@ -24,10 +25,8 @@ const StreamingBubble = React.memo(function StreamingBubble({
 }: Props) {
   const { showToast } = useApp();
   const bodyRef = useRef<HTMLDivElement>(null);
-  const cursorRef = useRef<HTMLSpanElement | null>(null);
-  const textNodeRef = useRef<Text | null>(null);
-  const pendingText = useRef<string>('');
   const rafId = useRef<number>(0);
+  const pendingText = useRef<string>('');
 
   const [thinkExpanded, setThinkExpanded] = useState(false);
   const thinkStartRef = useRef<number>(Date.now());
@@ -41,62 +40,42 @@ const StreamingBubble = React.memo(function StreamingBubble({
     }
   }, [isThinking, thinking]);
 
-  // ── Smooth throttled text rendering ─────────────────────────
+  // ── Progressive markdown rendering ──────────────────────────
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
 
     if (done) {
-      // Final render: full markdown + highlight
+      // Final render: full markdown + code highlighting
       cancelAnimationFrame(rafId.current);
       el.innerHTML = renderMarkdown(text, '__streaming');
       highlightCodeBlocks(el, showToast);
-      cursorRef.current = null;
-      textNodeRef.current = null;
       return;
     }
 
     if (text) {
-      // Store the latest text and request an animation frame
       pendingText.current = text;
+      // Throttle to one rAF to batch updates
       if (!rafId.current) {
         rafId.current = requestAnimationFrame(() => {
           if (!bodyRef.current) return;
-
-          // Set up the text node + cursor on first frame
-          if (!textNodeRef.current) {
-            bodyRef.current.textContent = '';
-            const tn = document.createTextNode(pendingText.current);
-            const cursor = document.createElement('span');
-            cursor.className = 'stream-cursor';
-            bodyRef.current.appendChild(tn);
-            bodyRef.current.appendChild(cursor);
-            textNodeRef.current = tn;
-            cursorRef.current = cursor;
-          } else {
-            // Just update the text node with the latest value
-            textNodeRef.current.nodeValue = pendingText.current;
-          }
+          const html = renderMarkdown(pendingText.current, '__streaming');
+          // Append the blinking cursor after the rendered HTML
+          bodyRef.current.innerHTML = html + '<span class="stream-cursor"></span>';
           rafId.current = 0;
         });
       }
     } else {
-      // No text yet → clean up
+      // No text yet: clear everything
       cancelAnimationFrame(rafId.current);
       rafId.current = 0;
-      el.textContent = '';
-      cursorRef.current = null;
-      textNodeRef.current = null;
+      el.innerHTML = '';
     }
   }, [text, done, showToast]);
 
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
-    return () => {
-      cancelAnimationFrame(rafId.current);
-      cursorRef.current = null;
-      textNodeRef.current = null;
-    };
+    return () => cancelAnimationFrame(rafId.current);
   }, []);
 
   const showThinkingSkeleton = isThinking && !text;
