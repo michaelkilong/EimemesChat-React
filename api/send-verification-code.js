@@ -1,4 +1,4 @@
-// api/send-verification-code.js — v2.0 (atomic code + rate limits, Vercel IP, verified-user guard)
+// api/send-verification-code.js — v2.1 (email guard + atomic rate limits)
 import admin from 'firebase-admin';
 import crypto from 'crypto';
 
@@ -16,13 +16,9 @@ const db = admin.firestore();
 
 // ── Robust client IP using Vercel's trusted header ──────────────
 function getClientIP(req) {
-  // Vercel's secure, non‑spoofable IP header
   if (req.headers['x-vercel-ip']) return req.headers['x-vercel-ip'];
-  // Fallback to forwarded chain (less trusted, but okay on Vercel)
   const fwd = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   if (fwd) return fwd;
-  // If we truly can't get an IP, use a unique request key to avoid
-  // cross‑user collision on a single "unknown" document.
   return `req-${crypto.randomUUID()}`;
 }
 
@@ -49,12 +45,11 @@ async function checkIPRateLimit(ip) {
     });
   } catch (err) {
     console.error('[ip-rate] Transaction failed:', err.message);
-    return false; // block on error – safety first
+    return false;
   }
 }
 
 // ── Atomic per‑user rate limit + code creation ──────────────────
-// Returns the 6‑digit code string if allowed, or null if rate‑limited.
 async function tryCreateVerificationCode(uid) {
   const userRef = db.collection('verificationRateLimits').doc(uid);
   const codeRef = db.collection('emailVerificationCodes').doc(uid);
@@ -71,13 +66,9 @@ async function tryCreateVerificationCode(uid) {
       const windowStart = data.windowStart || 0;
       const countInWindow = (now - windowStart < 600_000) ? (data.count || 0) : 0;
 
-      // 1‑minute cooldown
       if (now - lastSent < 60_000) return null;
-      // 3‑per‑10‑min limit
       if (countInWindow >= 3) return null;
 
-      // Write both the rate‑limit counters and the verification code
-      // in one atomic step – no inconsistency window.
       tx.set(userRef, {
         lastSent: now,
         windowStart: countInWindow === 0 ? now : (data.windowStart || now),
@@ -94,7 +85,7 @@ async function tryCreateVerificationCode(uid) {
     });
   } catch (err) {
     console.error('[user-rate+code] Transaction failed:', err.message);
-    return null; // block on error
+    return null;
   }
 }
 
@@ -107,7 +98,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // 1. Per‑IP rate limit (before auth, but after IP resolution)
+  // 1. Per‑IP rate limit
   const ip = getClientIP(req);
   const ipAllowed = await checkIPRateLimit(ip);
   if (!ipAllowed) {
@@ -128,18 +119,23 @@ export default async function handler(req, res) {
   const uid = decoded.uid;
   const email = decoded.email;
 
+  // ── Guard: only accounts with an email can receive codes ────
+  if (!email) {
+    return res.status(400).json({ error: 'No email address is associated with this account.' });
+  }
+
   // 2. Reject already‑verified users
   if (decoded.email_verified) {
     return res.status(400).json({ error: 'Email is already verified.' });
   }
 
-  // 3. Atomic: check user rate limits AND persist the code
+  // 3. Atomic: rate‑limit check + code creation
   const code = await tryCreateVerificationCode(uid);
   if (!code) {
     return res.status(429).json({ error: 'Wait a moment before requesting another code.' });
   }
 
-  // 4. Send the email (unchanged)
+  // 4. Send email
   const nodemailer = (await import('nodemailer')).default;
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -149,7 +145,6 @@ export default async function handler(req, res) {
     },
   });
 
-  // ── Email HTML (identical to your existing template) ──────────
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
