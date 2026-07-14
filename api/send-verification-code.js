@@ -1,4 +1,4 @@
-// api/send-verification-code.js — v2.1 (email guard + atomic rate limits)
+// api/send-verification-code.js — v2.2 (static IP fallback, no UUID bypass)
 import admin from 'firebase-admin';
 import crypto from 'crypto';
 
@@ -16,10 +16,13 @@ const db = admin.firestore();
 
 // ── Robust client IP using Vercel's trusted header ──────────────
 function getClientIP(req) {
+  // Vercel's secure, non‑spoofable IP header
   if (req.headers['x-vercel-ip']) return req.headers['x-vercel-ip'];
+  // Fallback to forwarded chain (less trusted, but okay on Vercel)
   const fwd = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   if (fwd) return fwd;
-  return `req-${crypto.randomUUID()}`;
+  // Static fallback – all IP‑less requests share the same rate‑limit bucket
+  return 'ip-unavailable';
 }
 
 // ── Atomic per‑IP rate limit (3 requests / 10 min) ─────────────
@@ -66,9 +69,12 @@ async function tryCreateVerificationCode(uid) {
       const windowStart = data.windowStart || 0;
       const countInWindow = (now - windowStart < 600_000) ? (data.count || 0) : 0;
 
+      // 1‑minute cooldown
       if (now - lastSent < 60_000) return null;
+      // 3‑per‑10‑min limit
       if (countInWindow >= 3) return null;
 
+      // Write both rate‑limit counters and verification code in one atomic step
       tx.set(userRef, {
         lastSent: now,
         windowStart: countInWindow === 0 ? now : (data.windowStart || now),
