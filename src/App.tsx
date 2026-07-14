@@ -1,9 +1,9 @@
 // App.tsx
-// v2.14 — Fixed: navigateTo defined before use to prevent build error
+// v2.15 — Fixed: navigateTo parameter typed as View to satisfy setView
 import React, { useState, useCallback, useEffect, useRef, Suspense, lazy } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import { useApp } from './context/AppContext';
+import { useApp, View } from './context/AppContext';  // ← import View type
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import { useConversations } from './hooks/useConversations';
@@ -18,7 +18,7 @@ import LoginModal            from './components/modals/LoginModal';
 import VerificationModal     from './components/modals/VerificationModal';
 import type { Attachment }   from './types';
 
-// Lazy‑loaded views – only loaded when needed
+// Lazy‑loaded views
 const SettingsView          = lazy(() => import('./components/SettingsView'));
 const ProfileView           = lazy(() => import('./components/ProfileView'));
 const PersonalizationView   = lazy(() => import('./components/PersonalizationView'));
@@ -120,8 +120,8 @@ export default function App() {
     incrementDailyCount,
   );
 
-  // ── Navigation helper – MUST be defined before any usage ──
-  const navigateTo = useCallback((newView: string) => {
+  // ── Navigation helper with correct type ──
+  const navigateTo = useCallback((newView: View) => {
     document.body.classList.add('page-transitioning');
     setView(newView);
     setTimeout(() => document.body.classList.remove('page-transitioning'), 100);
