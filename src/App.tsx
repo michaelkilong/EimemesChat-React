@@ -1,12 +1,6 @@
 // App.tsx
-// v2.12 — Perf: stable callbacks to enable React.memo in child components
-// v2.11 — Added ReportBugView; Settings now opens dedicated bug report page
-// v2.10 — Removed landscape desktop mode effect; iOS‑only keyboard lift still present
-// v2.9  — iOS‑only keyboard lift (Android/desktop stays at bottom:0)
-// v2.7  — Gated authenticated UI behind mandatory email verification (VerificationModal)
-// v2.6  — Daily limit 100 + real‑time usage counter + landscape desktop mode
-// v2.4.1 — Latched authReady to prevent loading screen flicker on token refresh
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+// v2.13 — Perf: lazy views + page-transitioning class for smooth navigation
+import React, { useState, useCallback, useEffect, useRef, Suspense, lazy } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { useApp } from './context/AppContext';
@@ -20,15 +14,17 @@ import LoadingScreen         from './components/LoadingScreen';
 import Sidebar               from './components/Sidebar';
 import MessageList           from './components/MessageList';
 import InputArea             from './components/InputArea';
-import SettingsView          from './components/SettingsView';
-import ProfileView           from './components/ProfileView';
-import PersonalizationView   from './components/PersonalizationView';
-import AboutView             from './components/AboutView';
-import LicensesView          from './components/LicensesView';
-import ReportBugView         from './components/ReportBugView';
 import LoginModal            from './components/modals/LoginModal';
 import VerificationModal     from './components/modals/VerificationModal';
 import type { Attachment }   from './types';
+
+// Lazy‑loaded views – only loaded when needed
+const SettingsView          = lazy(() => import('./components/SettingsView'));
+const ProfileView           = lazy(() => import('./components/ProfileView'));
+const PersonalizationView   = lazy(() => import('./components/PersonalizationView'));
+const AboutView             = lazy(() => import('./components/AboutView'));
+const LicensesView          = lazy(() => import('./components/LicensesView'));
+const ReportBugView         = lazy(() => import('./components/ReportBugView'));
 
 const DAILY_LIMIT = 100;
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -66,13 +62,11 @@ export default function App() {
   useAuth();
   useTheme();
 
-  // ── iOS detection ──────────────────────────
   const [isIOS, setIsIOS] = useState(false);
   useEffect(() => {
     setIsIOS(/iPhone|iPad|iPod/.test(navigator.userAgent));
   }, []);
 
-  // ── iOS keyboard offset ───────────────────
   const [kbOffset, setKbOffset] = useState(0);
   useEffect(() => {
     if (!isIOS) return;
@@ -110,13 +104,13 @@ export default function App() {
     if (currentConvId) {
       const currentConv = conversations.find(c => c.id === currentConvId);
       if (!currentConv?.messages?.length) {
-        setView('chat');
+        navigateTo('chat');
         return;
       }
     }
     const id = await createNewChat();
-    if (id) { setCurrentConvId(id); setView('chat'); }
-  }, [createNewChat, setView, currentConvId, conversations]);
+    if (id) { setCurrentConvId(id); navigateTo('chat'); }
+  }, [createNewChat, currentConvId, conversations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const incrementDailyCount = useCallback(() => {
     setDailyCount(prev => {
@@ -138,7 +132,7 @@ export default function App() {
     incrementDailyCount,
   );
 
-  // ── Stabilise state values for callbacks via refs ──
+  // ── Stable refs for callback identity ──
   const sendMessageRef = useRef(sendMessage);
   sendMessageRef.current = sendMessage;
   const regenerateRef = useRef(regenerate);
@@ -152,7 +146,7 @@ export default function App() {
   const currentConvIdRef = useRef(currentConvId);
   currentConvIdRef.current = currentConvId;
 
-  // ── Stable callbacks (empty deps → never change identity) ──
+  // ── Stable callbacks (empty deps) ──
   const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean, useThinking?: boolean) => {
     sendMessageRef.current(text, () => {
       setChipsUsed(true);
@@ -175,7 +169,7 @@ export default function App() {
     regenerateRef.current(originalMsg);
   }, []);
 
-  // ── Daily limit init ──────────────────────
+  // ── Daily limit init ──
   useEffect(() => {
     if (!currentUser) return;
     const ref = doc(db, 'users', currentUser.uid);
@@ -187,6 +181,13 @@ export default function App() {
       if (count >= DAILY_LIMIT) setDailyLimitReached(true);
     }).catch(() => {});
   }, [currentUser]);
+
+  // ── Navigation helper: freezes expensive CSS during transitions ──
+  const navigateTo = useCallback((newView: string) => {
+    document.body.classList.add('page-transitioning');
+    setView(newView);
+    setTimeout(() => document.body.classList.remove('page-transitioning'), 100);
+  }, [setView]);
 
   const handleDeleteConv = useCallback(async (id: string) => {
     await deleteConv(id);
@@ -224,84 +225,86 @@ export default function App() {
             conversations={conversations}
             currentConvId={currentConvId}
             onNewChat={handleNewChat}
-            onSelectConv={id => { setCurrentConvId(id); setView('chat'); }}
-            onOpenSettings={() => { setView('settings'); setSidebarOpen(false); }}
+            onSelectConv={id => { setCurrentConvId(id); navigateTo('chat'); }}
+            onOpenSettings={() => { navigateTo('settings'); setSidebarOpen(false); }}
             onDeleteConv={handleDeleteConv}
             dailyCount={dailyCount}
             dailyLimit={DAILY_LIMIT}
           />
-
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {view === 'chat' && (
-              <>
-                <header style={{
-                  flexShrink: 0, display: 'flex', alignItems: 'center',
-                  justifyContent: 'space-between',
-                  height: 'calc(60px + var(--sat))',
-                  padding: 'calc(var(--sat) + 10px) 16px 10px',
-                  background: `linear-gradient(to bottom, var(--fade-top) 0%, var(--fade-top) 55%, transparent 100%)`,
-                  position: 'relative', zIndex: 10,
-                }}>
-                  <CircleBtn onClick={() => setSidebarOpen(true)} className="menu-btn-mobile">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                      <line x1="3" y1="6" x2="21" y2="6"/>
-                      <line x1="3" y1="12" x2="21" y2="12"/>
-                      <line x1="3" y1="18" x2="21" y2="18"/>
-                    </svg>
-                  </CircleBtn>
-                  <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: '16px', fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 'calc(100% - 120px)' }}>{topbarTitle}</span>
-                  <CircleBtn onClick={handleNewChat} className="topbar-newchat">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19"/>
-                      <line x1="5" y1="12" x2="19" y2="12"/>
-                    </svg>
-                  </CircleBtn>
-                </header>
-                <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                  <MessageList
-                    messages={messages}
-                    isTyping={isTyping}
-                    isSearching={isSearching}
-                    isStreaming={isStreaming}
-                    streamText={streamText}
-                    streamDone={streamDone}
-                    streamModel={streamModel}
-                    streamDisclaimer={streamDisclaimer}
-                    streamSources={streamSources}
-                    streamThinking={streamThinking}
-                    isThinking={isThinking}
-                    convId={currentConvId}
-                    chipsUsed={chipsUsed}
-                    onChipClick={handleSend}
-                    onRegen={handleRegen}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    bottom: isIOS ? kbOffset : 0,
-                    left: 0, right: 0, zIndex: 5,
-                    transition: isIOS ? 'bottom 0.15s ease-out' : 'none',
+            <Suspense fallback={<div style={{ flex:1 }} />}>
+              {view === 'chat' && (
+                <>
+                  <header style={{
+                    flexShrink: 0, display: 'flex', alignItems: 'center',
+                    justifyContent: 'space-between',
+                    height: 'calc(60px + var(--sat))',
+                    padding: 'calc(var(--sat) + 10px) 16px 10px',
+                    background: `linear-gradient(to bottom, var(--fade-top) 0%, var(--fade-top) 55%, transparent 100%)`,
+                    position: 'relative', zIndex: 10,
                   }}>
-                    <InputArea onSend={handleSend} onStop={stopStreaming} isSending={isSending} isStreaming={isStreaming} dailyLimitReached={dailyLimitReached} />
+                    <CircleBtn onClick={() => setSidebarOpen(true)} className="menu-btn-mobile">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                      </svg>
+                    </CircleBtn>
+                    <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: '16px', fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 'calc(100% - 120px)' }}>{topbarTitle}</span>
+                    <CircleBtn onClick={handleNewChat} className="topbar-newchat">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                      </svg>
+                    </CircleBtn>
+                  </header>
+                  <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <MessageList
+                      messages={messages}
+                      isTyping={isTyping}
+                      isSearching={isSearching}
+                      isStreaming={isStreaming}
+                      streamText={streamText}
+                      streamDone={streamDone}
+                      streamModel={streamModel}
+                      streamDisclaimer={streamDisclaimer}
+                      streamSources={streamSources}
+                      streamThinking={streamThinking}
+                      isThinking={isThinking}
+                      convId={currentConvId}
+                      chipsUsed={chipsUsed}
+                      onChipClick={handleSend}
+                      onRegen={handleRegen}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: isIOS ? kbOffset : 0,
+                      left: 0, right: 0, zIndex: 5,
+                      transition: isIOS ? 'bottom 0.15s ease-out' : 'none',
+                    }}>
+                      <InputArea onSend={handleSend} onStop={stopStreaming} isSending={isSending} isStreaming={isStreaming} dailyLimitReached={dailyLimitReached} />
+                    </div>
                   </div>
-                </div>
-              </>
-            )}
-            {view === 'settings' && (
-              <SettingsView
-                onBack={() => setView('chat')}
-                onOpenProfile={() => setView('profile')}
-                onOpenPersonalization={() => setView('personalization')}
-                onOpenAbout={() => setView('about')}
-                onClearChats={handleClearChats}
-                conversations={conversations}
-                onOpenReportBug={() => setView('reportbug')}
-              />
-            )}
-            {view === 'profile' && <ProfileView onBack={() => setView('settings')} getUserConvsRef={getUserConvsRef} />}
-            {view === 'personalization' && <PersonalizationView onBack={() => setView('settings')} />}
-            {view === 'about' && <AboutView onBack={() => setView('settings')} onOpenLicenses={() => setView('licenses')} />}
-            {view === 'licenses' && <LicensesView onBack={() => setView('about')} />}
-            {view === 'reportbug' && <ReportBugView onBack={() => setView('settings')} />}
+                </>
+              )}
+
+              {view === 'settings' && (
+                <SettingsView
+                  onBack={() => navigateTo('chat')}
+                  onOpenProfile={() => navigateTo('profile')}
+                  onOpenPersonalization={() => navigateTo('personalization')}
+                  onOpenAbout={() => navigateTo('about')}
+                  onClearChats={handleClearChats}
+                  conversations={conversations}
+                  onOpenReportBug={() => navigateTo('reportbug')}
+                />
+              )}
+              {view === 'profile' && <ProfileView onBack={() => navigateTo('settings')} getUserConvsRef={getUserConvsRef} />}
+              {view === 'personalization' && <PersonalizationView onBack={() => navigateTo('settings')} />}
+              {view === 'about' && <AboutView onBack={() => navigateTo('settings')} onOpenLicenses={() => navigateTo('licenses')} />}
+              {view === 'licenses' && <LicensesView onBack={() => navigateTo('about')} />}
+              {view === 'reportbug' && <ReportBugView onBack={() => navigateTo('settings')} />}
+            </Suspense>
           </div>
         </>
       )}
