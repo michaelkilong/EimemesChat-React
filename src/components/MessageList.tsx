@@ -1,4 +1,8 @@
-// MessageList.tsx — v1.6 — Streaming class toggle + will-change for WebView perf
+// MessageList.tsx — v1.8 — Sticky manual scroll pause (auto‑scroll stops until button tapped)
+// v1.7 — Auto‑scroll restored (always scroll on new message/typing)
+// v1.6 — Streaming class toggle + will-change for WebView perf
+// v1.5 — Perf: memo + scroll fixes for low-end devices
+// v1.4 — Timestamp‑based programmatic scroll suppression
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import MessageBubble from './MessageBubble';
 import StreamingBubble from './StreamingBubble';
@@ -58,10 +62,11 @@ const MessageList = React.memo(function MessageList({
     clearTimeout(scrollTimer.current);
   }, []);
 
-  // ── Scroll to bottom ──
+  // ── Scroll to bottom (resets manual pause) ──
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
+    userScrolledUp.current = false;   // allow auto‑scroll again
     programmaticScrolling.current = true;
     clearTimeout(scrollTimer.current);
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
@@ -76,16 +81,12 @@ const MessageList = React.memo(function MessageList({
     return () => el.removeEventListener('scrollend', endProgrammaticScroll);
   }, [endProgrammaticScroll]);
 
-  // ── Scroll on new message / typing ──
+  // ── Always scroll on new message / typing ──
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    if (isNearBottom) scrollToBottom();
-    userScrolledUp.current = !isNearBottom;
+    scrollToBottom();
   }, [messages.length, isTyping, scrollToBottom]);
 
-  // ── Auto‑scroll during streaming (throttled) ──
+  // ── Auto‑scroll during streaming (respects manual pause) ──
   const rafId = useRef<number | null>(null);
   useEffect(() => {
     if (!isStreaming || userScrolledUp.current || programmaticScrolling.current) return;
@@ -107,7 +108,7 @@ const MessageList = React.memo(function MessageList({
     };
   }, [streamText, isStreaming]);
 
-  // ── Toggle streaming class on body for CSS performance ──
+  // ── Toggle streaming class on body ──
   useEffect(() => {
     if (isStreaming) {
       document.body.classList.add('streaming-active');
@@ -116,19 +117,22 @@ const MessageList = React.memo(function MessageList({
     }
   }, [isStreaming]);
 
-  // ── Handle user scroll ──
+  // ── Manual scroll handling (sticky pause) ──
   const handleScroll = useCallback(() => {
     if (programmaticScrolling.current) return;
     const el = scrollRef.current;
     if (!el) return;
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    userScrolledUp.current = distFromBottom > 80;
+
+    // Once the user scrolls up, keep auto‑scroll off until the button is tapped
+    if (distFromBottom > 80 && !userScrolledUp.current) {
+      userScrolledUp.current = true;
+    }
     setShowScrollBtn(distFromBottom > 120);
   }, []);
 
   const handleScrollBtnClick = useCallback(() => {
     haptic.light();
-    userScrolledUp.current = false;
     scrollToBottom();
   }, [scrollToBottom]);
 
@@ -157,6 +161,7 @@ const MessageList = React.memo(function MessageList({
           display: 'flex',
           flexDirection: 'column',
         }}>
+          {/* ---------- Welcome screen ---------- */}
           {showWelcome && (
             <div style={{
               display: 'flex', flexDirection: 'column',
@@ -203,6 +208,7 @@ const MessageList = React.memo(function MessageList({
             </div>
           )}
 
+          {/* ---------- Messages ---------- */}
           {messages.map((msg, i) => {
             const isLast = i === messages.length - 1 && msg.role === 'assistant' && !isStreaming;
             let lastUserMsg = '';
@@ -224,6 +230,7 @@ const MessageList = React.memo(function MessageList({
             );
           })}
 
+          {/* ---------- Typing / searching indicators ---------- */}
           {isTyping && !isSearching && <TypingIndicator />}
 
           {isSearching && (
@@ -239,6 +246,7 @@ const MessageList = React.memo(function MessageList({
             </div>
           )}
 
+          {/* ---------- Streaming bubble ---------- */}
           {isStreaming && (
             <StreamingBubble
               text={streamText}
@@ -256,6 +264,7 @@ const MessageList = React.memo(function MessageList({
         </div>
       </div>
 
+      {/* ---------- Scroll‑to‑bottom button ---------- */}
       {showScrollBtn && (
         <button
           onClick={handleScrollBtnClick}
