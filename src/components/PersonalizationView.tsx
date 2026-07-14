@@ -1,5 +1,5 @@
-// PersonalizationView.tsx — v1.0
-import React, { useState, useEffect } from 'react';
+// PersonalizationView.tsx — v1.1 — WebView input reliability fix
+import React, { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useApp } from '../context/AppContext';
@@ -40,6 +40,11 @@ export default function PersonalizationView({ onBack }: Props) {
   const [saving,             setSaving]             = useState(false);
   const [loaded,             setLoaded]             = useState(false);
 
+  // Refs for fallback value reading (WebView reliability)
+  const nicknameRef = useRef<HTMLInputElement>(null);
+  const occupationRef = useRef<HTMLInputElement>(null);
+  const customRef = useRef<HTMLTextAreaElement>(null);
+
   // Load saved preferences
   useEffect(() => {
     if (!currentUser) return;
@@ -59,11 +64,17 @@ export default function PersonalizationView({ onBack }: Props) {
 
   const handleSave = async () => {
     if (!currentUser || saving) return;
+
+    // Use ref values as fallback in case state didn't update (WebView quirk)
+    const finalNickname = nicknameRef.current?.value ?? nickname;
+    const finalOccupation = occupationRef.current?.value ?? occupation;
+    const finalCustom = customRef.current?.value ?? customInstructions;
+
     setSaving(true);
     try {
       await setDoc(
         doc(db, 'users', currentUser.uid),
-        { preferences: { tone, nickname, occupation, customInstructions } },
+        { preferences: { tone, nickname: finalNickname, occupation: finalOccupation, customInstructions: finalCustom } },
         { merge: true }
       );
       haptic.success();
@@ -78,7 +89,6 @@ export default function PersonalizationView({ onBack }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
-
       {/* Header */}
       <header style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -97,7 +107,6 @@ export default function PersonalizationView({ onBack }: Props) {
           Personalization
         </span>
 
-        {/* Save — checkmark button top right like ChatGPT */}
         <button
           onClick={handleSave}
           disabled={saving || !loaded}
@@ -111,7 +120,6 @@ export default function PersonalizationView({ onBack }: Props) {
       </header>
 
       <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 48px' }}>
-
         {/* Tone */}
         <div style={{ marginBottom: '24px' }}>
           <label style={labelStyle}>Base tone</label>
@@ -142,14 +150,18 @@ export default function PersonalizationView({ onBack }: Props) {
         <div style={{ marginBottom: '24px' }}>
           <label style={labelStyle}>Your nickname</label>
           <input
+            ref={nicknameRef}
             style={inputStyle}
             type="text"
+            autoComplete="off"
+            spellCheck={false}
             placeholder="What should the AI call you?"
             value={nickname}
-            onChange={e => setNickname(e.target.value)}
+            onInput={(e) => setNickname((e.target as HTMLInputElement).value)}
+            onBlur={(e) => setNickname((e.target as HTMLInputElement).value)}
             maxLength={40}
             onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'}
-            onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
+            onBlurCapture={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
           />
         </div>
 
@@ -157,14 +169,18 @@ export default function PersonalizationView({ onBack }: Props) {
         <div style={{ marginBottom: '24px' }}>
           <label style={labelStyle}>Your occupation</label>
           <input
+            ref={occupationRef}
             style={inputStyle}
             type="text"
+            autoComplete="off"
+            spellCheck={false}
             placeholder="Engineer, student, designer..."
             value={occupation}
-            onChange={e => setOccupation(e.target.value)}
+            onInput={(e) => setOccupation((e.target as HTMLInputElement).value)}
+            onBlur={(e) => setOccupation((e.target as HTMLInputElement).value)}
             maxLength={60}
             onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'}
-            onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
+            onBlurCapture={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
           />
           <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '8px' }}>
             Helps the AI tailor responses to your context.
@@ -175,19 +191,22 @@ export default function PersonalizationView({ onBack }: Props) {
         <div style={{ marginBottom: '24px' }}>
           <label style={labelStyle}>Custom instructions</label>
           <textarea
+            ref={customRef}
             style={{ ...inputStyle, resize: 'none', minHeight: '120px', lineHeight: 1.6 }}
+            autoComplete="off"
+            spellCheck={false}
             placeholder="Anything else you'd like the AI to keep in mind — interests, preferences, how you like responses formatted..."
             value={customInstructions}
-            onChange={e => setCustomInstructions(e.target.value)}
+            onInput={(e) => setCustomInstructions((e.target as HTMLTextAreaElement).value)}
+            onBlur={(e) => setCustomInstructions((e.target as HTMLTextAreaElement).value)}
             maxLength={500}
             onFocus={e => (e.target as HTMLTextAreaElement).style.borderColor = 'var(--accent)'}
-            onBlur={e => (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border)'}
+            onBlurCapture={e => (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border)'}
           />
           <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '6px', textAlign: 'right' }}>
             {customInstructions.length}/500
           </div>
         </div>
-
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
