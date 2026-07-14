@@ -1,4 +1,5 @@
 // App.tsx
+// v2.12 — Perf: stable callbacks to enable React.memo in child components
 // v2.11 — Added ReportBugView; Settings now opens dedicated bug report page
 // v2.10 — Removed landscape desktop mode effect; iOS‑only keyboard lift still present
 // v2.9  — iOS‑only keyboard lift (Android/desktop stays at bottom:0)
@@ -24,7 +25,7 @@ import ProfileView           from './components/ProfileView';
 import PersonalizationView   from './components/PersonalizationView';
 import AboutView             from './components/AboutView';
 import LicensesView          from './components/LicensesView';
-import ReportBugView         from './components/ReportBugView';   // ← new
+import ReportBugView         from './components/ReportBugView';
 import LoginModal            from './components/modals/LoginModal';
 import VerificationModal     from './components/modals/VerificationModal';
 import type { Attachment }   from './types';
@@ -65,16 +66,16 @@ export default function App() {
   useAuth();
   useTheme();
 
-  // ── iOS detection (safe on server) ──────────────────────────
+  // ── iOS detection ──────────────────────────
   const [isIOS, setIsIOS] = useState(false);
   useEffect(() => {
     setIsIOS(/iPhone|iPad|iPod/.test(navigator.userAgent));
   }, []);
 
-  // ── iOS keyboard offset (only when necessary) ───────────────
+  // ── iOS keyboard offset ───────────────────
   const [kbOffset, setKbOffset] = useState(0);
   useEffect(() => {
-    if (!isIOS) return;                         // keep bottom:0 on Android/desktop
+    if (!isIOS) return;
     const handle = () => {
       const viewport = window.visualViewport;
       if (!viewport) return;
@@ -137,6 +138,44 @@ export default function App() {
     incrementDailyCount,
   );
 
+  // ── Stabilise state values for callbacks via refs ──
+  const sendMessageRef = useRef(sendMessage);
+  sendMessageRef.current = sendMessage;
+  const regenerateRef = useRef(regenerate);
+  regenerateRef.current = regenerate;
+  const getConvRefRef = useRef(getConvRef);
+  getConvRefRef.current = getConvRef;
+  const isSendingRef = useRef(isSending);
+  isSendingRef.current = isSending;
+  const isStreamingRef2 = useRef(isStreaming);
+  isStreamingRef2.current = isStreaming;
+  const currentConvIdRef = useRef(currentConvId);
+  currentConvIdRef.current = currentConvId;
+
+  // ── Stable callbacks (empty deps → never change identity) ──
+  const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean, useThinking?: boolean) => {
+    sendMessageRef.current(text, () => {
+      setChipsUsed(true);
+      localStorage.setItem('ec_chips_used', 'true');
+    }, attachment, useWebSearch, undefined, useThinking);
+  }, []);
+
+  const handleRegen = useCallback(async (originalMsg: string) => {
+    if (isSendingRef.current || isStreamingRef2.current) return;
+    const cid = currentConvIdRef.current;
+    if (!cid) return;
+    const convRef = getConvRefRef.current(cid);
+    if (!convRef) return;
+    const snap = await getDoc(convRef);
+    if (!snap.exists()) return;
+    const msgs    = snap.data().messages || [];
+    const trimmed = [...msgs];
+    while (trimmed.length && trimmed[trimmed.length - 1].role === 'assistant') trimmed.pop();
+    await updateDoc(convRef, { messages: trimmed, updatedAt: new Date() });
+    regenerateRef.current(originalMsg);
+  }, []);
+
+  // ── Daily limit init ──────────────────────
   useEffect(() => {
     if (!currentUser) return;
     const ref = doc(db, 'users', currentUser.uid);
@@ -148,26 +187,6 @@ export default function App() {
       if (count >= DAILY_LIMIT) setDailyLimitReached(true);
     }).catch(() => {});
   }, [currentUser]);
-
-  const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean, useThinking?: boolean) => {
-    sendMessage(text, () => {
-      setChipsUsed(true);
-      localStorage.setItem('ec_chips_used', 'true');
-    }, attachment, useWebSearch, undefined, useThinking);
-  }, [sendMessage]);
-
-  const handleRegen = useCallback(async (originalMsg: string) => {
-    if (!currentConvId || isSending || isStreaming) return;
-    const convRef = getConvRef(currentConvId);
-    if (!convRef) return;
-    const snap = await getDoc(convRef);
-    if (!snap.exists()) return;
-    const msgs    = snap.data().messages || [];
-    const trimmed = [...msgs];
-    while (trimmed.length && trimmed[trimmed.length - 1].role === 'assistant') trimmed.pop();
-    await updateDoc(convRef, { messages: trimmed, updatedAt: new Date() });
-    regenerate(originalMsg);
-  }, [currentConvId, isSending, isStreaming, getConvRef, regenerate]);
 
   const handleDeleteConv = useCallback(async (id: string) => {
     await deleteConv(id);
@@ -275,14 +294,14 @@ export default function App() {
                 onOpenAbout={() => setView('about')}
                 onClearChats={handleClearChats}
                 conversations={conversations}
-                onOpenReportBug={() => setView('reportbug')}  // ← new
+                onOpenReportBug={() => setView('reportbug')}
               />
             )}
             {view === 'profile' && <ProfileView onBack={() => setView('settings')} getUserConvsRef={getUserConvsRef} />}
             {view === 'personalization' && <PersonalizationView onBack={() => setView('settings')} />}
             {view === 'about' && <AboutView onBack={() => setView('settings')} onOpenLicenses={() => setView('licenses')} />}
             {view === 'licenses' && <LicensesView onBack={() => setView('about')} />}
-            {view === 'reportbug' && <ReportBugView onBack={() => setView('settings')} />}  {/* ← new */}
+            {view === 'reportbug' && <ReportBugView onBack={() => setView('settings')} />}
           </div>
         </>
       )}
