@@ -17,7 +17,7 @@ interface Props {
   isThinking: boolean;
 }
 
-export default function StreamingBubble({ text, done, model, disclaimer, time, sources, thinking, isThinking }: Props) {
+const StreamingBubble = React.memo(function StreamingBubble({ text, done, model, disclaimer, time, sources, thinking, isThinking }: Props) {
   const { showToast } = useApp();
   const bodyRef = useRef<HTMLDivElement>(null);
   const [thinkExpanded, setThinkExpanded] = useState(false);
@@ -128,4 +128,6 @@ export default function StreamingBubble({ text, done, model, disclaimer, time, s
       `}</style>
     </div>
   );
-}
+});
+
+export default StreamingBubble;
