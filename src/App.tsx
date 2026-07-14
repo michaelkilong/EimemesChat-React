@@ -1,5 +1,16 @@
 // App.tsx
+// v2.17 — Skeleton fallback for page transitions (PageSkeleton)
 // v2.16 — Local View type ensures navigateTo is type-safe
+// v2.15 — Fixed: navigateTo parameter typed as View to satisfy setView
+// v2.14 — Fixed: navigateTo defined before use to prevent build error
+// v2.13 — Perf: lazy views + page-transitioning class for smooth navigation
+// v2.12 — Perf: stable callbacks to enable React.memo in child components
+// v2.11 — Added ReportBugView; Settings now opens dedicated bug report page
+// v2.10 — Removed landscape desktop mode effect; iOS‑only keyboard lift still present
+// v2.9  — iOS‑only keyboard lift (Android/desktop stays at bottom:0)
+// v2.7  — Gated authenticated UI behind mandatory email verification (VerificationModal)
+// v2.6  — Daily limit 100 + real‑time usage counter + landscape desktop mode
+// v2.4.1 — Latched authReady to prevent loading screen flicker on token refresh
 import React, { useState, useCallback, useEffect, useRef, Suspense, lazy } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -14,11 +25,12 @@ import LoadingScreen         from './components/LoadingScreen';
 import Sidebar               from './components/Sidebar';
 import MessageList           from './components/MessageList';
 import InputArea             from './components/InputArea';
+import PageSkeleton          from './components/PageSkeleton';   // ← skeleton fallback
 import LoginModal            from './components/modals/LoginModal';
 import VerificationModal     from './components/modals/VerificationModal';
 import type { Attachment }   from './types';
 
-// Lazy‑loaded views
+// Lazy‑loaded views – only loaded when needed
 const SettingsView          = lazy(() => import('./components/SettingsView'));
 const ProfileView           = lazy(() => import('./components/ProfileView'));
 const PersonalizationView   = lazy(() => import('./components/PersonalizationView'));
@@ -235,7 +247,8 @@ export default function App() {
             dailyLimit={DAILY_LIMIT}
           />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <Suspense fallback={<div style={{ flex:1 }} />}>
+            {/* ── Shimmer skeleton appears instantly while the lazy page loads ── */}
+            <Suspense fallback={<PageSkeleton />}>
               {view === 'chat' && (
                 <>
                   <header style={{
