@@ -62,7 +62,7 @@ function stripForSpeech(text: string): string {
     .trim();
 }
 
-export default function MessageBubble({ message, isLast, lastUserMsg, convId, onRegen }: Props) {
+const MessageBubble = React.memo(function MessageBubble({ message, isLast, lastUserMsg, convId, onRegen }: Props) {
   const { showToast } = useApp();
   const bodyRef    = useRef<HTMLDivElement>(null);
   const uttRef     = useRef<SpeechSynthesisUtterance | null>(null);
@@ -306,4 +306,6 @@ export default function MessageBubble({ message, isLast, lastUserMsg, convId, on
       `}</style>
     </div>
   );
-}
+});
+
+export default MessageBubble;
