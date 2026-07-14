@@ -1,4 +1,4 @@
-// api/send-verification-code.js — v1.6 (cryptographically secure random code)
+// api/send-verification-code.js — v2.0 (atomic code + rate limits, Vercel IP, verified-user guard)
 import admin from 'firebase-admin';
 import crypto from 'crypto';
 
@@ -14,6 +14,90 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+// ── Robust client IP using Vercel's trusted header ──────────────
+function getClientIP(req) {
+  // Vercel's secure, non‑spoofable IP header
+  if (req.headers['x-vercel-ip']) return req.headers['x-vercel-ip'];
+  // Fallback to forwarded chain (less trusted, but okay on Vercel)
+  const fwd = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  if (fwd) return fwd;
+  // If we truly can't get an IP, use a unique request key to avoid
+  // cross‑user collision on a single "unknown" document.
+  return `req-${crypto.randomUUID()}`;
+}
+
+// ── Atomic per‑IP rate limit (3 requests / 10 min) ─────────────
+async function checkIPRateLimit(ip) {
+  const ref = db.collection('ipRateLimits').doc(ip);
+  try {
+    return await db.runTransaction(async (tx) => {
+      const doc = await tx.get(ref);
+      const data = doc.exists ? doc.data() : {};
+      const now = Date.now();
+      const windowStart = data.windowStart || 0;
+      const count = (now - windowStart < 600_000) ? (data.count || 0) : 0;
+
+      if (count >= 3) return false;
+
+      tx.set(ref, {
+        windowStart: count === 0 ? now : (data.windowStart || now),
+        count: count + 1,
+        lastRequest: now,
+      }, { merge: true });
+
+      return true;
+    });
+  } catch (err) {
+    console.error('[ip-rate] Transaction failed:', err.message);
+    return false; // block on error – safety first
+  }
+}
+
+// ── Atomic per‑user rate limit + code creation ──────────────────
+// Returns the 6‑digit code string if allowed, or null if rate‑limited.
+async function tryCreateVerificationCode(uid) {
+  const userRef = db.collection('verificationRateLimits').doc(uid);
+  const codeRef = db.collection('emailVerificationCodes').doc(uid);
+
+  const code = String(crypto.randomInt(100000, 1000000));
+  const now = Date.now();
+  const expiresAt = new Date(now + 10 * 60 * 1000);
+
+  try {
+    return await db.runTransaction(async (tx) => {
+      const userDoc = await tx.get(userRef);
+      const data = userDoc.exists ? userDoc.data() : {};
+      const lastSent = data.lastSent || 0;
+      const windowStart = data.windowStart || 0;
+      const countInWindow = (now - windowStart < 600_000) ? (data.count || 0) : 0;
+
+      // 1‑minute cooldown
+      if (now - lastSent < 60_000) return null;
+      // 3‑per‑10‑min limit
+      if (countInWindow >= 3) return null;
+
+      // Write both the rate‑limit counters and the verification code
+      // in one atomic step – no inconsistency window.
+      tx.set(userRef, {
+        lastSent: now,
+        windowStart: countInWindow === 0 ? now : (data.windowStart || now),
+        count: countInWindow + 1,
+      }, { merge: true });
+
+      tx.set(codeRef, {
+        code,
+        expiresAt,
+        createdAt: new Date(now),
+      });
+
+      return code;
+    });
+  } catch (err) {
+    console.error('[user-rate+code] Transaction failed:', err.message);
+    return null; // block on error
+  }
+}
+
 export default async function handler(req, res) {
   const origin = req.headers.origin || '';
   const allowed = ['https://eimemes-chat-ai.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
@@ -23,51 +107,39 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // 1. Per‑IP rate limit (before auth, but after IP resolution)
+  const ip = getClientIP(req);
+  const ipAllowed = await checkIPRateLimit(ip);
+  if (!ipAllowed) {
+    return res.status(429).json({ error: 'Too many requests from this IP. Try again later.' });
+  }
+
   const authHeader = req.headers.authorization || '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
 
-  let uid, email;
+  let decoded;
   try {
-    const decoded = await admin.auth().verifyIdToken(idToken);
-    uid = decoded.uid;
-    email = decoded.email;
+    decoded = await admin.auth().verifyIdToken(idToken);
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
   }
 
-  // Rate limit: 1 per 60s, 3 per 10 min
-  const counterRef = db.collection('verificationRateLimits').doc(uid);
-  const now = Date.now();
-  const snap = await counterRef.get();
-  const data = snap.exists ? snap.data() : {};
-  const lastSent = data.lastSent || 0;
-  const windowStart = data.windowStart || 0;
-  const countInWindow = (now - windowStart < 600000) ? (data.count || 0) : 0;
+  const uid = decoded.uid;
+  const email = decoded.email;
 
-  if (now - lastSent < 60000) {
+  // 2. Reject already‑verified users
+  if (decoded.email_verified) {
+    return res.status(400).json({ error: 'Email is already verified.' });
+  }
+
+  // 3. Atomic: check user rate limits AND persist the code
+  const code = await tryCreateVerificationCode(uid);
+  if (!code) {
     return res.status(429).json({ error: 'Wait a moment before requesting another code.' });
   }
-  if (countInWindow >= 3) {
-    return res.status(429).json({ error: 'Too many codes requested. Try again later.' });
-  }
 
-  // Cryptographically secure random 6-digit code
-  const code = String(crypto.randomInt(100000, 1000000));
-  const expiresAt = new Date(now + 10 * 60 * 1000);
-
-  await db.collection('emailVerificationCodes').doc(uid).set({
-    code,
-    expiresAt,
-    createdAt: new Date(),
-  });
-
-  await counterRef.set({
-    lastSent: now,
-    windowStart: countInWindow === 0 ? now : (data.windowStart || now),
-    count: countInWindow + 1,
-  }, { merge: true });
-
+  // 4. Send the email (unchanged)
   const nodemailer = (await import('nodemailer')).default;
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -77,6 +149,7 @@ export default async function handler(req, res) {
     },
   });
 
+  // ── Email HTML (identical to your existing template) ──────────
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
