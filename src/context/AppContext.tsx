@@ -1,6 +1,8 @@
-// context/AppContext.tsx — v1.1 (added emailVerified state for mandatory email verification gate)
+// context/AppContext.tsx — v1.2 (custom emailVerified sync from Firestore)
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import type { User } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';   // adjust path if your firebase config file is elsewhere
 import type { View } from '../types';
 
 interface AppContextType {
@@ -28,7 +30,40 @@ export const useApp = () => useContext(AppContext);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady,   setAuthReady]   = useState(false);
-  const [emailVerified, setEmailVerified] = useState(false);
+
+  // Merged emailVerified – from Firebase Auth + our custom Firestore field
+  const [firebaseVerified, setFirebaseVerified] = useState(false);
+  const [customVerified,   setCustomVerified]   = useState(false);
+
+  // Whenever the user changes, reset and start a Firestore listener
+  useEffect(() => {
+    if (!currentUser) {
+      setFirebaseVerified(false);
+      setCustomVerified(false);
+      return;
+    }
+    // If Firebase already marks them verified, use that
+    if (currentUser.emailVerified) {
+      setFirebaseVerified(true);
+    }
+    // Listen to our custom field
+    const unsub = onSnapshot(doc(db, 'users', currentUser.uid), (snap) => {
+      const data = snap.data();
+      if (data?.emailVerified === true) {
+        setCustomVerified(true);
+      }
+    });
+    return () => unsub();
+  }, [currentUser]);
+
+  const emailVerified = firebaseVerified || customVerified;
+  const setEmailVerified = useCallback((v: boolean) => {
+    setCustomVerified(v);
+    if (v && currentUser && !currentUser.emailVerified) {
+      currentUser.reload().catch(() => {});
+    }
+  }, [currentUser]);
+
   const [view,        setView_]       = useState<View>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark,      setIsDark]      = useState(true);
@@ -36,19 +71,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (localStorage.getItem('ec_font_size') as 'small' | 'medium' | 'large') || 'medium'
   );
 
-  // Persist fontSize + sync to DOM attribute
   const setFontSize = useCallback((s: 'small' | 'medium' | 'large') => {
     setFontSizeState(s);
     localStorage.setItem('ec_font_size', s);
     document.documentElement.setAttribute('data-font-size', s);
   }, []);
 
-  // Set initial attribute
   useEffect(() => {
     document.documentElement.setAttribute('data-font-size', fontSize);
   }, [fontSize]);
 
-  // Wrap setView to push browser history entries
   const setView = useCallback((v: View) => {
     setView_(v);
     if (v === 'chat') {
@@ -58,15 +90,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Listen to browser back/forward button
   useEffect(() => {
     history.replaceState({ view: 'chat' }, '', '/');
-
     const handlePop = (e: PopStateEvent) => {
       const v = (e.state?.view as View) || 'chat';
       setView_(v);
     };
-
     window.addEventListener('popstate', handlePop);
     return () => window.removeEventListener('popstate', handlePop);
   }, []);
@@ -128,7 +157,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       {/* Toast */}
       <div className={`toast ${toastVisible ? 'show' : ''}`}>{toastMsg}</div>
 
-      {/* Confirm Dialog – only closes via Cancel/action button */}
+      {/* Confirm Dialog */}
       <div className={`confirm-overlay ${confirmState.open ? 'show' : ''}`}>
         <div className="confirm-card">
           <div style={{ padding: '24px 22px 18px', textAlign: 'center' }}>
