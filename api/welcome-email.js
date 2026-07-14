@@ -1,4 +1,4 @@
-// api/welcome-email.js — v2.3 — Premium dark welcome email
+// api/welcome-email.js — v3.0 — Clean light welcome email
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -45,92 +45,49 @@ export default async function handler(req, res) {
     const firstName = (displayName || email.split('@')[0]).trim();
     const greetingName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
-    const html = `
-<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Welcome to EimemesChat</title>
 </head>
+<body style="margin:0;padding:0;background-color:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr>
+    <td align="center" style="padding:48px 24px;">
+      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
 
-<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+        <!-- Blue header -->
+        <tr>
+          <td style="background:#2563eb;padding:32px 24px;text-align:center;">
+            <img src="https://eimemes-chat-ai.vercel.app/chat-logo.png" alt="EimemesChat" width="48" height="48" style="display:block;margin:0 auto 16px;border-radius:12px;">
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Welcome, ${greetingName}</h1>
+          </td>
+        </tr>
 
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;">
-<tr>
-<td align="center" style="padding:64px 24px;">
+        <!-- White body -->
+        <tr>
+          <td style="padding:32px 28px;color:#334155;font-size:15px;line-height:1.7;">
+            <p style="margin:0 0 16px;">Thanks for creating an account. EimemesChat is an AI assistant built to help you think, write, search, and get things done — through natural conversation, in English or Kuki, however you prefer to talk.</p>
+            <p style="margin:0 0 16px;">There's nothing to configure. Sign in, ask a question, and it's ready to go — whether that's drafting something, searching the web, or just talking something through.</p>
+            <p style="margin:0;">Glad to have you here.</p>
+          </td>
+        </tr>
 
-<table width="460" cellpadding="0" cellspacing="0" style="max-width:460px;width:100%;">
+        <!-- Subtle footer -->
+        <tr>
+          <td style="border-top:1px solid #e2e8f0;padding:20px 28px;text-align:center;color:#94a3b8;font-size:12px;">
+            © 2026 EimemesChat AI
+          </td>
+        </tr>
 
-<!-- Logo -->
-<tr>
-<td align="center" style="padding-bottom:40px;">
-<a href="https://eimemes-chat-ai.vercel.app" target="_blank">
-<img src="https://i.postimg.cc/VLwLSYtF/F4601C8F-006B-4327-ABED-2B46FA7366AF.png" alt="EimemesChat" width="56" height="56" style="display:block;border:0;border-radius:12px;">
-</a>
-</td>
-</tr>
-
-<!-- Heading -->
-<tr>
-<td align="center" style="padding-bottom:16px;">
-<h1 style="margin:0;color:#ffffff;font-size:24px;line-height:1.35;font-weight:700;letter-spacing:-0.3px;">
-Welcome, ${greetingName}
-</h1>
-</td>
-</tr>
-
-<!-- Body -->
-<tr>
-<td align="center" style="padding-bottom:14px;">
-<p style="margin:0;color:#a3a3a3;font-size:15px;line-height:1.7;">
-Thanks for creating an account. EimemesChat is an AI assistant built to help you think, write, search, and get things done — through natural conversation, in English or Kuki, however you prefer to talk.
-</p>
-</td>
-</tr>
-<tr>
-<td align="center" style="padding-bottom:14px;">
-<p style="margin:0;color:#a3a3a3;font-size:15px;line-height:1.7;">
-There's nothing to configure. Sign in, ask a question, and it's ready to go — whether that's drafting something, searching the web, or just talking something through.
-</p>
-</td>
-</tr>
-<tr>
-<td align="center" style="padding-bottom:36px;">
-<p style="margin:0;color:#a3a3a3;font-size:15px;line-height:1.7;">
-Glad to have you here.
-</p>
-</td>
-</tr>
-
-<!-- Button -->
-<tr>
-<td align="center" style="padding-bottom:44px;">
-<a href="https://eimemes-chat-ai.vercel.app"
-style="background:#ffffff;color:#0a0a0a;text-decoration:none;font-size:14.5px;font-weight:600;padding:13px 30px;border-radius:8px;display:inline-block;">
-Open EimemesChat
-</a>
-</td>
-</tr>
-
-<!-- Footer -->
-<tr>
-<td align="center" style="border-top:1px solid #232323;padding-top:24px;">
-<p style="margin:0;color:#5c5c5c;font-size:12.5px;line-height:1.6;">
-© 2026 EimemesChat AI · MIT License
-</p>
-</td>
-</tr>
-
+      </table>
+    </td>
+  </tr>
 </table>
-
-</td>
-</tr>
-</table>
-
 </body>
-</html>
-`;
+</html>`;
 
     const text = `Welcome, ${greetingName}
 
@@ -140,9 +97,7 @@ There's nothing to configure. Sign in, ask a question, and it's ready to go — 
 
 Glad to have you here.
 
-Open EimemesChat: https://eimemes-chat-ai.vercel.app
-
-© 2026 EimemesChat AI · MIT License`;
+© 2026 EimemesChat AI`;
 
     await transporter.sendMail({
       from: `"EimemesChat AI" <${process.env.EMAIL_USER}>`,
