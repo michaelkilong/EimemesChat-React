@@ -1,5 +1,6 @@
-// api/send-verification-code.js — v1.4 (larger logo)
+// api/send-verification-code.js — v1.6 (cryptographically secure random code)
 import admin from 'firebase-admin';
+import crypto from 'crypto';
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -51,7 +52,8 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Too many codes requested. Try again later.' });
   }
 
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  // Cryptographically secure random 6-digit code
+  const code = String(crypto.randomInt(100000, 1000000));
   const expiresAt = new Date(now + 10 * 60 * 1000);
 
   await db.collection('emailVerificationCodes').doc(uid).set({
@@ -96,12 +98,15 @@ export default async function handler(req, res) {
   <!-- White body -->
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;">
     <tr>
-      <td align="center" style="padding:32px 24px;color:#334155;font-size:15px;line-height:1.7;">
+      <td style="padding:32px 24px;color:#334155;font-size:15px;line-height:1.7;">
+        <p style="margin:0 0 16px;">Dear <strong>${email.split('@')[0]}</strong>,</p>
         <p style="margin:0 0 24px;">Use the 6‑digit code below to verify your email address and start using EimemesChat.</p>
 
         <!-- Code box -->
-        <div style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:12px;padding:20px 36px;display:inline-block;margin-bottom:24px;">
-          <span style="font-size:34px;font-weight:700;letter-spacing:10px;color:#1e293b;font-family:monospace;">${code}</span>
+        <div style="text-align:center; margin-bottom:24px;">
+          <div style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:12px;padding:20px 36px;display:inline-block;">
+            <span style="font-size:34px;font-weight:700;letter-spacing:10px;color:#1e293b;font-family:monospace;">${code}</span>
+          </div>
         </div>
 
         <p style="margin:0;color:#64748b;font-size:13px;">This code expires in 10 minutes.</p>
