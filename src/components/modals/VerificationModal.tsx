@@ -1,8 +1,6 @@
-// components/modals/VerificationModal.tsx — v1.1 (force ID-token refresh after
-// verification is detected, so Firestore rules checking token.email_verified
-// don't reject the newly-verified user with a stale cached claim)
-import React, { useState, useEffect, useCallback } from 'react';
-import { sendEmailVerification, signOut, reload } from 'firebase/auth';
+// components/modals/VerificationModal.tsx — v2.0 (custom 6-digit code)
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { signOut, reload } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 import { friendlyAuthError } from '../../utils/authErrors';
@@ -15,15 +13,22 @@ interface Props { visible: boolean; }
 
 export default function VerificationModal({ visible }: Props) {
   const { currentUser, setEmailVerified, showToast } = useApp();
-  const [checking,   setChecking]   = useState(false);
-  const [resending,  setResending]  = useState(false);
+  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [verifying, setVerifying] = useState(false);
+  const [resending, setResending] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const [cooldown,   setCooldown]   = useState(0);
-  const [error,      setError]      = useState('');
+  const [cooldown, setCooldown] = useState(0);
+  const [error, setError] = useState('');
+  const [autoSent, setAutoSent] = useState(false);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const anyLoading = checking || resending || signingOut;
+  const anyLoading = verifying || resending || signingOut;
 
-  // Restore any in-progress cooldown after a page refresh, per uid
+  useEffect(() => {
+    if (!visible || !currentUser || autoSent) return;
+    sendCode();
+  }, [visible, currentUser?.uid]);
+
   useEffect(() => {
     const uid = currentUser?.uid;
     if (!uid || !visible) return;
@@ -34,31 +39,12 @@ export default function VerificationModal({ visible }: Props) {
     }
   }, [currentUser?.uid, visible]);
 
-  // Countdown ticker for the resend cooldown
   useEffect(() => {
     if (cooldown <= 0) return;
     const t = setTimeout(() => setCooldown(c => (c <= 1 ? 0 : c - 1)), 1000);
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  // Marks the user verified in app state AND forces a fresh ID token so
-  // Firestore requests immediately carry the updated email_verified claim
-  // (calling reload() alone only updates the local user object, not the
-  // token the SDK attaches to requests).
-  const markVerified = useCallback(async () => {
-    try {
-      await auth.currentUser?.getIdToken(true);
-    } catch {
-      // If the token refresh fails (e.g. offline), Firestore calls will
-      // still use the stale token and get rejected until it succeeds —
-      // the app-level gate below still keeps the UI itself locked out.
-    }
-    setEmailVerified(true);
-    showToast("You're verified! Welcome in.");
-  }, [setEmailVerified, showToast]);
-
-  // Background poll — catches the case where the user verifies their email
-  // in another tab, browser, or device while sitting on this screen.
   useEffect(() => {
     if (!visible) return;
     const interval = setInterval(async () => {
@@ -66,69 +52,107 @@ export default function VerificationModal({ visible }: Props) {
       try {
         await reload(auth.currentUser);
         if (auth.currentUser.emailVerified) {
-          await markVerified();
+          setEmailVerified(true);
+          showToast("You're verified! Welcome in.");
         }
-      } catch {
-        // Silent — background check. Manual actions below still surface errors.
-      }
+      } catch { /* silent */ }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [visible, markVerified]);
+  }, [visible, setEmailVerified, showToast]);
 
-  const handleResend = useCallback(async () => {
-    const user = auth.currentUser;
-    if (!user || resending || cooldown > 0) return;
+  const sendCode = async () => {
+    if (!currentUser) return;
     setError('');
-    setResending(true);
     try {
-      await sendEmailVerification(user);
-      showToast('Verification email sent! Check your inbox.');
-      localStorage.setItem(COOLDOWN_KEY_PREFIX + user.uid, String(Date.now()));
+      const token = await currentUser.getIdToken();
+      const res = await fetch('/api/send-verification-code', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to send code');
+      showToast('Verification code sent to your email.');
+      localStorage.setItem(COOLDOWN_KEY_PREFIX + currentUser.uid, String(Date.now()));
       setCooldown(RESEND_COOLDOWN_SECONDS);
+      setAutoSent(true);
     } catch (e: any) {
-      setError(friendlyAuthError(e.code));
-      if (e.code === 'auth/too-many-requests') setCooldown(RESEND_COOLDOWN_SECONDS);
+      setError(e.message || 'Could not send code. Try again later.');
+    }
+  };
+
+  const handleVerify = async () => {
+    const codeStr = code.join('');
+    if (codeStr.length !== 6 || !currentUser) return;
+    setError('');
+    setVerifying(true);
+    try {
+      const res = await fetch('/api/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: currentUser.uid, code: codeStr }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailVerified(true);
+        showToast("You're verified! Welcome in.");
+      } else {
+        setError(data.error || 'Invalid code. Please try again.');
+        setCode(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+      }
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (resending || cooldown > 0) return;
+    setResending(true);
+    setError('');
+    try {
+      const token = await currentUser?.getIdToken();
+      const res = await fetch('/api/send-verification-code', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        showToast('Code resent! Check your inbox.');
+        localStorage.setItem(COOLDOWN_KEY_PREFIX + currentUser!.uid, String(Date.now()));
+        setCooldown(RESEND_COOLDOWN_SECONDS);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setError(err.error || 'Failed to resend code.');
+      }
+    } catch {
+      setError('Could not resend code. Try again later.');
     } finally {
       setResending(false);
     }
-  }, [resending, cooldown, showToast]);
+  };
 
-  const handleCheckVerified = useCallback(async () => {
-    const user = auth.currentUser;
-    if (!user || checking) return;
-    setError('');
-    setChecking(true);
-    try {
-      await reload(user);
-      if (user.emailVerified) {
-        await markVerified();
-      } else {
-        setError("Still not verified. Check your inbox (and spam folder) for the link, then try again.");
-      }
-    } catch (e: any) {
-      if (e.code === 'auth/user-token-expired' || e.code === 'auth/invalid-user-token') {
-        setError('Your session has expired. Please sign in again.');
-        await signOut(auth).catch(() => {});
-      } else {
-        setError(friendlyAuthError(e.code));
-      }
-    } finally {
-      setChecking(false);
-    }
-  }, [checking, markVerified]);
-
-  const handleBackToLogin = useCallback(async () => {
+  const handleBackToLogin = async () => {
     if (anyLoading) return;
     setSigningOut(true);
-    try {
-      await signOut(auth);
-    } catch {
-      // If sign-out fails offline, the local session clears once connectivity
-      // returns via the normal auth listener — nothing else useful to do here.
-    } finally {
-      setSigningOut(false);
+    try { await signOut(auth); } catch {}
+    setSigningOut(false);
+  };
+
+  const handleCodeChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const newCode = [...code];
+    newCode[index] = value.slice(-1);
+    setCode(newCode);
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus();
     }
-  }, [anyLoading]);
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !code[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
 
   const btnPrimary: React.CSSProperties = {
     width: '100%', padding: '14px', margin: '8px 0',
@@ -192,24 +216,43 @@ export default function VerificationModal({ visible }: Props) {
         </h2>
 
         <div style={{ fontSize: '14px', color: 'var(--text-3)', marginBottom: '4px', textAlign: 'center', lineHeight: 1.5 }}>
-          We sent a verification link to
+          We sent a 6‑digit code to
         </div>
-        <div style={{ fontSize: '15px', color: 'var(--text-1)', fontWeight: 600, marginBottom: '18px', textAlign: 'center', wordBreak: 'break-all' }}>
+        <div style={{ fontSize: '15px', color: 'var(--text-1)', fontWeight: 600, marginBottom: '20px', textAlign: 'center', wordBreak: 'break-all' }}>
           {currentUser?.email || 'your email address'}
         </div>
-        <div style={{ fontSize: '13.5px', color: 'var(--text-3)', marginBottom: '20px', textAlign: 'center', lineHeight: 1.5 }}>
-          Click the link in that email, then tap "I've Verified My Email" below. You'll need to verify before you can use EimemesChat.
+
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
+          {code.map((digit, idx) => (
+            <input
+              key={idx}
+              ref={el => inputRefs.current[idx] = el}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
+              value={digit}
+              onChange={e => handleCodeChange(idx, e.target.value)}
+              onKeyDown={e => handleKeyDown(idx, e)}
+              style={{
+                width: '46px', height: '54px',
+                borderRadius: '12px', border: '1px solid var(--border)',
+                background: 'var(--input-bg)', color: 'var(--text-1)',
+                fontSize: '24px', fontWeight: 600, textAlign: 'center',
+                outline: 'none', fontFamily: 'inherit',
+              }}
+            />
+          ))}
         </div>
 
         <button
           style={btnPrimary}
-          disabled={anyLoading}
-          aria-busy={checking}
-          onClick={handleCheckVerified}
-          onMouseEnter={e => { if (!anyLoading) e.currentTarget.style.filter = 'brightness(1.15)'; }}
+          disabled={anyLoading || code.join('').length !== 6}
+          aria-busy={verifying}
+          onClick={handleVerify}
+          onMouseEnter={e => { if (!anyLoading && code.join('').length === 6) e.currentTarget.style.filter = 'brightness(1.15)'; }}
           onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
         >
-          {checking ? spinner : "I've Verified My Email"}
+          {verifying ? spinner : 'Verify Code'}
         </button>
 
         <button
@@ -220,7 +263,7 @@ export default function VerificationModal({ visible }: Props) {
           onMouseEnter={e => { if (!anyLoading && cooldown === 0) e.currentTarget.style.background = 'var(--glass-1)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-2)'; }}
         >
-          {resending ? spinner : cooldown > 0 ? `Resend available in ${cooldown}s` : 'Resend Verification Email'}
+          {resending ? spinner : cooldown > 0 ? `Resend available in ${cooldown}s` : 'Resend Code'}
         </button>
 
         <button
