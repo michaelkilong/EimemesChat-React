@@ -1,4 +1,4 @@
-// api/welcome-email.js — v3.4 (larger logo)
+// api/welcome-email.js — v3.6 (full display name, clean fallback)
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -9,6 +9,20 @@ if (!admin.apps.length) {
       privateKey:  process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
   });
+}
+
+// ── Helper: get a friendly name ─────────────────────────────────
+function getFriendlyName(displayName, email) {
+  if (displayName && displayName.trim().length > 0) {
+    return displayName.trim();                       // full name as user set it
+  }
+  // Fallback: cleaned first word from email local part
+  const raw = (email || '').split('@')[0]
+    .replace(/[0-9._-]/g, ' ')
+    .trim()
+    .split(/\s+/)[0];
+  if (!raw) return 'there';
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
 }
 
 export default async function handler(req, res) {
@@ -40,8 +54,7 @@ export default async function handler(req, res) {
       },
     });
 
-    const firstName = (displayName || email.split('@')[0]).trim();
-    const greetingName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    const name = getFriendlyName(displayName, email);
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -65,7 +78,7 @@ export default async function handler(req, res) {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;">
     <tr>
       <td style="padding:32px 24px;color:#334155;font-size:15px;line-height:1.7;">
-        <p style="margin:0 0 16px;">Dear <strong>${greetingName}</strong>,</p>
+        <p style="margin:0 0 16px;">Dear <strong>${name}</strong>,</p>
         <p style="margin:0 0 16px;">Thank you for signing up for EimemesChat. We're glad to have you here.</p>
         <p style="margin:0 0 16px;">EimemesChat helps you write, research, and stay organised — just start a conversation.</p>
         <p style="margin:0;">Best wishes,<br/>Team EimemesChat</p>
@@ -98,7 +111,7 @@ export default async function handler(req, res) {
 </body>
 </html>`;
 
-    const text = `Dear ${greetingName},
+    const text = `Dear ${name},
 
 Thank you for signing up for EimemesChat. We're glad to have you here.
 
