@@ -1,4 +1,4 @@
-// MessageList.tsx — v1.4 — Timestamp‑based programmatic scroll suppression
+// MessageList.tsx — v1.5 — Perf: memo + scroll fixes for low-end devices
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import MessageBubble from './MessageBubble';
 import StreamingBubble from './StreamingBubble';
@@ -39,38 +39,85 @@ interface Props {
 }
 
 const INPUT_AREA_HEIGHT = 170;
-const PROGRAMMATIC_GRACE_MS = 200;       // ignore scroll events for this long after our own change
 
-export default function MessageList({
+const MessageList = React.memo(function MessageList({
   messages, isTyping, isSearching, isStreaming,
   streamText, streamDone, streamModel, streamDisclaimer, streamSources,
   convId, chipsUsed, onChipClick, onRegen, streamThinking, isThinking,
 }: Props) {
-  const bottomRef              = useRef<HTMLDivElement>(null);
-  const scrollRef              = useRef<HTMLDivElement>(null);
-  const userScrolledUp         = useRef(false);
-  const lastProgrammaticScroll = useRef(0);
+  const bottomRef                = useRef<HTMLDivElement>(null);
+  const scrollRef                = useRef<HTMLDivElement>(null);
+  const userScrolledUp           = useRef(false);
+  const programmaticScrolling    = useRef(false);
+  const scrollTimer              = useRef<ReturnType<typeof setTimeout>>();
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  // ── Scroll to bottom on new message / typing ────────────────
-  useEffect(() => {
-    userScrolledUp.current = false;
-    lastProgrammaticScroll.current = Date.now();
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, isTyping]);
+  // ── Safe ending of programmatic scroll ──
+  const endProgrammaticScroll = useCallback(() => {
+    programmaticScrolling.current = false;
+    clearTimeout(scrollTimer.current);
+  }, []);
 
-  // ── Auto‑scroll during streaming (unless user scrolled up) ──
-  useEffect(() => {
-    if (!isStreaming || !scrollRef.current) return;
-    if (userScrolledUp.current) return;
+  // ── Scroll to bottom (used by button & automatic triggers) ──
+  const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
-    lastProgrammaticScroll.current = Date.now();
-    el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    programmaticScrolling.current = true;
+    clearTimeout(scrollTimer.current);
+
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+
+    // Fallback if scrollend not supported
+    scrollTimer.current = setTimeout(endProgrammaticScroll, 500);
+  }, [endProgrammaticScroll]);
+
+  // ── Listen for scrollend to reliably clear the flag ──
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scrollend', endProgrammaticScroll, { passive: true });
+    return () => el.removeEventListener('scrollend', endProgrammaticScroll);
+  }, [endProgrammaticScroll]);
+
+  // ── Scroll to bottom on new message / typing (only if near bottom) ──
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (isNearBottom) {
+      scrollToBottom();
+    }
+    userScrolledUp.current = !isNearBottom;
+  }, [messages.length, isTyping, scrollToBottom]);
+
+  // ── Auto‑scroll during streaming (throttled with rAF) ──
+  const rafId = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isStreaming || userScrolledUp.current || programmaticScrolling.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    // Throttle to once per frame
+    if (rafId.current === null) {
+      rafId.current = requestAnimationFrame(() => {
+        if (el && !userScrolledUp.current && !programmaticScrolling.current) {
+          el.scrollTop = el.scrollHeight;
+        }
+        rafId.current = null;
+      });
+    }
+
+    return () => {
+      if (rafId.current !== null) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = null;
+      }
+    };
   }, [streamText, isStreaming]);
 
-  // ── Track user scrolls ──────────────────────────────────────
+  // ── Track user scrolls ──
   const handleScroll = useCallback(() => {
-    if (Date.now() - lastProgrammaticScroll.current < PROGRAMMATIC_GRACE_MS) return;
+    if (programmaticScrolling.current) return; // ignore programmatic scrolls
     const el = scrollRef.current;
     if (!el) return;
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -78,12 +125,11 @@ export default function MessageList({
     setShowScrollBtn(distFromBottom > 120);
   }, []);
 
-  const scrollToBottom = () => {
+  const handleScrollBtnClick = useCallback(() => {
     haptic.light();
     userScrolledUp.current = false;
-    lastProgrammaticScroll.current = Date.now();
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+    scrollToBottom();
+  }, [scrollToBottom]);
 
   const showWelcome = messages.length === 0 && !isTyping && !isStreaming;
 
@@ -93,10 +139,22 @@ export default function MessageList({
         ref={scrollRef}
         onScroll={handleScroll}
         className="scroll-thin"
-        style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any, overscrollBehavior: 'none', background: 'transparent' }}
+        style={{
+          height: '100%',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch' as any,
+          overscrollBehavior: 'none',
+          background: 'transparent',
+          contain: 'strict', // performance: isolates layout
+        }}
       >
-        <div style={{ maxWidth: '740px', margin: '0 auto', padding: `24px 20px ${INPUT_AREA_HEIGHT}px`, display: 'flex', flexDirection: 'column' }}>
-
+        <div style={{
+          maxWidth: '740px',
+          margin: '0 auto',
+          padding: `24px 20px ${INPUT_AREA_HEIGHT}px`,
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
           {showWelcome && (
             <div style={{
               display: 'flex', flexDirection: 'column',
@@ -198,7 +256,8 @@ export default function MessageList({
 
       {showScrollBtn && (
         <button
-          onClick={scrollToBottom}
+          onClick={handleScrollBtnClick}
+          aria-label="Scroll to bottom"
           style={{
             position: 'absolute',
             bottom: `${INPUT_AREA_HEIGHT + 12}px`,
@@ -222,4 +281,6 @@ export default function MessageList({
       )}
     </div>
   );
-}
+});
+
+export default MessageList;
