@@ -1,6 +1,6 @@
-// StreamingBubble.tsx — v1.4 — Font size via CSS variable
+// StreamingBubble.tsx — v1.5 — Incremental text update for WebView performance
 import React, { useEffect, useRef, useState } from 'react';
-import { renderMarkdown, highlightCodeBlocks, escHtml } from '../lib/markdown';
+import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
 import Disclaimer from './Disclaimer';
 import SourcesList from './SourcesList';
@@ -17,13 +17,19 @@ interface Props {
   isThinking: boolean;
 }
 
-const StreamingBubble = React.memo(function StreamingBubble({ text, done, model, disclaimer, time, sources, thinking, isThinking }: Props) {
+const StreamingBubble = React.memo(function StreamingBubble({
+  text, done, model, disclaimer, time, sources, thinking, isThinking,
+}: Props) {
   const { showToast } = useApp();
   const bodyRef = useRef<HTMLDivElement>(null);
+  const cursorRef = useRef<HTMLSpanElement | null>(null);
+  const textNodeRef = useRef<Text | null>(null);
+
   const [thinkExpanded, setThinkExpanded] = useState(false);
   const thinkStartRef = useRef<number>(Date.now());
   const [thinkSeconds, setThinkSeconds] = useState(0);
 
+  // ── Thinking timer ──────────────────────────────────────────
   useEffect(() => {
     if (isThinking) thinkStartRef.current = Date.now();
     if (!isThinking && thinking) {
@@ -31,15 +37,50 @@ const StreamingBubble = React.memo(function StreamingBubble({ text, done, model,
     }
   }, [isThinking, thinking]);
 
+  // ── Incremental text rendering ──────────────────────────────
   useEffect(() => {
-    if (!bodyRef.current) return;
+    const el = bodyRef.current;
+    if (!el) return;
+
     if (done) {
-      bodyRef.current.innerHTML = renderMarkdown(text, '__streaming');
-      highlightCodeBlocks(bodyRef.current, showToast);
-    } else if (text) {
-      bodyRef.current.innerHTML = escHtml(text).replace(/\n/g, '<br>') + '<span class="stream-cursor"></span>';
+      // Final render: use full markdown + highlight
+      el.innerHTML = renderMarkdown(text, '__streaming');
+      highlightCodeBlocks(el, showToast);
+      cursorRef.current = null;
+      textNodeRef.current = null;
+      return;
+    }
+
+    if (text) {
+      // First time: set up the text node + cursor structure
+      if (!textNodeRef.current) {
+        el.textContent = ''; // clear whatever was there
+        const tn = document.createTextNode(text);
+        const cursor = document.createElement('span');
+        cursor.className = 'stream-cursor';
+        el.appendChild(tn);
+        el.appendChild(cursor);
+        textNodeRef.current = tn;
+        cursorRef.current = cursor;
+      } else {
+        // Subsequent updates: just change the text node's value
+        textNodeRef.current.nodeValue = text;
+      }
+    } else {
+      // No text yet → clean up
+      el.textContent = '';
+      cursorRef.current = null;
+      textNodeRef.current = null;
     }
   }, [text, done, showToast]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cursorRef.current = null;
+      textNodeRef.current = null;
+    };
+  }, []);
 
   const showThinkingSkeleton = isThinking && !text;
   const showThinkingPill     = thinking && !isThinking;
@@ -47,7 +88,6 @@ const StreamingBubble = React.memo(function StreamingBubble({ text, done, model,
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '8px 0' }}>
       <div style={{ width: '100%' }}>
-
         {(showThinkingSkeleton || showThinkingPill) && (
           <div style={{ marginBottom: '10px' }}>
             <button
@@ -62,20 +102,17 @@ const StreamingBubble = React.memo(function StreamingBubble({ text, done, model,
               <span style={{ fontSize: '15px', color: 'var(--text-3)', fontWeight: 400 }}>
                 {showThinkingSkeleton ? 'Thinking' : `Thought for ${thinkSeconds > 0 ? `${thinkSeconds}s` : 'a moment'}`}
               </span>
-
               {showThinkingSkeleton && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '3px', paddingTop: '2px' }}>
                   {[0, 1, 2].map(i => (
                     <span key={i} style={{
                       width: '4px', height: '4px', borderRadius: '50%',
-                      background: 'var(--text-3)',
-                      display: 'inline-block',
+                      background: 'var(--text-3)', display: 'inline-block',
                       animation: `think-dot 1.2s ease-in-out ${i * 0.2}s infinite`,
                     }} />
                   ))}
                 </span>
               )}
-
               {showThinkingPill && (
                 <svg
                   width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)"
@@ -86,17 +123,12 @@ const StreamingBubble = React.memo(function StreamingBubble({ text, done, model,
                 </svg>
               )}
             </button>
-
             <div style={{ height: '1px', background: 'var(--border)', margin: '8px 0', opacity: 0.5 }} />
-
             {(showThinkingSkeleton || thinkExpanded) && thinking && (
               <div style={{
-                fontSize: '13px', color: 'var(--text-3)',
-                lineHeight: 1.7, fontStyle: 'italic',
-                maxHeight: showThinkingSkeleton ? '100px' : '220px',
-                overflowY: 'auto',
-                transition: 'max-height 0.3s ease',
-                paddingBottom: '4px',
+                fontSize: '13px', color: 'var(--text-3)', lineHeight: 1.7, fontStyle: 'italic',
+                maxHeight: showThinkingSkeleton ? '100px' : '220px', overflowY: 'auto',
+                transition: 'max-height 0.3s ease', paddingBottom: '4px',
               }}>
                 {thinking}
               </div>
@@ -104,13 +136,11 @@ const StreamingBubble = React.memo(function StreamingBubble({ text, done, model,
           </div>
         )}
 
-        {(text || done) && (
-          <div
-            ref={bodyRef}
-            className="msg-body"
-            style={{ color: 'var(--text-1)', fontSize: 'var(--msg-font-size)', lineHeight: 1.75, padding: '2px 0' }}
-          />
-        )}
+        <div
+          ref={bodyRef}
+          className="msg-body"
+          style={{ color: 'var(--text-1)', fontSize: 'var(--msg-font-size)', lineHeight: 1.75, padding: '2px 0' }}
+        />
 
         {done && (
           <>
@@ -119,7 +149,6 @@ const StreamingBubble = React.memo(function StreamingBubble({ text, done, model,
           </>
         )}
       </div>
-
       <style>{`
         @keyframes think-dot {
           0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
