@@ -1,5 +1,5 @@
 // App.tsx
-// v2.13 — Perf: lazy views + page-transitioning class for smooth navigation
+// v2.14 — Fixed: navigateTo defined before use to prevent build error
 import React, { useState, useCallback, useEffect, useRef, Suspense, lazy } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -100,18 +100,6 @@ export default function App() {
   const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
   const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
 
-  const handleNewChat = useCallback(async () => {
-    if (currentConvId) {
-      const currentConv = conversations.find(c => c.id === currentConvId);
-      if (!currentConv?.messages?.length) {
-        navigateTo('chat');
-        return;
-      }
-    }
-    const id = await createNewChat();
-    if (id) { setCurrentConvId(id); navigateTo('chat'); }
-  }, [createNewChat, currentConvId, conversations]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const incrementDailyCount = useCallback(() => {
     setDailyCount(prev => {
       const next = prev + 1;
@@ -132,6 +120,13 @@ export default function App() {
     incrementDailyCount,
   );
 
+  // ── Navigation helper – MUST be defined before any usage ──
+  const navigateTo = useCallback((newView: string) => {
+    document.body.classList.add('page-transitioning');
+    setView(newView);
+    setTimeout(() => document.body.classList.remove('page-transitioning'), 100);
+  }, [setView]);
+
   // ── Stable refs for callback identity ──
   const sendMessageRef = useRef(sendMessage);
   sendMessageRef.current = sendMessage;
@@ -146,7 +141,7 @@ export default function App() {
   const currentConvIdRef = useRef(currentConvId);
   currentConvIdRef.current = currentConvId;
 
-  // ── Stable callbacks (empty deps) ──
+  // ── Stable callbacks ──
   const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean, useThinking?: boolean) => {
     sendMessageRef.current(text, () => {
       setChipsUsed(true);
@@ -169,6 +164,28 @@ export default function App() {
     regenerateRef.current(originalMsg);
   }, []);
 
+  const handleNewChat = useCallback(async () => {
+    if (currentConvId) {
+      const currentConv = conversations.find(c => c.id === currentConvId);
+      if (!currentConv?.messages?.length) {
+        navigateTo('chat');
+        return;
+      }
+    }
+    const id = await createNewChat();
+    if (id) { setCurrentConvId(id); navigateTo('chat'); }
+  }, [createNewChat, currentConvId, conversations, navigateTo]);
+
+  const handleDeleteConv = useCallback(async (id: string) => {
+    await deleteConv(id);
+    if (currentConvId === id) setCurrentConvId(null);
+  }, [deleteConv, currentConvId]);
+
+  const handleClearChats = useCallback(async () => {
+    await clearAllChats();
+    setCurrentConvId(null);
+  }, [clearAllChats]);
+
   // ── Daily limit init ──
   useEffect(() => {
     if (!currentUser) return;
@@ -181,23 +198,6 @@ export default function App() {
       if (count >= DAILY_LIMIT) setDailyLimitReached(true);
     }).catch(() => {});
   }, [currentUser]);
-
-  // ── Navigation helper: freezes expensive CSS during transitions ──
-  const navigateTo = useCallback((newView: string) => {
-    document.body.classList.add('page-transitioning');
-    setView(newView);
-    setTimeout(() => document.body.classList.remove('page-transitioning'), 100);
-  }, [setView]);
-
-  const handleDeleteConv = useCallback(async (id: string) => {
-    await deleteConv(id);
-    if (currentConvId === id) setCurrentConvId(null);
-  }, [deleteConv, currentConvId]);
-
-  const handleClearChats = useCallback(async () => {
-    await clearAllChats();
-    setCurrentConvId(null);
-  }, [clearAllChats]);
 
   useEffect(() => {
     if (!showApp) return;
