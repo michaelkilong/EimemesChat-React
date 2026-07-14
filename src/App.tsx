@@ -1,315 +1,557 @@
-// App.tsx
-// v2.13 — Perf: lazy views + page-transitioning class for smooth navigation
-import React, { useState, useCallback, useEffect, useRef, Suspense, lazy } from 'react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from './firebase';
-import { useApp } from './context/AppContext';
-import { useAuth } from './hooks/useAuth';
-import { useTheme } from './hooks/useTheme';
-import { useConversations } from './hooks/useConversations';
-import { useMessages } from './hooks/useMessages';
-import { useChat } from './hooks/useChat';
+/* globals.css — v2.5 — Added smooth page transition performance rules */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&display=swap');
 
-import LoadingScreen         from './components/LoadingScreen';
-import Sidebar               from './components/Sidebar';
-import MessageList           from './components/MessageList';
-import InputArea             from './components/InputArea';
-import LoginModal            from './components/modals/LoginModal';
-import VerificationModal     from './components/modals/VerificationModal';
-import type { Attachment }   from './types';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-// Lazy‑loaded views – only loaded when needed
-const SettingsView          = lazy(() => import('./components/SettingsView'));
-const ProfileView           = lazy(() => import('./components/ProfileView'));
-const PersonalizationView   = lazy(() => import('./components/PersonalizationView'));
-const AboutView             = lazy(() => import('./components/AboutView'));
-const LicensesView          = lazy(() => import('./components/LicensesView'));
-const ReportBugView         = lazy(() => import('./components/ReportBugView'));
-
-const DAILY_LIMIT = 100;
-function todayStr() { return new Date().toISOString().slice(0, 10); }
-
-function CircleBtn({ onClick, children, className }: { onClick: () => void; children: React.ReactNode; className?: string }) {
-  const [pressed, setPressed] = useState(false);
-  return (
-    <button
-      className={className}
-      onClick={onClick}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
-      onMouseLeave={() => setPressed(false)}
-      onTouchStart={() => setPressed(true)}
-      onTouchEnd={() => setPressed(false)}
-      style={{
-        width: '40px', height: '40px', borderRadius: '50%',
-        background: pressed ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.22)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.35)',
-        cursor: 'pointer', flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: 'var(--text-1)',
-        transition: 'background 0.12s',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      {children}
-    </button>
-  );
+/* ═══════════════════════════════════════════
+   CSS VARIABLES
+   Theme is controlled by JS (useTheme.ts) which always applies
+   html.dark or html.light class. The :root block provides safe-area
+   insets and defaults before JS loads.
+═══════════════════════════════════════════ */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
 }
 
-export default function App() {
-  useAuth();
-  useTheme();
+/* Font size options (set by AppContext on <html>) */
+html[data-font-size="small"]  { --msg-font-size: 14px; }
+html[data-font-size="medium"] { --msg-font-size: 16px; }
+html[data-font-size="large"]  { --msg-font-size: 18px; }
 
-  const [isIOS, setIsIOS] = useState(false);
-  useEffect(() => {
-    setIsIOS(/iPhone|iPad|iPod/.test(navigator.userAgent));
-  }, []);
+/* ── Black & Grey Dark Theme ──────────────────────────────────── */
+html.dark {
+  --bg-a:      #000000;
+  --bg-b:      #0d0d0d;
+  --glass-0:   rgba(0,0,0,0.97);
+  --glass-1:   rgba(20,20,22,0.95);
+  --glass-2:   rgba(40,40,44,0.85);
+  --glass-3:   rgba(255,255,255,0.04);
+  --border:    rgba(255,255,255,0.10);
+  --border-b:  rgba(255,255,255,0.05);
+  --text-1:    rgba(255,255,255,0.93);
+  --text-2:    rgba(255,255,255,0.58);
+  --text-3:    rgba(255,255,255,0.34);
+  --accent:    #e5e5e5;                      /* brighter white accent for icons / hovers */
+  --accent-dim:rgba(255,255,255,0.12);       /* increased contrast for hover highlights */
+  --bubble-u:  #1c1c1e;
+  --bubble-ub: #2c2c2e;
+  --send-bg:   linear-gradient(145deg,#0a84ff 0%,#0062d6 100%); /* send button stays blue */
+  --send-fg:   #ffffff;
+  --input-bg:  #1c1c1e;
+  --code-bg:   rgba(255,255,255,0.06);
+  --sh-sm:     0 2px 10px rgba(0,0,0,0.45);
+  --sh-md:     0 10px 40px rgba(0,0,0,0.6);
+  --sh-input:  0 2px 8px rgba(0,0,0,0.4);
+  --fade-top:  #000000;
+}
 
-  const [kbOffset, setKbOffset] = useState(0);
-  useEffect(() => {
-    if (!isIOS) return;
-    const handle = () => {
-      const viewport = window.visualViewport;
-      if (!viewport) return;
-      const offset = window.innerHeight - viewport.height;
-      setKbOffset(offset > 0 ? offset : 0);
-    };
-    window.visualViewport?.addEventListener('resize', handle);
-    window.visualViewport?.addEventListener('scroll', handle);
-    handle();
-    return () => {
-      window.visualViewport?.removeEventListener('resize', handle);
-      window.visualViewport?.removeEventListener('scroll', handle);
-    };
-  }, [isIOS]);
+/* ── Light theme — unchanged ──────────────────────────────────── */
+html.light {
+  --bg-a:      #e9eaf2;
+  --bg-b:      #f0f1f8;
+  --glass-0:   rgba(255,255,255,0.98);
+  --glass-1:   rgba(255,255,255,1.0);
+  --glass-2:   rgba(255,255,255,1.0);
+  --glass-3:   rgba(0,0,0,0.03);
+  --border:    rgba(0,0,0,0.08);
+  --border-b:  rgba(0,0,0,0.05);
+  --text-1:    rgba(0,0,0,0.88);
+  --text-2:    rgba(0,0,0,0.54);
+  --text-3:    rgba(0,0,0,0.32);
+  --accent:    #0a84ff;
+  --accent-dim:rgba(10,132,255,0.12);
+  --bubble-u:  rgba(10,132,255,0.14);
+  --bubble-ub: rgba(10,132,255,0.09);
+  --send-bg:   linear-gradient(145deg,#0a84ff 0%,#0062d6 100%);
+  --send-fg:   #ffffff;
+  --input-bg:  rgba(255,255,255,1.0);
+  --code-bg:   rgba(0,0,0,0.05);
+  --sh-sm:     0 2px 10px rgba(0,0,0,0.06);
+  --sh-md:     0 10px 40px rgba(0,0,0,0.12);
+  --sh-input:  0 2px 8px rgba(0,0,0,0.08);
+  --fade-top: #e9eaf2;
+}
 
-  const { currentUser, authReady, emailVerified, view, setView, sidebarOpen, setSidebarOpen } = useApp();
-  const [currentConvId,     setCurrentConvId]     = useState<string | null>(null);
-  const [chipsUsed,         setChipsUsed]         = useState(localStorage.getItem('ec_chips_used') === 'true');
-  const [dailyLimitReached, setDailyLimitReached] = useState(false);
-  const [dailyCount,        setDailyCount]        = useState(0);
+/* ═══════════════════════════════════════════
+   BASE
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  const authWasReady = useRef(false);
-  if (authReady) authWasReady.current = true;
-  const showLoading = !authReady && !authWasReady.current;
+html { height: 100%; }
 
-  const showApp = !!currentUser && emailVerified;
+body {
+  height: 100%;
+  min-height: -webkit-fill-available;
+  font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
+  font-size: 17px;
+  background: linear-gradient(145deg, var(--bg-a) 0%, var(--bg-b) 100%);
+  background-attachment: fixed;
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
 
-  const { conversations, createNewChat, clearAllChats, deleteConv, getConvRef, getUserConvsRef } = useConversations();
-  const { messages, setMessages, convTitle, setConvTitle, isStreamingRef }           = useMessages(currentConvId);
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
-  const handleNewChat = useCallback(async () => {
-    if (currentConvId) {
-      const currentConv = conversations.find(c => c.id === currentConvId);
-      if (!currentConv?.messages?.length) {
-        navigateTo('chat');
-        return;
-      }
-    }
-    const id = await createNewChat();
-    if (id) { setCurrentConvId(id); navigateTo('chat'); }
-  }, [createNewChat, currentConvId, conversations]); // eslint-disable-line react-hooks/exhaustive-deps
+/* ── OS-specific fonts ───────────────────────────────────────────── */
+html.os-android body {
+  font-family: 'Google Sans', Roboto, 'Noto Sans', system-ui, sans-serif;
+}
+html.os-ios body,
+html.os-mac body {
+  font-family: -apple-system, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', sans-serif;
+}
+html.os-other body {
+  font-family: system-ui, -apple-system, sans-serif;
+}
 
-  const incrementDailyCount = useCallback(() => {
-    setDailyCount(prev => {
-      const next = prev + 1;
-      if (next >= DAILY_LIMIT) setDailyLimitReached(true);
-      return next;
-    });
-  }, []);
+button { cursor: pointer; border: none; background: none; font-family: inherit; }
+input, textarea { font-family: inherit; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
 
-  const {
-    isSending, isStreaming, isTyping, isSearching,
-    streamText, streamDone, streamModel, streamDisclaimer, streamSources,
-    streamThinking, isThinking,
-    sendMessage, stopStreaming, regenerate,
-  } = useChat(
-    currentConvId, setCurrentConvId,
-    conversations, createNewChat,
-    setConvTitle, isStreamingRef, setMessages,
-    incrementDailyCount,
+/* ═══════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════ */
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.90) translateY(10px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+@keyframes tdot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 1; }
+  30%           { transform: translateY(-5px); opacity: 0.6; }
+}
+@keyframes cur-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+/* ═══════════════════════════════════════════
+   SCROLLBARS
+═══════════════════════════════════════════ */
+.scroll-thin::-webkit-scrollbar { width: 4px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ═══════════════════════════════════════════
+   GRADIENT TEXT
+═══════════════════════════════════════════ */
+.gradient-text {
+  background: linear-gradient(135deg, #5e9cff, #c96eff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ═══════════════════════════════════════════
+   TYPING DOTS
+═══════════════════════════════════════════ */
+.typing-dot {
+  width: 6px; height: 6px;
+  background: var(--text-3);
+  border-radius: 50%;
+  animation: tdot 1.3s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+/* ═══════════════════════════════════════════
+   STREAM CURSOR
+═══════════════════════════════════════════ */
+.stream-cursor {
+  display: inline-block;
+  width: 2px; height: 1em;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: cur-blink 0.55s steps(1) infinite;
+}
+
+/* ═══════════════════════════════════════════
+   MESSAGE BODY MARKDOWN
+═══════════════════════════════════════════ */
+.msg-body {
+  font-size: var(--msg-font-size, 16px);
+}
+.msg-body h1, .msg-body h2, .msg-body h3, .msg-body h4 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 600; margin: 18px 0 8px; color: var(--text-1);
+}
+.msg-body h1 { font-size: 28px; letter-spacing: -0.4px; }
+.msg-body h2 { font-size: 23px; letter-spacing: -0.3px; }
+.msg-body h3 { font-size: 19px; }
+.msg-body h4 { font-size: 16px; }
+.msg-body p  { margin: 0 0 12px; }
+.msg-body ul, .msg-body ol { padding-left: 22px; margin-bottom: 12px; }
+.msg-body li { margin-bottom: 6px; line-height: 1.75; }
+.msg-body a  { color: var(--accent); }
+.msg-body strong { font-weight: 600; color: var(--text-1); }
+.msg-body em { font-style: italic; }
+.msg-body blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 8px 0; padding: 8px 14px;
+  background: var(--accent-dim);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-2);
+}
+.msg-body table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+.msg-body th, .msg-body td { border: 1px solid var(--border); padding: 7px 10px; font-size: 14px; }
+.msg-body th { background: var(--glass-2); font-weight: 600; }
+.msg-body code:not(pre code) {
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 14px; color: var(--text-1); border: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════════════════
+   CODE BLOCKS
+═══════════════════════════════════════════ */
+.code-block {
+  background: var(--code-bg); border: 1px solid var(--border);
+  border-radius: 10px; margin: 10px 0; overflow: hidden;
+}
+.code-block-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+}
+.code-lang { font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: lowercase; }
+.copy-btn {
+  font-size: 12px; color: var(--text-3); padding: 3px 10px;
+  border-radius: 6px; border: 1px solid var(--border);
+  background: var(--glass-3); cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.copy-btn:hover { background: var(--border); color: var(--text-1); }
+.copy-btn.copied { color: var(--accent); border-color: var(--accent); }
+.code-block pre { padding: 14px; overflow-x: auto; margin: 0; }
+.code-block pre::-webkit-scrollbar { height: 4px; }
+.code-block pre::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.code-block pre code {
+  background: none; border: none; padding: 0;
+  font-size: 14px; line-height: 1.6;
+  white-space: pre; word-wrap: normal;
+  font-family: 'Fira Code', 'Courier New', monospace;
+}
+.hljs { background: transparent !important; }
+
+/* ═══════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════ */
+.toast {
+  position: fixed; bottom: 100px; left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--glass-0);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  font-size: 13.5px; padding: 10px 20px; border-radius: 30px;
+  opacity: 0; pointer-events: none;
+  box-shadow: var(--sh-md);
+  transition: opacity 0.22s, transform 0.22s;
+  z-index: 210; max-width: calc(100vw - 40px); text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ═══════════════════════════════════════════
+   CONFIRM OVERLAY
+═══════════════════════════════════════════ */
+.confirm-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 300;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s;
+}
+.confirm-overlay.show { opacity: 1; pointer-events: all; }
+.confirm-card {
+  background: var(--glass-1);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  width: min(320px, calc(100vw - 48px));
+  overflow: hidden;
+  box-shadow: var(--sh-md);
+  transform: scale(0.93);
+  transition: transform 0.22s cubic-bezier(0.34,1.4,0.64,1);
+}
+.confirm-overlay.show .confirm-card { transform: scale(1); }
+
+/* ═══════════════════════════════════════════
+   SETTINGS ROWS
+═══════════════════════════════════════════ */
+.settings-row-icon {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--accent-dim);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent); flex-shrink: 0;
+}
+.settings-row-icon.red { background: rgba(255,75,75,0.14); color: #ff6b6b; }
+
+/* ═══════════════════════════════════════════
+   THEME TOGGLE SWITCH
+═══════════════════════════════════════════ */
+.toggle-switch {
+  width: 48px; height: 28px; border-radius: 14px;
+  background: var(--border); position: relative;
+  cursor: pointer; transition: background 0.2s; flex-shrink: 0; border: none;
+}
+.toggle-switch.on { background: var(--accent); }
+.toggle-knob {
+  position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: white; transition: transform 0.22s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.toggle-switch.on .toggle-knob { transform: translateX(20px); }
+
+/* ═══════════════════════════════════════════
+   MODALS (signout, delete account)
+═══════════════════════════════════════════ */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal-card {
+  background: var(--glass-1);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 28px; padding: 32px 28px 24px;
+  max-width: 320px; width: 100%;
+  text-align: center;
+  box-shadow: var(--sh-md);
+  animation: modalPop 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* ═══════════════════════════════════════════
+   MSG ACTION BUTTONS
+═══════════════════════════════════════════ */
+.msg-action-btn {
+  width: 30px; height: 30px; border-radius: 8px; border: none;
+  background: transparent; color: var(--text-3);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: color 0.15s, transform 0.1s; flex-shrink: 0;
+}
+.msg-action-btn:hover { color: var(--text-1); transform: scale(1.12); }
+.msg-action-btn.regen-btn:hover { color: var(--accent); }
+.msg-action-btn.thumb-up.active   { color: #30d158; }
+.msg-action-btn.thumb-down.active { color: #ff6b6b; }
+
+/* ═══════════════════════════════════════════
+   LOGIN MODAL
+═══════════════════════════════════════════ */
+.login-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  z-index: 100;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.login-overlay.show { display: flex; }
+.login-card {
+  background: var(--glass-1);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 32px; padding: 32px 28px;
+  width: 100%; max-width: 340px; text-align: center;
+  box-shadow: var(--sh-md);
+  animation: modalPop 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* ═══════════════════════════════════════════
+   MOBILE
+═══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .sidebar-desktop { display: none !important; }
+  .menu-btn-mobile { display: flex !important; }
+  .topbar-newchat  { display: flex !important; }
+}
+@media (min-width: 769px) {
+  .menu-btn-mobile { display: none !important; }
+  .topbar-newchat  { display: flex !important; }
+  .sidebar-mask    { display: none !important; }
+}
+
+/* ═══════════════════════════════════════════
+   LANDSCAPE DESKTOP MODE (phone sideways)
+═══════════════════════════════════════════ */
+html.landscape-desktop .sidebar-mask { display: none !important; }
+
+html.landscape-desktop aside[style*="fixed"] {
+  position: relative !important;
+  transform: none !important;
+  z-index: auto !important;
+}
+
+html.landscape-desktop .menu-btn-mobile { display: none !important; }
+html.landscape-desktop .topbar-newchat  { display: flex !important; }
+
+/* ═══════════════════════════════════════════
+   CITATIONS & WEB SEARCH
+═══════════════════════════════════════════ */
+
+/* Skeleton wave animation */
+@keyframes wave {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton-line {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--glass-2) 25%,
+    var(--glass-3) 50%,
+    var(--glass-2) 75%
   );
+  background-size: 800px 100%;
+  animation: wave 1.6s ease-in-out infinite;
+}
 
-  // ── Stable refs for callback identity ──
-  const sendMessageRef = useRef(sendMessage);
-  sendMessageRef.current = sendMessage;
-  const regenerateRef = useRef(regenerate);
-  regenerateRef.current = regenerate;
-  const getConvRefRef = useRef(getConvRef);
-  getConvRefRef.current = getConvRef;
-  const isSendingRef = useRef(isSending);
-  isSendingRef.current = isSending;
-  const isStreamingRef2 = useRef(isStreaming);
-  isStreamingRef2.current = isStreaming;
-  const currentConvIdRef = useRef(currentConvId);
-  currentConvIdRef.current = currentConvId;
+/* Search skeleton container */
+.search-skeleton {
+  padding: 8px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.search-skeleton-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-3); font-weight: 500;
+  margin-bottom: 2px;
+}
+.search-skeleton-label-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  animation: breathe 1.2s infinite ease-in-out;
+}
+.citation-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin: 0 2px; padding: 1px 7px; border-radius: 999px;
+  background: var(--accent-dim); color: var(--accent);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  border: none; font-family: inherit; vertical-align: middle;
+  transition: background 0.15s; white-space: nowrap;
+}
+.citation-badge:hover { background: rgba(255,255,255,0.1); }
+.sources-list {
+  margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid var(--border-b);
+}
+.sources-list-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+  text-transform: uppercase; color: var(--text-3); margin-bottom: 8px;
+}
+.source-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid var(--border-b);
+  cursor: pointer; text-decoration: none;
+}
+.source-item:last-child { border-bottom: none; }
+.source-num {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent-dim); color: var(--accent);
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+.source-title { font-size: 13px; color: var(--accent); line-height: 1.4; flex: 1; }
+.source-url {
+  font-size: 11px; color: var(--text-3); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px;
+}
 
-  // ── Stable callbacks (empty deps) ──
-  const handleSend = useCallback((text: string, attachment?: Attachment, useWebSearch?: boolean, useThinking?: boolean) => {
-    sendMessageRef.current(text, () => {
-      setChipsUsed(true);
-      localStorage.setItem('ec_chips_used', 'true');
-    }, attachment, useWebSearch, undefined, useThinking);
-  }, []);
+/* ── Inline citation number bubbles ──────────────────────────── */
+.cite-bubble {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  vertical-align: middle;
+  margin: 0 2px;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+.cite-bubble:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+html.light .cite-bubble {
+  background: rgba(0,0,0,0.08);
+  color: var(--text-2);
+}
 
-  const handleRegen = useCallback(async (originalMsg: string) => {
-    if (isSendingRef.current || isStreamingRef2.current) return;
-    const cid = currentConvIdRef.current;
-    if (!cid) return;
-    const convRef = getConvRefRef.current(cid);
-    if (!convRef) return;
-    const snap = await getDoc(convRef);
-    if (!snap.exists()) return;
-    const msgs    = snap.data().messages || [];
-    const trimmed = [...msgs];
-    while (trimmed.length && trimmed[trimmed.length - 1].role === 'assistant') trimmed.pop();
-    await updateDoc(convRef, { messages: trimmed, updatedAt: new Date() });
-    regenerateRef.current(originalMsg);
-  }, []);
+/* ═══════════════════════════════════════════
+   STREAMING PERFORMANCE (native WebView)
+═══════════════════════════════════════════ */
+body.streaming-active *,
+body.streaming-active *::before,
+body.streaming-active *::after {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
 
-  // ── Daily limit init ──
-  useEffect(() => {
-    if (!currentUser) return;
-    const ref = doc(db, 'users', currentUser.uid);
-    getDoc(ref).then(snap => {
-      if (!snap.exists()) return;
-      const data = snap.data() as { dailyCount?: number; lastDate?: string };
-      const count = data.lastDate === todayStr() ? (data.dailyCount || 0) : 0;
-      setDailyCount(count);
-      if (count >= DAILY_LIMIT) setDailyLimitReached(true);
-    }).catch(() => {});
-  }, [currentUser]);
+body.streaming-active .scroll-thin {
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
 
-  // ── Navigation helper: freezes expensive CSS during transitions ──
-  const navigateTo = useCallback((newView: string) => {
-    document.body.classList.add('page-transitioning');
-    setView(newView);
-    setTimeout(() => document.body.classList.remove('page-transitioning'), 100);
-  }, [setView]);
+/* Skip rendering of messages far outside the viewport */
+.msg-body {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
 
-  const handleDeleteConv = useCallback(async (id: string) => {
-    await deleteConv(id);
-    if (currentConvId === id) setCurrentConvId(null);
-  }, [deleteConv, currentConvId]);
+/* ═══════════════════════════════════════════
+   SMOOTH PAGE TRANSITIONS (freeze CSS while switching views)
+═══════════════════════════════════════════ */
+body.page-transitioning *,
+body.page-transitioning *::before,
+body.page-transitioning *::after {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
 
-  const handleClearChats = useCallback(async () => {
-    await clearAllChats();
-    setCurrentConvId(null);
-  }, [clearAllChats]);
-
-  useEffect(() => {
-    if (!showApp) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key === 'n') { e.preventDefault(); handleNewChat(); }
-      if (mod && e.key === 'k') { e.preventDefault(); setSidebarOpen(true); window.dispatchEvent(new CustomEvent('focus-search')); }
-      if (e.key === 'Escape' && sidebarOpen) { setSidebarOpen(false); }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNewChat, sidebarOpen, setSidebarOpen, showApp]);
-
-  const topbarTitle = currentConvId
-    ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
-    : '';
-
-  if (showLoading) return <LoadingScreen visible />;
-
-  return (
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
-      {showApp && (
-        <>
-          <Sidebar
-            conversations={conversations}
-            currentConvId={currentConvId}
-            onNewChat={handleNewChat}
-            onSelectConv={id => { setCurrentConvId(id); navigateTo('chat'); }}
-            onOpenSettings={() => { navigateTo('settings'); setSidebarOpen(false); }}
-            onDeleteConv={handleDeleteConv}
-            dailyCount={dailyCount}
-            dailyLimit={DAILY_LIMIT}
-          />
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <Suspense fallback={<div style={{ flex:1 }} />}>
-              {view === 'chat' && (
-                <>
-                  <header style={{
-                    flexShrink: 0, display: 'flex', alignItems: 'center',
-                    justifyContent: 'space-between',
-                    height: 'calc(60px + var(--sat))',
-                    padding: 'calc(var(--sat) + 10px) 16px 10px',
-                    background: `linear-gradient(to bottom, var(--fade-top) 0%, var(--fade-top) 55%, transparent 100%)`,
-                    position: 'relative', zIndex: 10,
-                  }}>
-                    <CircleBtn onClick={() => setSidebarOpen(true)} className="menu-btn-mobile">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                        <line x1="3" y1="6" x2="21" y2="6"/>
-                        <line x1="3" y1="12" x2="21" y2="12"/>
-                        <line x1="3" y1="18" x2="21" y2="18"/>
-                      </svg>
-                    </CircleBtn>
-                    <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: '16px', fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 'calc(100% - 120px)' }}>{topbarTitle}</span>
-                    <CircleBtn onClick={handleNewChat} className="topbar-newchat">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19"/>
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                      </svg>
-                    </CircleBtn>
-                  </header>
-                  <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    <MessageList
-                      messages={messages}
-                      isTyping={isTyping}
-                      isSearching={isSearching}
-                      isStreaming={isStreaming}
-                      streamText={streamText}
-                      streamDone={streamDone}
-                      streamModel={streamModel}
-                      streamDisclaimer={streamDisclaimer}
-                      streamSources={streamSources}
-                      streamThinking={streamThinking}
-                      isThinking={isThinking}
-                      convId={currentConvId}
-                      chipsUsed={chipsUsed}
-                      onChipClick={handleSend}
-                      onRegen={handleRegen}
-                    />
-                    <div style={{
-                      position: 'absolute',
-                      bottom: isIOS ? kbOffset : 0,
-                      left: 0, right: 0, zIndex: 5,
-                      transition: isIOS ? 'bottom 0.15s ease-out' : 'none',
-                    }}>
-                      <InputArea onSend={handleSend} onStop={stopStreaming} isSending={isSending} isStreaming={isStreaming} dailyLimitReached={dailyLimitReached} />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {view === 'settings' && (
-                <SettingsView
-                  onBack={() => navigateTo('chat')}
-                  onOpenProfile={() => navigateTo('profile')}
-                  onOpenPersonalization={() => navigateTo('personalization')}
-                  onOpenAbout={() => navigateTo('about')}
-                  onClearChats={handleClearChats}
-                  conversations={conversations}
-                  onOpenReportBug={() => navigateTo('reportbug')}
-                />
-              )}
-              {view === 'profile' && <ProfileView onBack={() => navigateTo('settings')} getUserConvsRef={getUserConvsRef} />}
-              {view === 'personalization' && <PersonalizationView onBack={() => navigateTo('settings')} />}
-              {view === 'about' && <AboutView onBack={() => navigateTo('settings')} onOpenLicenses={() => navigateTo('licenses')} />}
-              {view === 'licenses' && <LicensesView onBack={() => navigateTo('about')} />}
-              {view === 'reportbug' && <ReportBugView onBack={() => navigateTo('settings')} />}
-            </Suspense>
-          </div>
-        </>
-      )}
-      <LoginModal visible={!currentUser} />
-      <VerificationModal visible={!!currentUser && !emailVerified} />
-    </div>
-  );
+body.page-transitioning .scroll-thin,
+body.page-transitioning aside,
+body.page-transitioning header,
+body.page-transitioning .modal-overlay,
+body.page-transitioning .login-overlay {
+  backdrop-filter: none !important;
+  box-shadow: none !important;
 }
