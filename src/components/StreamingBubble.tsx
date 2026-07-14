@@ -1,4 +1,6 @@
-// StreamingBubble.tsx — v1.5 — Incremental text update for WebView performance
+// StreamingBubble.tsx — v1.6 — Smooth throttled text updates (rAF-batched)
+// v1.5 — Incremental text update for WebView performance
+// v1.4 — Font size via CSS variable
 import React, { useEffect, useRef, useState } from 'react';
 import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
@@ -24,6 +26,8 @@ const StreamingBubble = React.memo(function StreamingBubble({
   const bodyRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLSpanElement | null>(null);
   const textNodeRef = useRef<Text | null>(null);
+  const pendingText = useRef<string>('');
+  const rafId = useRef<number>(0);
 
   const [thinkExpanded, setThinkExpanded] = useState(false);
   const thinkStartRef = useRef<number>(Date.now());
@@ -37,13 +41,14 @@ const StreamingBubble = React.memo(function StreamingBubble({
     }
   }, [isThinking, thinking]);
 
-  // ── Incremental text rendering ──────────────────────────────
+  // ── Smooth throttled text rendering ─────────────────────────
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
 
     if (done) {
-      // Final render: use full markdown + highlight
+      // Final render: full markdown + highlight
+      cancelAnimationFrame(rafId.current);
       el.innerHTML = renderMarkdown(text, '__streaming');
       highlightCodeBlocks(el, showToast);
       cursorRef.current = null;
@@ -52,22 +57,33 @@ const StreamingBubble = React.memo(function StreamingBubble({
     }
 
     if (text) {
-      // First time: set up the text node + cursor structure
-      if (!textNodeRef.current) {
-        el.textContent = ''; // clear whatever was there
-        const tn = document.createTextNode(text);
-        const cursor = document.createElement('span');
-        cursor.className = 'stream-cursor';
-        el.appendChild(tn);
-        el.appendChild(cursor);
-        textNodeRef.current = tn;
-        cursorRef.current = cursor;
-      } else {
-        // Subsequent updates: just change the text node's value
-        textNodeRef.current.nodeValue = text;
+      // Store the latest text and request an animation frame
+      pendingText.current = text;
+      if (!rafId.current) {
+        rafId.current = requestAnimationFrame(() => {
+          if (!bodyRef.current) return;
+
+          // Set up the text node + cursor on first frame
+          if (!textNodeRef.current) {
+            bodyRef.current.textContent = '';
+            const tn = document.createTextNode(pendingText.current);
+            const cursor = document.createElement('span');
+            cursor.className = 'stream-cursor';
+            bodyRef.current.appendChild(tn);
+            bodyRef.current.appendChild(cursor);
+            textNodeRef.current = tn;
+            cursorRef.current = cursor;
+          } else {
+            // Just update the text node with the latest value
+            textNodeRef.current.nodeValue = pendingText.current;
+          }
+          rafId.current = 0;
+        });
       }
     } else {
       // No text yet → clean up
+      cancelAnimationFrame(rafId.current);
+      rafId.current = 0;
       el.textContent = '';
       cursorRef.current = null;
       textNodeRef.current = null;
@@ -77,6 +93,7 @@ const StreamingBubble = React.memo(function StreamingBubble({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      cancelAnimationFrame(rafId.current);
       cursorRef.current = null;
       textNodeRef.current = null;
     };
