@@ -515,3 +515,24 @@ html.light .cite-bubble {
   background: rgba(0,0,0,0.08);
   color: var(--text-2);
 }
+
+/* ═══════════════════════════════════════════
+   STREAMING PERFORMANCE (native WebView)
+═══════════════════════════════════════════ */
+body.streaming-active *,
+body.streaming-active *::before,
+body.streaming-active *::after {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
+
+body.streaming-active .scroll-thin {
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* Skip rendering of messages far outside the viewport */
+.msg-body {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
