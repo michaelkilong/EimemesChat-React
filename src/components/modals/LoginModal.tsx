@@ -1,4 +1,4 @@
-// components/modals/LoginModal.tsx — v1.9 (custom verification code instead of Firebase link)
+// components/modals/LoginModal.tsx — v1.10 (fixed duplicate verification email)
 import React, { useState, useEffect } from 'react';
 import {
   signInWithPopup,
@@ -76,22 +76,6 @@ export default function LoginModal({ visible }: Props) {
         }),
       }).catch(() => {});
     } catch {}
-  };
-
-  // Sends our custom verification code via the new API
-  const sendVerificationCode = async (user: any) => {
-    try {
-      const token = await user.getIdToken();
-      await fetch('/api/send-verification-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-    } catch {
-      // silent – the user can request a new code from the verification modal
-    }
   };
 
   // Receives the ID token the wrapper got from native Google Sign‑In
@@ -183,10 +167,10 @@ export default function LoginModal({ visible }: Props) {
     setLoadingEmail(true);
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      // ✅ Custom verification code instead of Firebase link
-      await sendVerificationCode(result.user);
+      // ✅ The verification code will be sent automatically by the VerificationModal
+      // when it appears – no need to send it here (prevents duplicate).
       await sendWelcomeEmail(result.user);
-      showToast('Account created! Check your email for the verification code.');
+      showToast('Account created! A verification code has been sent to your email.');
     } catch (e: any) {
       setError(friendlyAuthError(e.code));
     } finally {
