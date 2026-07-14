@@ -1,6 +1,4 @@
-// components/modals/LoginModal.tsx — v1.8
-// v1.8 — Fixed isWebView() (UA spoof was defeating it); wired native Google Sign-In credential handoff
-// v1.7 — welcome email for both Google + email sign-up
+// components/modals/LoginModal.tsx — v1.9 (custom verification code instead of Firebase link)
 import React, { useState, useEffect } from 'react';
 import {
   signInWithPopup,
@@ -9,7 +7,6 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
-  sendEmailVerification,
   fetchSignInMethodsForEmail,
   getAdditionalUserInfo,
 } from 'firebase/auth';
@@ -81,7 +78,23 @@ export default function LoginModal({ visible }: Props) {
     } catch {}
   };
 
-  // ── Receives the ID token the wrapper got from native Google Sign-In ────
+  // Sends our custom verification code via the new API
+  const sendVerificationCode = async (user: any) => {
+    try {
+      const token = await user.getIdToken();
+      await fetch('/api/send-verification-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } catch {
+      // silent – the user can request a new code from the verification modal
+    }
+  };
+
+  // Receives the ID token the wrapper got from native Google Sign‑In
   useEffect(() => {
     window.__handleNativeGoogleAuth = async (idToken: string) => {
       try {
@@ -109,7 +122,7 @@ export default function LoginModal({ visible }: Props) {
       setError('');
       setLoadingGoogle(true);
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'NATIVE_GOOGLE_SIGNIN' }));
-      return; // loadingGoogle is cleared inside __handleNativeGoogleAuth once it resolves
+      return;
     }
 
     setLoadingGoogle(true);
@@ -170,9 +183,10 @@ export default function LoginModal({ visible }: Props) {
     setLoadingEmail(true);
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      await sendEmailVerification(result.user);
+      // ✅ Custom verification code instead of Firebase link
+      await sendVerificationCode(result.user);
       await sendWelcomeEmail(result.user);
-      showToast('Account created! Check your email to verify your address.');
+      showToast('Account created! Check your email for the verification code.');
     } catch (e: any) {
       setError(friendlyAuthError(e.code));
     } finally {
