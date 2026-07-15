@@ -1,4 +1,5 @@
-// components/ProfileView.tsx — v2.3 (refetch after edit)
+// components/ProfileView.tsx — v2.4 (instant UI update after edit)
+// v2.3 — refetch after edit
 import React, { useState, useEffect } from 'react';
 import { signOut } from 'firebase/auth';
 import { setDoc, doc, getDoc } from 'firebase/firestore';
@@ -65,17 +66,23 @@ export default function ProfileView({ onBack, getUserConvsRef }: Props) {
   const [customPhoto, setCustomPhoto] = useState<string | null>(null);
   const [customDisplayName, setCustomDisplayName] = useState<string | null>(null);
 
-  // Fetch custom profile data – also runs when returning from edit screen
+  // Fetch custom profile data from Firestore (fallback)
   useEffect(() => {
     if (!currentUser) return;
     getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
       if (snap.exists()) {
         const data = snap.data();
-        if (data.profilePhoto) setCustomPhoto(data.profilePhoto);
+        if (data.profilePhoto !== undefined) setCustomPhoto(data.profilePhoto);
         if (data.displayName) setCustomDisplayName(data.displayName);
       }
     });
-  }, [currentUser, editingProfile]);   // ← refetch when editingProfile changes
+  }, [currentUser]);
+
+  // Called instantly after save in EditProfileView
+  const handleProfileUpdated = (name: string, photo: string) => {
+    setCustomDisplayName(name);
+    setCustomPhoto(photo);
+  };
 
   const handleLogoutAll = async () => {
     if (!currentUser) return;
@@ -94,7 +101,12 @@ export default function ProfileView({ onBack, getUserConvsRef }: Props) {
   };
 
   if (editingProfile) {
-    return <EditProfileView onBack={() => setEditingProfile(false)} />;
+    return (
+      <EditProfileView
+        onBack={() => setEditingProfile(false)}
+        onSaved={handleProfileUpdated}
+      />
+    );
   }
 
   const displayName = customDisplayName || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User';
