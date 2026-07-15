@@ -1,7 +1,9 @@
-// InputArea.tsx — v2.15 — Clear daily-limit block (no input at all)
+// InputArea.tsx — v2.16 — Bottom sheet file upload (replaces direct file input trigger)
+// v2.15 — Clear daily-limit block (no input at all)
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
+import FileUploadSheet from './FileUploadSheet';
 import type { Attachment } from '../types';
 
 const ACCEPTED = '.pdf,.txt,.md,.csv,.docx,.jpg,.jpeg,.png,.gif,.webp,image/*';
@@ -21,6 +23,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const [processing, setProcessing] = useState(false);
   const [fileError,  setFileError]  = useState('');
   const [webSearch,  setWebSearch]  = useState(false);
+  const [showSheet,  setShowSheet]  = useState(false);   // <-- sheet visibility
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,12 +56,13 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleSend(); }
   };
 
-  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
+  // Shared file processing logic (used by both the old file input and the new sheet)
+  const processSelectedFile = useCallback(async (file: File) => {
     setFileError('');
-    if (file.size > MAX_SIZE) { setFileError('File too large (max 20MB)'); return; }
+    if (file.size > MAX_SIZE) {
+      setFileError('File too large (max 20MB)');
+      return;
+    }
     setProcessing(true);
     try {
       setAttachment(await processFile(file));
@@ -69,6 +73,23 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
       setProcessing(false);
     }
   }, []);
+
+  // Old direct file input handler (still available, but rarely used now)
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    await processSelectedFile(file);
+  }, [processSelectedFile]);
+
+  // Sheet callbacks
+  const handleSheetImage = useCallback((file: File) => {
+    processSelectedFile(file);
+  }, [processSelectedFile]);
+
+  const handleSheetFile = useCallback((file: File) => {
+    processSelectedFile(file);
+  }, [processSelectedFile]);
 
   const busy = isSending || isStreaming;
 
@@ -148,7 +169,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           minHeight: '100px',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',   // center the warning vertically
+          justifyContent: 'center',
         }}>
 
           {dailyLimitReached ? (
@@ -157,7 +178,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
               padding: '8px 0',
             }}>
-              {/* small clock icon or exclamation */}
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="12" y1="8" x2="12" y2="12"/>
@@ -178,7 +198,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
             </div>
           ) : (
             <>
-              {/* Textarea — visible only when limit not reached */}
+              {/* Textarea */}
               <textarea
                 ref={textareaRef}
                 value={value}
@@ -204,7 +224,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                 }}
               />
 
-              {/* Dedicated spacer */}
+              {/* Spacer */}
               <div style={{ flex: 1 }} />
 
               {/* ── Toolbar row ── */}
@@ -262,8 +282,9 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
 
                 {/* Right: attach + send/stop */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Attach button now opens sheet */}
                   <button
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => { haptic.light(); setShowSheet(true); }}
                     disabled={busy || processing}
                     title="Attach file"
                     style={{
@@ -352,7 +373,16 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           }
         </div>
 
+        {/* Hidden file input (kept for possible edge cases, not used for sheet) */}
         <input ref={fileInputRef} type="file" accept={ACCEPTED} onChange={handleFileChange} style={{ display: 'none' }} />
+
+        {/* ── Bottom Sheet for upload ── */}
+        <FileUploadSheet
+          visible={showSheet}
+          onClose={() => setShowSheet(false)}
+          onSelectImage={handleSheetImage}
+          onSelectFile={handleSheetFile}
+        />
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes progress-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }`}</style>
