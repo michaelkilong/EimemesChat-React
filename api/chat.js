@@ -1,5 +1,5 @@
 // api/chat.js
-// v5.19 — OpenRouter fallback (qwen3.6-plus-preview) with timeout & stable fallback model
+// v5.19 — OpenRouter fallback (gemma-2-2b-it:free) with timeout & stable fallback model
 // v5.18 — Memory extraction now awaited (before res.end) to keep Vercel alive
 // v5.17 — Memory extraction now uses Hugging Face free tier (flan-t5-large)
 // v5.14 — Moved all prompt strings to prompts/apiPrompts.js; code‑only file
@@ -56,10 +56,10 @@ const GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-// ── OpenRouter model (free Nemotron 120B) ──
-const OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+// ── OpenRouter model (efficient & fast free model) ──
+const OPENROUTER_MODEL = "google/gemma-2-2b-it:free";
 const OPENROUTER_FALLBACK_MODEL = null;    // no secondary fallback needed
-const OPENROUTER_TIMEOUT = 30000;          // 30s for a large model
+const OPENROUTER_TIMEOUT = 15000;          // 15s is plenty for a 2B model
 
 /* ── Memory extraction model (Hugging Face free tier) ─────────── */
 const HF_MEMORY_MODEL = "google/flan-t5-large";
@@ -805,7 +805,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // Simplified OpenRouter fallback — only uses the primary (free) Nemotron model
+  // Simplified OpenRouter fallback — uses efficient free Gemma 2B model
   if ((!result || !result.success) && OPENROUTER_API_KEY) {
     console.log(`[chat] Falling back to OpenRouter (${OPENROUTER_MODEL})`);
     try {
