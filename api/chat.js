@@ -57,7 +57,7 @@ const GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 // ── OpenRouter model (efficient & fast free model) ──
-const OPENROUTER_MODEL = "google/gemma-2-2b-it:free";
+const OPENROUTER_MODEL = "google/gemma-2b-it:free";
 const OPENROUTER_FALLBACK_MODEL = null;    // no secondary fallback needed
 const OPENROUTER_TIMEOUT = 15000;          // 15s is plenty for a 2B model
 
