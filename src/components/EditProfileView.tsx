@@ -1,4 +1,5 @@
-// components/EditProfileView.tsx — v2.6 (instant compression + consistent border style)
+// components/EditProfileView.tsx — v2.7 (callback to update parent instantly)
+// v2.6 — instant compression + consistent border style
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useProfile } from '../hooks/useProfile';
@@ -34,9 +35,10 @@ function compressImage(dataUrl: string): Promise<string> {
 
 interface Props {
   onBack: () => void;
+  onSaved?: (name: string, photo: string) => void;   // NEW: tell parent about the update
 }
 
-export default function EditProfileView({ onBack }: Props) {
+export default function EditProfileView({ onBack, onSaved }: Props) {
   const { currentUser, showToast } = useApp();
   const { saving, saveProfile } = useProfile();
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
@@ -70,6 +72,8 @@ export default function EditProfileView({ onBack }: Props) {
       displayName: displayName.trim(),
       photoURL: photoDataUrl,
     });
+    // Instantly update the parent view
+    onSaved?.(displayName.trim(), photoDataUrl);
     showToast('Profile saved!');
     onBack();
   };
