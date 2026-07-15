@@ -1,4 +1,5 @@
 // api/chat.js
+// v5.19 — OpenRouter fallback (qwen3.6-plus-preview) with timeout & stable fallback model
 // v5.18 — Memory extraction now awaited (before res.end) to keep Vercel alive
 // v5.17 — Memory extraction now uses Hugging Face free tier (flan-t5-large)
 // v5.14 — Moved all prompt strings to prompts/apiPrompts.js; code‑only file
@@ -52,6 +53,11 @@ const GEMINI_GEN_URL    = `https://generativelanguage.googleapis.com/v1beta/mode
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions";
+
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODEL = "qwen/qwen3.6-plus-preview";
+const OPENROUTER_FALLBACK_MODEL = "qwen/qwen3-coder:free";
+const OPENROUTER_TIMEOUT = 15000; // separate timeout for OpenRouter primary
 
 /* ── Memory extraction model (Hugging Face free tier) ─────────── */
 const HF_MEMORY_MODEL = "google/flan-t5-large";
@@ -481,8 +487,83 @@ async function streamGroq({ apiKey, messages, maxTokens, res, scanner }) {
   return { success: true, leaked, fullText, thinkingText: '', model: GROQ_MODEL };
 }
 
+/* ── Stream OpenRouter (OpenAI compatible) ─────────────────────── */
+async function streamOpenRouter({ apiKey, model, messages, maxTokens, timeout, res, scanner }) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+
+  const apiRes = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: maxTokens,
+      temperature: 0.72,
+      stream: true,
+    }),
+    signal: controller.signal,
+  });
+
+  clearTimeout(timer);
+
+  if (!apiRes.ok) {
+    const errText = await apiRes.text();
+    console.error(`[OpenRouter:${model}] HTTP ${apiRes.status}: ${errText.slice(0, 200)}`);
+    return { success: false, status: apiRes.status };
+  }
+
+  console.log(`✅ Streaming: OpenRouter/${model}`);
+
+  const reader  = apiRes.body.getReader();
+  const decoder = new TextDecoder();
+  let buf      = "";
+  let fullText = "";
+  let leaked   = false;
+
+  streamLoop:
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop();
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (raw === "[DONE]") break streamLoop;
+
+      try {
+        const parsed = JSON.parse(raw);
+        const token  = parsed.choices?.[0]?.delta?.content || "";
+        if (!token) continue;
+
+        const leakGram = scanner.checkChunk(token);
+        if (leakGram) {
+          leaked = true;
+          let safeReply = getBlockMessage("system_leak");
+          if (!safeReply) safeReply = "I can't respond to that request.";
+          sseEvent(res, { outputBlocked: true, safeReply });
+          sseEvent(res, { done: true, model, reply: safeReply });
+          res.end(); break streamLoop;
+        }
+
+        fullText += token;
+        sseEvent(res, { token });
+      } catch { /* malformed chunk */ }
+    }
+  }
+
+  return { success: true, leaked, fullText, thinkingText: '', model };
+}
+
 /* ── Title generation ─────────────────────────────────────────── */
-async function generateTitle({ geminiApiKey, groqApiKey, safeMessage, fullText, res }) {
+async function generateTitle({ geminiApiKey, groqApiKey, openRouterApiKey, safeMessage, fullText, res }) {
   const prompt = buildTitlePrompt(safeMessage, fullText);
 
   try {
@@ -507,6 +588,29 @@ async function generateTitle({ geminiApiKey, groqApiKey, safeMessage, fullText, 
         headers: { Authorization: `Bearer ${groqApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: GROQ_MODEL, max_tokens: 16, temperature: 0.4,
+          messages: [
+            { role: "system", content: "Generate an ultra-short chat title. Output ONLY the title, 2-5 words, no punctuation, no quotes." },
+            { role: "user",   content: prompt },
+          ],
+        }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const t = d.choices?.[0]?.message?.content?.trim().slice(0, 60);
+        if (t) sseEvent(res, { title: t });
+      }
+    }
+    if (openRouterApiKey) {
+      const r = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${openRouterApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: OPENROUTER_MODEL,
+          max_tokens: 16,
+          temperature: 0.4,
           messages: [
             { role: "system", content: "Generate an ultra-short chat title. Output ONLY the title, 2-5 words, no punctuation, no quotes." },
             { role: "user",   content: prompt },
@@ -550,7 +654,8 @@ export default async function handler(req, res) {
 
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
   const GROQ_API_KEY   = process.env.GROQ_API_KEY;
-  if (!GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: "No AI API key configured." });
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+  if (!GEMINI_API_KEY && !GROQ_API_KEY && !OPENROUTER_API_KEY) return res.status(500).json({ error: "No AI API key configured." });
 
   const { message, history, isFirstMessage, attachment, useWebSearch, useThinking, isRegeneration } = req.body;
   if (!message && !attachment) return res.status(400).json({ error: "Message or attachment required" });
@@ -664,7 +769,7 @@ export default async function handler(req, res) {
 
   const scanner = createStreamScanner(PROMPT_FINGERPRINT);
 
-  /* ── Try Gemini native, fall back to Groq ─────────────────────── */
+  /* ── Try Gemini native, fall back to Groq, then OpenRouter ───── */
   let result = null;
 
   if (GEMINI_API_KEY) {
@@ -698,6 +803,40 @@ export default async function handler(req, res) {
     }
   }
 
+  if ((!result || !result.success) && OPENROUTER_API_KEY) {
+    console.log(`[chat] Falling back to OpenRouter`);
+    try {
+      const openRouterScanner = createStreamScanner(PROMPT_FINGERPRINT);
+      // Try primary model with shorter timeout, if it fails use fallback model
+      result = await streamOpenRouter({
+        apiKey: OPENROUTER_API_KEY,
+        model: OPENROUTER_MODEL,
+        messages: openaiMessages,
+        maxTokens,
+        timeout: OPENROUTER_TIMEOUT,
+        res,
+        scanner: openRouterScanner,
+      });
+      if (!result.success) {
+        // Ultimate fallback
+        console.log(`[chat] OpenRouter primary failed, trying fallback model`);
+        const finalScanner = createStreamScanner(PROMPT_FINGERPRINT);
+        result = await streamOpenRouter({
+          apiKey: OPENROUTER_API_KEY,
+          model: OPENROUTER_FALLBACK_MODEL,
+          messages: openaiMessages,
+          maxTokens,
+          timeout: MODEL_TIMEOUT_MS,
+          res,
+          scanner: finalScanner,
+        });
+      }
+    } catch (err) {
+      console.error(`[OpenRouter] Error:`, err.message);
+      result = { success: false };
+    }
+  }
+
   if (!result || !result.success) {
     sseEvent(res, { error: "EimemesChat is currently unavailable. Please try again shortly." });
     res.end(); return;
@@ -717,7 +856,14 @@ export default async function handler(req, res) {
   });
 
   if (isFirstMessage && result.fullText) {
-    await generateTitle({ geminiApiKey: GEMINI_API_KEY, groqApiKey: GROQ_API_KEY, safeMessage, fullText: result.fullText, res });
+    await generateTitle({
+      geminiApiKey: GEMINI_API_KEY,
+      groqApiKey: GROQ_API_KEY,
+      openRouterApiKey: OPENROUTER_API_KEY,
+      safeMessage,
+      fullText: result.fullText,
+      res,
+    });
   }
 
   /* ── Memory extraction (awaited, so Vercel keeps function alive) ── */
