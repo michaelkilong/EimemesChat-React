@@ -1,7 +1,15 @@
+// SignOutModal.tsx
+// v1.1 — Also clears native Google session in wrapper (fixes account picker auto-reusing last login)
 import React, { useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { useApp } from '../../context/AppContext';
+
+declare global {
+  interface Window {
+    ReactNativeWebView?: { postMessage: (msg: string) => void };
+  }
+}
 
 interface Props { visible: boolean; onClose: () => void; }
 
@@ -12,6 +20,13 @@ export default function SignOutModal({ visible, onClose }: Props) {
   const handleSignOut = () => {
     setLoading(true);
     showToast('Signing you out…');
+
+    // Clear the native Google session too, so the account picker
+    // shows fresh next time instead of silently reusing this login.
+    if (typeof window !== 'undefined' && window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'NATIVE_GOOGLE_SIGNOUT' }));
+    }
+
     setTimeout(() => {
       signOut(auth)
         .catch(console.error)
