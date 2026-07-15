@@ -55,9 +55,11 @@ const GROQ_MODEL = "llama-3.3-70b-versatile";
 const GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_MODEL = "qwen/qwen3.6-plus-preview";
-const OPENROUTER_FALLBACK_MODEL = "qwen/qwen3-coder:free";
-const OPENROUTER_TIMEOUT = 15000; // separate timeout for OpenRouter primary
+
+// ── OpenRouter model (free Nemotron 120B) ──
+const OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+const OPENROUTER_FALLBACK_MODEL = null;    // no secondary fallback needed
+const OPENROUTER_TIMEOUT = 30000;          // 30s for a large model
 
 /* ── Memory extraction model (Hugging Face free tier) ─────────── */
 const HF_MEMORY_MODEL = "google/flan-t5-large";
@@ -803,11 +805,11 @@ export default async function handler(req, res) {
     }
   }
 
+  // Simplified OpenRouter fallback — only uses the primary (free) Nemotron model
   if ((!result || !result.success) && OPENROUTER_API_KEY) {
-    console.log(`[chat] Falling back to OpenRouter`);
+    console.log(`[chat] Falling back to OpenRouter (${OPENROUTER_MODEL})`);
     try {
       const openRouterScanner = createStreamScanner(PROMPT_FINGERPRINT);
-      // Try primary model with shorter timeout, if it fails use fallback model
       result = await streamOpenRouter({
         apiKey: OPENROUTER_API_KEY,
         model: OPENROUTER_MODEL,
@@ -817,20 +819,6 @@ export default async function handler(req, res) {
         res,
         scanner: openRouterScanner,
       });
-      if (!result.success) {
-        // Ultimate fallback
-        console.log(`[chat] OpenRouter primary failed, trying fallback model`);
-        const finalScanner = createStreamScanner(PROMPT_FINGERPRINT);
-        result = await streamOpenRouter({
-          apiKey: OPENROUTER_API_KEY,
-          model: OPENROUTER_FALLBACK_MODEL,
-          messages: openaiMessages,
-          maxTokens,
-          timeout: MODEL_TIMEOUT_MS,
-          res,
-          scanner: finalScanner,
-        });
-      }
     } catch (err) {
       console.error(`[OpenRouter] Error:`, err.message);
       result = { success: false };
