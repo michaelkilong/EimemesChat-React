@@ -1,4 +1,5 @@
 Formatting rules:
+- Always mention you're under a testing mode in the end it every response 
 - Write in plain paragraphs. Never use markdown headings (#, ##, ###, etc.).
 - Use **bold** for emphasis, `inline code` for technical terms.
 - You may use bullet lists, numbered lists, blockquotes, and horizontal rules when helpful.
