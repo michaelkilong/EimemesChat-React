@@ -1,4 +1,4 @@
-// PersonalizationView.tsx — v1.1 — WebView input reliability fix
+// PersonalizationView.tsx — v1.2 — Robust Firestore save with error logging & fallback
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -40,12 +40,10 @@ export default function PersonalizationView({ onBack }: Props) {
   const [saving,             setSaving]             = useState(false);
   const [loaded,             setLoaded]             = useState(false);
 
-  // Refs for fallback value reading (WebView reliability)
   const nicknameRef = useRef<HTMLInputElement>(null);
   const occupationRef = useRef<HTMLInputElement>(null);
   const customRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load saved preferences
   useEffect(() => {
     if (!currentUser) return;
     getDoc(doc(db, 'users', currentUser.uid))
@@ -59,33 +57,81 @@ export default function PersonalizationView({ onBack }: Props) {
         }
         setLoaded(true);
       })
-      .catch(() => setLoaded(true));
+      .catch(err => {
+        console.error('Failed to load preferences:', err);
+        setLoaded(true);
+      });
   }, [currentUser]);
 
   const handleSave = async () => {
     if (!currentUser || saving) return;
 
-    // Use ref values as fallback in case state didn't update (WebView quirk)
+    // 1. Quick network check
+    if (!navigator.onLine) {
+      showToast('No internet connection');
+      return;
+    }
+
     const finalNickname = nicknameRef.current?.value ?? nickname;
     const finalOccupation = occupationRef.current?.value ?? occupation;
     const finalCustom = customRef.current?.value ?? customInstructions;
 
+    const payload = {
+      preferences: {
+        tone,
+        nickname: finalNickname,
+        occupation: finalOccupation,
+        customInstructions: finalCustom,
+      },
+    };
+
     setSaving(true);
+
     try {
-      await setDoc(
-        doc(db, 'users', currentUser.uid),
-        { preferences: { tone, nickname: finalNickname, occupation: finalOccupation, customInstructions: finalCustom } },
-        { merge: true }
-      );
+      // 2. Attempt Firestore save with a timeout
+      await Promise.race([
+        setDoc(doc(db, 'users', currentUser.uid), payload, { merge: true }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore save timed out')), 8000)),
+      ]);
+
       haptic.success();
       showToast('Preferences saved');
       onBack();
-    } catch {
-      showToast('Failed to save. Try again.');
+    } catch (err: any) {
+      // 3. Log the real error for debugging
+      console.error('Firestore save failed:', err?.message || err);
+
+      // 4. Show user the error detail (first 40 chars)
+      const msg = err?.message || err?.toString() || 'Unknown error';
+      showToast(`Save failed: ${msg.slice(0, 40)}`);
+
+      // 5. Fallback: save to localStorage so data isn't lost
+      try {
+        localStorage.setItem('ec_pending_prefs', JSON.stringify(payload.preferences));
+        console.log('Saved preferences to localStorage fallback');
+      } catch (localErr) {
+        console.error('localStorage fallback also failed:', localErr);
+      }
     } finally {
       setSaving(false);
     }
   };
+
+  // (Optional) On mount, check if there are pending prefs to resend
+  useEffect(() => {
+    if (!currentUser || !navigator.onLine) return;
+    const pending = localStorage.getItem('ec_pending_prefs');
+    if (!pending) return;
+    try {
+      const prefs = JSON.parse(pending);
+      setDoc(doc(db, 'users', currentUser.uid), { preferences: prefs }, { merge: true })
+        .then(() => {
+          localStorage.removeItem('ec_pending_prefs');
+          console.log('Successfully synced pending preferences');
+        })
+        .catch(() => {});
+    } catch {}
+  }, [currentUser]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
