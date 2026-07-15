@@ -1,4 +1,6 @@
 // App.tsx
+// v2.19 — Clear messages instantly on conversation change (prevents lingering old responses)
+// v2.18 — Swipe‑from‑left edge to open sidebar
 // v2.17 — Skeleton fallback for page transitions (PageSkeleton)
 // v2.16 — Local View type ensures navigateTo is type-safe
 // v2.15 — Fixed: navigateTo parameter typed as View to satisfy setView
@@ -25,12 +27,12 @@ import LoadingScreen         from './components/LoadingScreen';
 import Sidebar               from './components/Sidebar';
 import MessageList           from './components/MessageList';
 import InputArea             from './components/InputArea';
-import PageSkeleton          from './components/PageSkeleton';   // ← skeleton fallback
+import PageSkeleton          from './components/PageSkeleton';
 import LoginModal            from './components/modals/LoginModal';
 import VerificationModal     from './components/modals/VerificationModal';
 import type { Attachment }   from './types';
 
-// Lazy‑loaded views – only loaded when needed
+// Lazy‑loaded views
 const SettingsView          = lazy(() => import('./components/SettingsView'));
 const ProfileView           = lazy(() => import('./components/ProfileView'));
 const PersonalizationView   = lazy(() => import('./components/PersonalizationView'));
@@ -38,7 +40,6 @@ const AboutView             = lazy(() => import('./components/AboutView'));
 const LicensesView          = lazy(() => import('./components/LicensesView'));
 const ReportBugView         = lazy(() => import('./components/ReportBugView'));
 
-// Local View type – exactly the strings used in the app
 type View = 'chat' | 'settings' | 'profile' | 'personalization' | 'about' | 'licenses' | 'reportbug';
 
 const DAILY_LIMIT = 100;
@@ -135,7 +136,13 @@ export default function App() {
     incrementDailyCount,
   );
 
-  // ── Navigation helper (typed correctly with local View) ──
+  // ── Clear messages & stop streaming when conversation changes ──
+  useEffect(() => {
+    setMessages([]);
+    stopStreaming(); // abort any active AI response
+  }, [currentConvId, setMessages, stopStreaming]);
+
+  // ── Navigation helper ──
   const navigateTo = useCallback((newView: View) => {
     document.body.classList.add('page-transitioning');
     setView(newView);
@@ -226,6 +233,37 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleNewChat, sidebarOpen, setSidebarOpen, showApp]);
 
+  // ── Swipe‑from‑left gesture (open sidebar) ──
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const touchTracking = useRef(false);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartX.current = touch.clientX;
+    touchStartY.current = touch.clientY;
+    touchTracking.current = touch.clientX <= 20 && !sidebarOpen;
+  }, [sidebarOpen]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchTracking.current) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartX.current;
+    const dy = touch.clientY - touchStartY.current;
+    if (Math.abs(dy) > 30) {
+      touchTracking.current = false;
+      return;
+    }
+    if (dx > 50) {
+      touchTracking.current = false;
+      setSidebarOpen(true);
+    }
+  }, [setSidebarOpen]);
+
+  const handleTouchEnd = useCallback(() => {
+    touchTracking.current = false;
+  }, []);
+
   const topbarTitle = currentConvId
     ? (convTitle || conversations.find(c => c.id === currentConvId)?.title || 'EimemesChat')
     : '';
@@ -246,8 +284,12 @@ export default function App() {
             dailyCount={dailyCount}
             dailyLimit={DAILY_LIMIT}
           />
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* ── Shimmer skeleton appears instantly while the lazy page loads ── */}
+          <div
+            style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             <Suspense fallback={<PageSkeleton />}>
               {view === 'chat' && (
                 <>
