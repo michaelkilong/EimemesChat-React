@@ -1,4 +1,5 @@
-// MessageBubble.tsx — v1.7 — Original icons with rounded joins/caps + fixed regenerate arrow
+// MessageBubble.tsx — v1.8 — Native TTS via wrapper postMessage bridge (falls back to speechSynthesis in real browsers)
+// v1.7 — Original icons with rounded joins/caps + fixed regenerate arrow
 import React, { useEffect, useRef, useState } from 'react';
 import { renderMarkdown, highlightCodeBlocks } from '../lib/markdown';
 import { useApp } from '../context/AppContext';
@@ -7,6 +8,31 @@ import { haptic } from '../lib/haptic';
 import Disclaimer from './Disclaimer';
 import SourcesList from './SourcesList';
 import type { Message } from '../types';
+
+declare global {
+  interface Window {
+    ReactNativeWebView?: { postMessage: (msg: string) => void };
+    __handleNativeTTSFinished?: () => void;
+  }
+}
+
+function isNativeWrapper(): boolean {
+  return typeof window !== 'undefined' && !!window.ReactNativeWebView;
+}
+
+// Module-level — evaluated once regardless of how many MessageBubble
+// instances mount, since only one utterance (native or Web Speech) can
+// ever be playing at a time.
+let activeSpeakingStopper: (() => void) | null = null;
+
+if (typeof window !== 'undefined') {
+  window.__handleNativeTTSFinished = () => {
+    if (activeSpeakingStopper) {
+      activeSpeakingStopper();
+      activeSpeakingStopper = null;
+    }
+  };
+}
 
 interface Props {
   message: Message;
@@ -88,6 +114,27 @@ const MessageBubble = React.memo(function MessageBubble({ message, isLast, lastU
   }, []);
 
   const handleSpeak = () => {
+    // ── Native wrapper: route through expo-speech via postMessage ──
+    if (isNativeWrapper()) {
+      if (speaking) {
+        window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'NATIVE_TTS_STOP' }));
+        setSpeaking(false);
+        activeSpeakingStopper = null;
+        return;
+      }
+
+      // Stop whichever other bubble might currently be speaking
+      activeSpeakingStopper?.();
+
+      haptic.light();
+      const clean = stripForSpeech(message.content);
+      activeSpeakingStopper = () => setSpeaking(false);
+      window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'NATIVE_TTS_SPEAK', text: clean }));
+      setSpeaking(true);
+      return;
+    }
+
+    // ── Real browser: unchanged Web Speech API path ──
     if (!window.speechSynthesis) { showToast('Voice not supported on this browser'); return; }
 
     if (speaking) {
