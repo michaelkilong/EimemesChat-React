@@ -1,9 +1,9 @@
-// InputArea.tsx — v2.16 — Bottom sheet file upload (replaces direct file input trigger)
+// InputArea.tsx — v2.17 — Reverted to direct file input (removed bottom sheet)
+// v2.16 — Bottom sheet file upload (replaced direct file input trigger)
 // v2.15 — Clear daily-limit block (no input at all)
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
-import FileUploadSheet from './FileUploadSheet';
 import type { Attachment } from '../types';
 
 const ACCEPTED = '.pdf,.txt,.md,.csv,.docx,.jpg,.jpeg,.png,.gif,.webp,image/*';
@@ -23,7 +23,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const [processing, setProcessing] = useState(false);
   const [fileError,  setFileError]  = useState('');
   const [webSearch,  setWebSearch]  = useState(false);
-  const [showSheet,  setShowSheet]  = useState(false);   // <-- sheet visibility
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,13 +55,12 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleSend(); }
   };
 
-  // Shared file processing logic (used by both the old file input and the new sheet)
-  const processSelectedFile = useCallback(async (file: File) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
     setFileError('');
-    if (file.size > MAX_SIZE) {
-      setFileError('File too large (max 20MB)');
-      return;
-    }
+    if (file.size > MAX_SIZE) { setFileError('File too large (max 20MB)'); return; }
     setProcessing(true);
     try {
       setAttachment(await processFile(file));
@@ -73,23 +71,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
       setProcessing(false);
     }
   }, []);
-
-  // Old direct file input handler (still available, but rarely used now)
-  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    await processSelectedFile(file);
-  }, [processSelectedFile]);
-
-  // Sheet callbacks
-  const handleSheetImage = useCallback((file: File) => {
-    processSelectedFile(file);
-  }, [processSelectedFile]);
-
-  const handleSheetFile = useCallback((file: File) => {
-    processSelectedFile(file);
-  }, [processSelectedFile]);
 
   const busy = isSending || isStreaming;
 
@@ -173,7 +154,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
         }}>
 
           {dailyLimitReached ? (
-            /* ── Daily limit reached message ── */
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
               padding: '8px 0',
@@ -198,7 +178,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
             </div>
           ) : (
             <>
-              {/* Textarea */}
               <textarea
                 ref={textareaRef}
                 value={value}
@@ -224,13 +203,9 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                 }}
               />
 
-              {/* Spacer */}
               <div style={{ flex: 1 }} />
 
-              {/* ── Toolbar row ── */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-
-                {/* Left: web search pill */}
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <button
                     onClick={() => { haptic.light(); setWebSearch(w => !w); }}
@@ -280,11 +255,10 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                   </button>
                 </div>
 
-                {/* Right: attach + send/stop */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {/* Attach button now opens sheet */}
+                  {/* Direct file input trigger */}
                   <button
-                    onClick={() => { haptic.light(); setShowSheet(true); }}
+                    onClick={() => fileInputRef.current?.click()}
                     disabled={busy || processing}
                     title="Attach file"
                     style={{
@@ -365,7 +339,6 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           )}
         </div>
 
-        {/* ── Footer ── */}
         <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-3)', marginTop: '7px', pointerEvents: 'none' }}>
           {dailyLimitReached
             ? <span style={{ color: '#ff6b6b', fontWeight: 500 }}>Your daily quota has been used. Resets tomorrow.</span>
@@ -373,16 +346,7 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
           }
         </div>
 
-        {/* Hidden file input (kept for possible edge cases, not used for sheet) */}
         <input ref={fileInputRef} type="file" accept={ACCEPTED} onChange={handleFileChange} style={{ display: 'none' }} />
-
-        {/* ── Bottom Sheet for upload ── */}
-        <FileUploadSheet
-          visible={showSheet}
-          onClose={() => setShowSheet(false)}
-          onSelectImage={handleSheetImage}
-          onSelectFile={handleSheetFile}
-        />
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes progress-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }`}</style>
