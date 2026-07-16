@@ -1,4 +1,8 @@
-// components/modals/LoginModal.tsx — v1.10 (fixed duplicate verification email)
+// components/modals/LoginModal.tsx — v1.11 (custom forgot password, no Firebase reset link)
+// v1.10 — Fixed duplicate verification email
+// v1.9  — Custom verification code instead of Firebase link
+// v1.8  — Fixed isWebView(); native Google Sign‑In credential handoff
+// v1.7  — Welcome email for both Google + email sign‑up
 import React, { useState, useEffect } from 'react';
 import {
   signInWithPopup,
@@ -6,7 +10,6 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
   fetchSignInMethodsForEmail,
   getAdditionalUserInfo,
 } from 'firebase/auth';
@@ -56,6 +59,7 @@ export default function LoginModal({ visible }: Props) {
   const [error,         setError]         = useState('');
   const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [loadingEmail,  setLoadingEmail]  = useState(false);
+  const [forgotSent,    setForgotSent]    = useState(false);
 
   const disabled = !agreed;
   const anyLoading = loadingGoogle || loadingEmail;
@@ -183,12 +187,19 @@ export default function LoginModal({ visible }: Props) {
       setError('Please enter your email address first.');
       return;
     }
+    setError('');
+    setLoadingEmail(true);
     try {
-      await sendPasswordResetEmail(auth, email.trim());
-      showToast('Password reset link sent! Check your inbox.');
-      setError('');
-    } catch (e: any) {
-      setError(friendlyAuthError(e.code));
+      await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+    } catch {
+      // fail silently – we don't reveal whether the email exists
+    } finally {
+      setLoadingEmail(false);
+      setForgotSent(true);
     }
   };
 
@@ -246,116 +257,135 @@ export default function LoginModal({ visible }: Props) {
 
         <input style={inputStyle} type="email" placeholder="Email" value={email} onChange={e => { setEmail(e.target.value); setError(''); }} />
 
-        <div style={{ position: 'relative' }}>
-          <input
-            style={inputStyle}
-            type={showPassword ? 'text' : 'password'}
-            placeholder="Password"
-            value={password}
-            onChange={e => { setPassword(e.target.value); setError(''); }}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(p => !p)}
-            style={{
-              position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-              background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer',
-              padding: '6px', display: 'flex',
-            }}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-          >
-            {showPassword ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                <path d="m14.12 14.12a3 3 0 1 1-4.24-4.24"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-            )}
-          </button>
-        </div>
-
-        {isSignUp && password && (
-          <div style={{ marginBottom: '8px', padding: '0 4px' }}>
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-              {[1, 2, 3, 4].map(i => (
-                <div
-                  key={i}
-                  style={{
-                    flex: 1, height: '3px', borderRadius: '999px',
-                    background: i <= strength.score ? strength.color : 'var(--border)',
-                    transition: 'background 0.2s',
-                  }}
-                />
-              ))}
-            </div>
-            <span style={{ fontSize: '12px', color: strength.color, fontWeight: 500 }}>
-              {strength.label}
-            </span>
-          </div>
-        )}
-
-        {!isSignUp && (
-          <div style={{ textAlign: 'right', marginBottom: '8px' }}>
-            <span
-              onClick={handleForgotPassword}
-              style={{ color: linkBlue, cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}
+        {!isSignUp && forgotSent ? (
+          <div style={{ marginBottom: '16px', textAlign: 'center', color: 'var(--text-2)', fontSize: '14px' }}>
+            <p style={{ margin: 0 }}>If an account exists for <strong>{email}</strong>, a password‑reset link has been sent.</p>
+            <p style={{ margin: '8px 0 0' }}>Please check your inbox (and spam folder).</p>
+            <button
+              onClick={() => { setForgotSent(false); setError(''); }}
+              style={{ marginTop: '12px', background: 'none', border: 'none', color: linkBlue, cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}
             >
-              Forgot password?
-            </span>
+              ← Back to sign in
+            </button>
           </div>
-        )}
-
-        {isSignUp ? (
-          <button
-            style={btnPrimary}
-            disabled={disabled || anyLoading}
-            onClick={handleSignup}
-            onMouseEnter={e => { if (!disabled && !anyLoading) e.currentTarget.style.filter = 'brightness(1.15)'; }}
-            onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
-          >
-            {loadingEmail ? spinner : 'Create Account'}
-          </button>
         ) : (
-          <button
-            style={btnPrimary}
-            disabled={disabled || anyLoading}
-            onClick={handleEmail}
-            onMouseEnter={e => { if (!disabled && !anyLoading) e.currentTarget.style.filter = 'brightness(1.15)'; }}
-            onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
-          >
-            {loadingEmail ? spinner : 'Sign In'}
-          </button>
+          <>
+            <div style={{ position: 'relative' }}>
+              <input
+                style={inputStyle}
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setError(''); }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(p => !p)}
+                style={{
+                  position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer',
+                  padding: '6px', display: 'flex',
+                }}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <path d="m14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
+            </div>
+
+            {isSignUp && password && (
+              <div style={{ marginBottom: '8px', padding: '0 4px' }}>
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                  {[1, 2, 3, 4].map(i => (
+                    <div
+                      key={i}
+                      style={{
+                        flex: 1, height: '3px', borderRadius: '999px',
+                        background: i <= strength.score ? strength.color : 'var(--border)',
+                        transition: 'background 0.2s',
+                      }}
+                    />
+                  ))}
+                </div>
+                <span style={{ fontSize: '12px', color: strength.color, fontWeight: 500 }}>
+                  {strength.label}
+                </span>
+              </div>
+            )}
+
+            {!isSignUp && (
+              <div style={{ textAlign: 'right', marginBottom: '8px' }}>
+                <span
+                  onClick={handleForgotPassword}
+                  style={{ color: linkBlue, cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}
+                >
+                  Forgot password?
+                </span>
+              </div>
+            )}
+          </>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '12px 0', color: 'var(--text-3)', fontSize: '14px' }}>
-          <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
-          or
-          <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
-        </div>
+        {!forgotSent && (
+          <>
+            {isSignUp ? (
+              <button
+                style={btnPrimary}
+                disabled={disabled || anyLoading}
+                onClick={handleSignup}
+                onMouseEnter={e => { if (!disabled && !anyLoading) e.currentTarget.style.filter = 'brightness(1.15)'; }}
+                onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
+              >
+                {loadingEmail ? spinner : 'Create Account'}
+              </button>
+            ) : (
+              <button
+                style={btnPrimary}
+                disabled={disabled || anyLoading}
+                onClick={handleEmail}
+                onMouseEnter={e => { if (!disabled && !anyLoading) e.currentTarget.style.filter = 'brightness(1.15)'; }}
+                onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
+              >
+                {loadingEmail ? spinner : 'Sign In'}
+              </button>
+            )}
 
-        <button
-          style={btnSecondary}
-          disabled={disabled || anyLoading}
-          onClick={handleGoogle}
-          onMouseEnter={e => { if (!disabled && !anyLoading) { e.currentTarget.style.background = 'var(--glass-1)'; e.currentTarget.style.filter = 'brightness(1.05)'; } }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-2)'; e.currentTarget.style.filter = 'none'; }}
-        >
-          {loadingGoogle ? spinner : (
-            <svg width="18" height="18" viewBox="0 0 48 48">
-              <path fill="#4285F4" d="M24 9.5c3.19 0 5.38 1.38 6.62 2.53l4.88-4.76C32.48 4.1 28.58 2 24 2 14.82 2 7.07 7.71 4.04 15.53l5.68 4.41C11.36 13.77 17.18 9.5 24 9.5z"/>
-              <path fill="#34A853" d="M46 24.5c0-1.57-.14-2.73-.43-3.91H24v7.38h12.72C36.19 31.31 33.68 34 30.36 35.62l5.52 4.28C40.93 36.08 46 30.86 46 24.5z"/>
-              <path fill="#FBBC05" d="M9.72 28.63A14.5 14.5 0 0 1 9.5 24c0-1.61.28-3.17.78-4.62l-5.68-4.41A23.96 23.96 0 0 0 2 24c0 3.87.93 7.53 2.57 10.76l5.15-6.13z"/>
-              <path fill="#EA4335" d="M24 46c4.97 0 9.15-1.64 12.21-4.46l-5.52-4.28C28.93 38.68 26.65 39.5 24 39.5c-6.82 0-12.64-4.27-14.28-10.87l-5.15 6.13C7.07 42.29 14.82 46 24 46z"/>
-            </svg>
-          )}
-          {loadingGoogle ? 'Signing in…' : 'Continue with Google'}
-        </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '12px 0', color: 'var(--text-3)', fontSize: '14px' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+              or
+              <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+            </div>
+
+            <button
+              style={btnSecondary}
+              disabled={disabled || anyLoading}
+              onClick={handleGoogle}
+              onMouseEnter={e => { if (!disabled && !anyLoading) { e.currentTarget.style.background = 'var(--glass-1)'; e.currentTarget.style.filter = 'brightness(1.05)'; } }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-2)'; e.currentTarget.style.filter = 'none'; }}
+            >
+              {loadingGoogle ? spinner : (
+                <svg width="18" height="18" viewBox="0 0 48 48">
+                  <path fill="#4285F4" d="M24 9.5c3.19 0 5.38 1.38 6.62 2.53l4.88-4.76C32.48 4.1 28.58 2 24 2 14.82 2 7.07 7.71 4.04 15.53l5.68 4.41C11.36 13.77 17.18 9.5 24 9.5z"/>
+                  <path fill="#34A853" d="M46 24.5c0-1.57-.14-2.73-.43-3.91H24v7.38h12.72C36.19 31.31 33.68 34 30.36 35.62l5.52 4.28C40.93 36.08 46 30.86 46 24.5z"/>
+                  <path fill="#FBBC05" d="M9.72 28.63A14.5 14.5 0 0 1 9.5 24c0-1.61.28-3.17.78-4.62l-5.68-4.41A23.96 23.96 0 0 0 2 24c0 3.87.93 7.53 2.57 10.76l5.15-6.13z"/>
+                  <path fill="#EA4335" d="M24 46c4.97 0 9.15-1.64 12.21-4.46l-5.52-4.28C28.93 38.68 26.65 39.5 24 39.5c-6.82 0-12.64-4.27-14.28-10.87l-5.15 6.13C7.07 42.29 14.82 46 24 46z"/>
+                </svg>
+              )}
+              {loadingGoogle ? 'Signing in…' : 'Continue with Google'}
+            </button>
+          </>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', margin: '16px 0', textAlign: 'left' }}>
           <input
@@ -372,7 +402,7 @@ export default function LoginModal({ visible }: Props) {
         </div>
 
         <span
-          onClick={() => { if (!anyLoading) { setIsSignUp(!isSignUp); setError(''); } }}
+          onClick={() => { if (!anyLoading) { setIsSignUp(!isSignUp); setError(''); setForgotSent(false); } }}
           style={{ display: 'inline-block', color: linkBlue, cursor: anyLoading ? 'default' : 'pointer', marginTop: '12px', fontSize: '14px', fontWeight: 500, opacity: anyLoading ? 0.5 : 1 }}
         >
           {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
