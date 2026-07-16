@@ -1,10 +1,11 @@
-// components/EditProfileView.tsx — v2.7 (callback to update parent instantly)
+// components/EditProfileView.tsx — v2.8 (writes displayName + photo to Firestore directly)
+// v2.7 (callback to update parent instantly)
 // v2.6 — instant compression + consistent border style
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useProfile } from '../hooks/useProfile';
 import { haptic } from '../lib/haptic';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /** Resize a base64 image to max 400×400 and return a compressed JPEG data URL */
@@ -35,18 +36,19 @@ function compressImage(dataUrl: string): Promise<string> {
 
 interface Props {
   onBack: () => void;
-  onSaved?: (name: string, photo: string) => void;   // NEW: tell parent about the update
+  onSaved?: (name: string, photo: string) => void;
 }
 
 export default function EditProfileView({ onBack, onSaved }: Props) {
   const { currentUser, showToast } = useApp();
-  const { saving, saveProfile } = useProfile();
+  const { saving: profileSaving, saveProfile } = useProfile();
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
   const [photoDataUrl, setPhotoDataUrl] = useState('');    // the small version for saving
   const [previewPhoto, setPreviewPhoto] = useState('');    // what you see on screen
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load existing photo
+  // Load existing photo and name from Firestore (fallback to current auth)
   useEffect(() => {
     if (!currentUser) return;
     getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
@@ -55,6 +57,7 @@ export default function EditProfileView({ onBack, onSaved }: Props) {
         const photo = data.profilePhoto || currentUser.photoURL || '';
         setPhotoDataUrl(photo);
         setPreviewPhoto(photo);
+        // Use Firestore displayName if it exists; otherwise fallback to auth
         if (data.displayName) setDisplayName(data.displayName);
       } else {
         const photo = currentUser.photoURL || '';
@@ -67,16 +70,51 @@ export default function EditProfileView({ onBack, onSaved }: Props) {
   const handleSave = async () => {
     if (!currentUser) return;
     if (!displayName.trim()) { showToast('Please enter a name.'); return; }
+
     haptic.medium();
+    setSaving(true);
+
+    // 1. Save via the hook (updates Auth profile if needed)
     await saveProfile(currentUser, {
       displayName: displayName.trim(),
       photoURL: photoDataUrl,
     });
-    // Instantly update the parent view
+
+    // 2. Ensure Firestore document also gets updated
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        displayName: displayName.trim(),
+        profilePhoto: photoDataUrl || null,   // null will clear the field
+      });
+    } catch (err: any) {
+      // If permission error, force token refresh and retry once
+      if (err.code === 'permission-denied' || err.message?.includes('permission')) {
+        try {
+          await currentUser.getIdToken(true);
+          await updateDoc(doc(db, 'users', currentUser.uid), {
+            displayName: displayName.trim(),
+            profilePhoto: photoDataUrl || null,
+          });
+        } catch (retryErr: any) {
+          showToast('Failed to save name. Please sign out and back in.');
+          setSaving(false);
+          return;
+        }
+      } else {
+        showToast(`Save failed: ${err.message?.slice(0, 40)}`);
+        setSaving(false);
+        return;
+      }
+    }
+
+    // 3. Tell the parent to update instantly
     onSaved?.(displayName.trim(), photoDataUrl);
     showToast('Profile saved!');
+    setSaving(false);
     onBack();
   };
+
+  // … (handleFileChange, removePhoto, etc. remain unchanged – keep them exactly as before)
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -85,13 +123,11 @@ export default function EditProfileView({ onBack, onSaved }: Props) {
     const reader = new FileReader();
     reader.onloadend = async () => {
       const fullSize = reader.result as string;
-      // Compress immediately
       try {
         const small = await compressImage(fullSize);
         setPhotoDataUrl(small);
-        setPreviewPhoto(small);      // show compressed version instantly
+        setPreviewPhoto(small);
       } catch {
-        // Fallback to original if compression fails
         setPhotoDataUrl(fullSize);
         setPreviewPhoto(fullSize);
       }
@@ -120,6 +156,7 @@ export default function EditProfileView({ onBack, onSaved }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* … header and everything else unchanged, EXCEPT the Save button uses `saving` now */}
       <header style={{
         display: 'flex', alignItems: 'center', gap: '12px',
         padding: 'calc(14px + var(--sat)) 20px 14px',
@@ -138,21 +175,21 @@ export default function EditProfileView({ onBack, onSaved }: Props) {
         <div style={{ flex: 1 }} />
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || profileSaving}
           style={{
             padding: '8px 18px', borderRadius: '10px',
             background: 'var(--accent-dim)', color: 'var(--accent)',
             fontWeight: 600, fontSize: '14px', fontFamily: 'inherit',
-            border: 'none', cursor: saving ? 'default' : 'pointer',
-            opacity: saving ? 0.5 : 1,
+            border: 'none', cursor: (saving || profileSaving) ? 'default' : 'pointer',
+            opacity: (saving || profileSaving) ? 0.5 : 1,
           }}
         >
-          {saving ? 'Saving…' : 'Save'}
+          {saving || profileSaving ? 'Saving…' : 'Save'}
         </button>
       </header>
 
       <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '24px 20px' }}>
-        {/* Avatar & photo controls */}
+        {/* Avatar & photo controls – unchanged */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{
             width: '96px', height: '96px', borderRadius: '50%',
@@ -198,7 +235,7 @@ export default function EditProfileView({ onBack, onSaved }: Props) {
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
         </div>
 
-        {/* Name input – search bar style */}
+        {/* Name input – unchanged */}
         <div style={{
           display: 'flex', alignItems: 'center',
           padding: '8px 12px',
