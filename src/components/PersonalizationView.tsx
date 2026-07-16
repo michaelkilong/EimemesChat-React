@@ -1,11 +1,6 @@
-// PersonalizationView.tsx — v1.8 — Removed forced token refresh; silent fallback to localStorage
-// v1.7 — Graceful token refresh + fallback to localStorage
-// v1.6 — Retry on permission error + forced token refresh
-// v1.5 — Retry on permission error after forced token refresh
-// v1.4 — Robust Firestore write (separate token refresh catch + updateDoc)
-// v1.3 — Force auth token refresh before Firestore write (native fix)
-import React, { useState, useEffect, useRef } from 'react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+// PersonalizationView.tsx — v1.0
+import React, { useState, useEffect } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -45,10 +40,7 @@ export default function PersonalizationView({ onBack }: Props) {
   const [saving,             setSaving]             = useState(false);
   const [loaded,             setLoaded]             = useState(false);
 
-  const nicknameRef = useRef<HTMLInputElement>(null);
-  const occupationRef = useRef<HTMLInputElement>(null);
-  const customRef = useRef<HTMLTextAreaElement>(null);
-
+  // Load saved preferences
   useEffect(() => {
     if (!currentUser) return;
     getDoc(doc(db, 'users', currentUser.uid))
@@ -62,66 +54,31 @@ export default function PersonalizationView({ onBack }: Props) {
         }
         setLoaded(true);
       })
-      .catch(err => {
-        console.error('Failed to load preferences:', err);
-        setLoaded(true);
-      });
+      .catch(() => setLoaded(true));
   }, [currentUser]);
 
   const handleSave = async () => {
     if (!currentUser || saving) return;
-
-    if (!navigator.onLine) {
-      showToast('No internet connection');
-      return;
-    }
-
-    const finalNickname = nicknameRef.current?.value ?? nickname;
-    const finalOccupation = occupationRef.current?.value ?? occupation;
-    const finalCustom = customRef.current?.value ?? customInstructions;
-
-    const prefs = {
-      tone,
-      nickname: finalNickname,
-      occupation: finalOccupation,
-      customInstructions: finalCustom,
-    };
-
     setSaving(true);
-
     try {
-      // Attempt to write directly to Firestore – no forced token refresh
-      await updateDoc(doc(db, 'users', currentUser.uid), { preferences: prefs });
+      await setDoc(
+        doc(db, 'users', currentUser.uid),
+        { preferences: { tone, nickname, occupation, customInstructions } },
+        { merge: true }
+      );
       haptic.success();
       showToast('Preferences saved');
       onBack();
-    } catch (err: any) {
-      console.error('Save failed:', err.message);
-      // If any error occurs (including permission), save to localStorage silently
-      try {
-        localStorage.setItem('ec_pending_prefs', JSON.stringify(prefs));
-      } catch {}
-      showToast('Saved offline – changes will sync when you reconnect.');
+    } catch {
+      showToast('Failed to save. Try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  // Sync pending preferences whenever possible (no forced refresh)
-  useEffect(() => {
-    if (!currentUser || !navigator.onLine) return;
-    const pending = localStorage.getItem('ec_pending_prefs');
-    if (!pending) return;
-    try {
-      const prefs = JSON.parse(pending);
-      updateDoc(doc(db, 'users', currentUser.uid), { preferences: prefs })
-        .then(() => localStorage.removeItem('ec_pending_prefs'))
-        .catch(() => {}); // stay in localStorage until next attempt
-    } catch {}
-  }, [currentUser]);
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
+
       {/* Header */}
       <header style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -140,6 +97,7 @@ export default function PersonalizationView({ onBack }: Props) {
           Personalization
         </span>
 
+        {/* Save — checkmark button top right like ChatGPT */}
         <button
           onClick={handleSave}
           disabled={saving || !loaded}
@@ -153,5 +111,85 @@ export default function PersonalizationView({ onBack }: Props) {
       </header>
 
       <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 48px' }}>
+
         {/* Tone */}
-        <div style={{ marginBottom: '
+        <div style={{ marginBottom: '24px' }}>
+          <label style={labelStyle}>Base tone</label>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {TONES.map(t => (
+              <button
+                key={t}
+                onClick={() => setTone(t)}
+                style={{
+                  padding: '10px 20px', borderRadius: '999px',
+                  border: `1.5px solid ${tone === t ? 'var(--accent)' : 'var(--border)'}`,
+                  background: tone === t ? 'var(--accent-dim)' : 'rgba(255,255,255,0.04)',
+                  color: tone === t ? 'var(--accent)' : 'var(--text-2)',
+                  fontSize: '14px', fontWeight: 500, cursor: 'pointer',
+                  transition: 'all 0.15s', fontFamily: 'inherit',
+                }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '8px' }}>
+            The main voice and tone the AI uses in your conversations.
+          </div>
+        </div>
+
+        {/* Nickname */}
+        <div style={{ marginBottom: '24px' }}>
+          <label style={labelStyle}>Your nickname</label>
+          <input
+            style={inputStyle}
+            type="text"
+            placeholder="What should the AI call you?"
+            value={nickname}
+            onChange={e => setNickname(e.target.value)}
+            maxLength={40}
+            onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'}
+            onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
+          />
+        </div>
+
+        {/* Occupation */}
+        <div style={{ marginBottom: '24px' }}>
+          <label style={labelStyle}>Your occupation</label>
+          <input
+            style={inputStyle}
+            type="text"
+            placeholder="Engineer, student, designer..."
+            value={occupation}
+            onChange={e => setOccupation(e.target.value)}
+            maxLength={60}
+            onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'}
+            onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
+          />
+          <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '8px' }}>
+            Helps the AI tailor responses to your context.
+          </div>
+        </div>
+
+        {/* Custom instructions */}
+        <div style={{ marginBottom: '24px' }}>
+          <label style={labelStyle}>Custom instructions</label>
+          <textarea
+            style={{ ...inputStyle, resize: 'none', minHeight: '120px', lineHeight: 1.6 }}
+            placeholder="Anything else you'd like the AI to keep in mind — interests, preferences, how you like responses formatted..."
+            value={customInstructions}
+            onChange={e => setCustomInstructions(e.target.value)}
+            maxLength={500}
+            onFocus={e => (e.target as HTMLTextAreaElement).style.borderColor = 'var(--accent)'}
+            onBlur={e => (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border)'}
+          />
+          <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '6px', textAlign: 'right' }}>
+            {customInstructions.length}/500
+          </div>
+        </div>
+
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
