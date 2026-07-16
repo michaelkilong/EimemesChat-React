@@ -399,9 +399,9 @@ export default function LoginModal({ visible }: Props) {
               />
               <label style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.4 }}>
                 I agree to the{' '}
-                <a href="https://app-eimemeschat.vercel.app/terms.html" target="_blank" rel="noreferrer" style={{ color: linkBlue, textDecoration: 'none' }}>Terms</a>
+                <a href="/legal/terms.html" target="_blank" rel="noreferrer" style={{ color: linkBlue, textDecoration: 'none' }}>Terms</a>
                 {' '}and{' '}
-                <a href="https://app-eimemeschat.vercel.app/privacy.html" target="_blank" rel="noreferrer" style={{ color: linkBlue, textDecoration: 'none' }}>Privacy Policy</a>
+                <a href="/legal/privacy.html" target="_blank" rel="noreferrer" style={{ color: linkBlue, textDecoration: 'none' }}>Privacy Policy</a>
               </label>
             </div>
 
