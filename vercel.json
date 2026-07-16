@@ -5,5 +5,8 @@
       "includeFiles": "prompts/**"
     }
   },
-  "alias": ["eimemes-chat-ai.vercel.app"]
+  "alias": ["eimemes-chat-ai.vercel.app"],
+  "rewrites": [
+    { "source": "/reset-password", "destination": "/reset-password.html" }
+  ]
 }
