@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>EimemesChat AI – FAQ & Support</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+			line-height: 1.6;
+			color: #1e2b3c;
+			background: #ffffff;
+			display: flex;
+			flex-direction: column;
+			min-height: 100vh;
+		}
+		header {
+			text-align: center;
+			padding: 2.5rem 1rem;
+			background: white;
+			border-bottom: 1px solid #eaeef2;
+		}
+		h1 {
+			font-size: 2.8rem;
+			font-weight: 700;
+			background: linear-gradient(135deg, #0a84ff, #c96eff);
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+			background-clip: text;
+			display: inline-block;
+			letter-spacing: -0.02em;
+		}
+		main {
+			flex: 1;
+			max-width: 1000px;
+			margin: 2rem auto;
+			padding: 0 2rem;
+		}
+		h2 {
+			font-size: 2rem;
+			font-weight: 600;
+			color: #0a2a44;
+			margin-bottom: 1.5rem;
+			border-bottom: 2px solid #f0f4f9;
+			padding-bottom: 0.5rem;
+		}
+		h3 {
+			font-size: 1.4rem;
+			font-weight: 600;
+			margin: 2rem 0 1rem;
+			color: #1e3a5f;
+		}
+		p {
+			color: #2d3a4a;
+			margin-bottom: 1.2rem;
+			line-height: 1.7;
+		}
+
+		/* FAQ Section */
+		.faq-container {
+			margin: 2rem 0;
+		}
+		.faq-item {
+			border-bottom: 1px solid #eaeef2;
+			padding: 1.2rem 0;
+		}
+		.faq-question {
+			font-weight: 600;
+			color: #0a2a44;
+			cursor: pointer;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			font-size: 1.1rem;
+		}
+		.faq-question:hover {
+			color: #0a84ff;
+		}
+		.faq-answer {
+			margin-top: 1rem;
+			padding-left: 1rem;
+			border-left: 3px solid #0a84ff;
+			color: #4a5b6f;
+			display: none;
+		}
+		.faq-answer.show {
+			display: block;
+		}
+		.toggle-icon {
+			font-size: 1.2rem;
+			color: #8a9bb5;
+		}
+
+		/* Contact Form */
+		.form-container {
+			background: #f8fafd;
+			padding: 2rem;
+			border-radius: 16px;
+			margin: 2rem 0;
+			border: 1px solid #e0e7ef;
+		}
+		.form-group {
+			margin-bottom: 1.5rem;
+		}
+		label {
+			display: block;
+			margin-bottom: 0.5rem;
+			font-weight: 500;
+			color: #2d3a4a;
+		}
+		input, textarea, select {
+			width: 100%;
+			padding: 0.8rem 1rem;
+			border: 1px solid #d0d9e5;
+			border-radius: 8px;
+			font-family: inherit;
+			font-size: 1rem;
+			transition: border-color 0.2s;
+		}
+		input:focus, textarea:focus, select:focus {
+			outline: none;
+			border-color: #0a84ff;
+			box-shadow: 0 0 0 3px rgba(10,132,255,0.1);
+		}
+		textarea {
+			min-height: 120px;
+			resize: vertical;
+		}
+		.file-upload {
+			border: 2px dashed #d0d9e5;
+			padding: 1.5rem;
+			text-align: center;
+			border-radius: 8px;
+			background: white;
+			cursor: pointer;
+			transition: border-color 0.2s;
+		}
+		.file-upload:hover {
+			border-color: #0a84ff;
+		}
+		.file-upload input {
+			display: none;
+		}
+		.file-info {
+			margin-top: 0.5rem;
+			font-size: 0.9rem;
+			color: #6b7f99;
+		}
+		.btn {
+			background: #0a84ff;
+			color: white;
+			border: none;
+			padding: 1rem 2rem;
+			border-radius: 8px;
+			font-size: 1rem;
+			font-weight: 600;
+			cursor: pointer;
+			transition: background 0.2s;
+			width: 100%;
+		}
+		.btn:hover {
+			background: #0066cc;
+		}
+		.btn:disabled {
+			background: #b0c4de;
+			cursor: not-allowed;
+		}
+		.form-row {
+			display: flex;
+			gap: 1rem;
+			margin-bottom: 1.5rem;
+		}
+		.form-row .form-group {
+			flex: 1;
+			margin-bottom: 0;
+		}
+		.success-message {
+			background: #e3f7e7;
+			color: #1e7b4c;
+			padding: 1rem;
+			border-radius: 8px;
+			margin-top: 1rem;
+			display: none;
+		}
+		.success-message.show {
+			display: block;
+		}
+		.error-message {
+			background: #ffe3e3;
+			color: #c41e1e;
+			padding: 1rem;
+			border-radius: 8px;
+			margin-top: 1rem;
+			display: none;
+		}
+		.error-message.show {
+			display: block;
+		}
+
+		/* Contact Info */
+		.contact-info {
+			background: white;
+			padding: 1.5rem;
+			border-radius: 12px;
+			border: 1px solid #e0e7ef;
+			margin: 2rem 0;
+		}
+		.contact-email {
+			font-size: 1.2rem;
+			color: #0a84ff;
+			font-weight: 500;
+			word-break: break-all;
+		}
+		.response-time {
+			color: #5a6a7a;
+			margin-top: 0.5rem;
+			font-size: 0.95rem;
+		}
+
+		footer {
+			background: #fff;
+			border-top: 1px solid #e0e7ef;
+			padding: 2rem 1rem;
+			text-align: center;
+			color: #5a6a7a;
+			margin-top: 3rem;
+		}
+		.footer-links {
+			display: flex;
+			justify-content: center;
+			gap: 2.5rem;
+			flex-wrap: wrap;
+			margin-bottom: 1.2rem;
+		}
+		.footer-links a {
+			color: #0a84ff;
+			text-decoration: none;
+			font-weight: 500;
+		}
+		.footer-links a:hover {
+			color: #c96eff;
+			text-decoration: underline;
+		}
+		.social-links {
+			display: flex;
+			justify-content: center;
+			gap: 1.8rem;
+			margin-bottom: 1.2rem;
+		}
+		.social-links a {
+			color: #5a6a7a;
+			text-decoration: none;
+			font-size: 0.95rem;
+		}
+		.social-links a:hover {
+			color: #0a84ff;
+		}
+		.copyright {
+			font-size: 0.9rem;
+			opacity: 0.8;
+		}
+		hr {
+			border: none;
+			border-top: 1px solid #e0e7ef;
+			margin: 2rem 0;
+		}
+	</style>
+</head>
+<body>
+	<header>
+		<h1> ✦ EimemesChat AI</h1>
+	</header>
+	<main>
+		<h2>Frequently Asked Questions</h2>
+
+		<div class="faq-container">
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					What is EimemesChat AI?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					EimemesChat AI is an independent platform providing AI-powered conversational services with a focus on cultural preservation.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					Is EimemesChat free to use?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					Yes, the service is completely free. There are no subscription fees or hidden charges.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					How do I sign up?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					You can sign up using your Google account or by creating an account with your email and password. After signing up, you'll receive a verification code to confirm your email address.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					I didn't receive the verification code. What should I do?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					Check your spam or junk folder. You can also tap "Resend Code" on the verification screen. If you still don't receive it, contact us at eimemeschatai@gmail.com.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					How do I reset my password?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					On the sign‑in screen, tap "Forgot password?" and enter your email address. We'll send you a password‑reset link valid for 30 minutes.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					What data do you collect?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					When you sign in with Google, we collect your name, email address, and profile picture. We also collect IP addresses for security purposes and store conversation history. We do not sell personal data. For complete information, please review our <a href="privacy.html">Privacy Policy</a>.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					Does EimemesChat support the Kuki language?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					Currently, the platform operates primarily in English. We are actively working toward implementing Kuki language capabilities.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					What are the daily message limits?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					Free users are limited to 100 messages per day. This limit resets every 24 hours.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					How do I report a bug?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					You can report a bug directly from the app: go to <strong>Settings → Report a Bug</strong> and describe the issue. You'll receive a confirmation once it's sent.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					How do I delete my conversations?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					You can delete individual conversations or clear all chat history through the Settings panel.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					How do I delete my account?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					Go to <strong>Settings → Profile → Delete Account</strong>. After deletion, all your data including chat history will be permanently removed.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					Who develops and maintains this platform?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					EimemesChat is an independent project developed by individuals committed to cultural preservation through technology.
+				</div>
+			</div>
+
+			<div class="faq-item">
+				<div class="faq-question" onclick="toggleFAQ(this)">
+					Is the source code available?
+					<span class="toggle-icon">▼</span>
+				</div>
+				<div class="faq-answer">
+					Yes! The client‑side source code is open‑source under the MIT License. You can find it on <a href="https://github.com/EimemesChat-AI" target="_blank">GitHub</a>.
+				</div>
+			</div>
+		</div>
+
+		<h2 style="margin-top: 3rem;">Contact Support</h2>
+
+		<div class="contact-info">
+			<div style="margin-bottom: 0.5rem; font-weight: 500;">Email us directly:</div>
+			<div class="contact-email">eimemeschatai@gmail.com</div>
+			<div class="response-time">Typical response time: 24-48 hours</div>
+		</div>
+
+		<div class="form-container">
+			<h3 style="margin-top: 0; margin-bottom: 1.5rem;">Send Feedback</h3>
+
+			<form id="feedbackForm">
+				<div class="form-row">
+					<div class="form-group">
+						<label for="name">Name</label>
+						<input type="text" id="name" placeholder="Your name" required>
+					</div>
+					<div class="form-group">
+						<label for="email">Email</label>
+						<input type="email" id="email" placeholder="your.email@example.com" required>
+					</div>
+				</div>
+
+				<div class="form-group">
+					<label for="subject">Subject</label>
+					<select id="subject" required>
+						<option value="">Select a topic</option>
+						<option value="feedback">General Feedback</option>
+						<option value="bug">Bug Report</option>
+						<option value="feature">Feature Request</option>
+						<option value="deletion">Account Deletion Request</option>
+						<option value="question">Question</option>
+						<option value="other">Other</option>
+					</select>
+				</div>
+
+				<div class="form-group">
+					<label for="message">Message</label>
+					<textarea id="message" placeholder="Please describe your feedback, question, or issue in detail..." required></textarea>
+				</div>
+
+				<div class="form-group">
+					<label>Attachment (optional)</label>
+					<div class="file-upload" onclick="document.getElementById('fileInput').click()">
+						<input type="file" id="fileInput" accept="image/*,.pdf,.doc,.docx,.txt">
+						<span>Click to upload or drag and drop</span>
+						<div class="file-info">Supported: images, PDF, DOC (max 5MB)</div>
+					</div>
+					<div id="fileSelected" style="font-size: 0.9rem; color: #0a84ff; margin-top: 0.5rem;"></div>
+				</div>
+
+				<button type="submit" class="btn" id="submitBtn">Send Feedback</button>
+
+				<div id="successMessage" class="success-message">
+					Thank you for your feedback. We will respond within 24-48 hours.
+				</div>
+
+				<div id="errorMessage" class="error-message">
+					There was an error sending your message. Please try again or email us directly.
+				</div>
+			</form>
+		</div>
+
+		<p style="text-align: center; color: #5a6a7a; margin: 2rem 0;">
+			For urgent matters, please email <strong>eimemeschatai@gmail.com</strong> directly.
+		</p>
+	</main>
+
+	<footer>
+		<div class="footer-links">
+			<a href="privacy.html">Privacy Policy</a>
+			<a href="terms.html">Terms of Use</a>
+			<a href="about.html">About Us</a>
+			<a href="support.html">FAQ & Support</a>
+		</div>
+		<div class="social-links">
+			<a href="#" target="_blank">X</a>
+			<a href="#" target="_blank">GitHub</a>
+			<a href="#" target="_blank">Email</a>
+		</div>
+		<div class="copyright">
+			&copy; 2026 EimemesChat AI. All rights reserved.
+		</div>
+	</footer>
+
+	<script>
+		function toggleFAQ(element) {
+			const answer = element.nextElementSibling;
+			const icon = element.querySelector('.toggle-icon');
+			if (answer.classList.contains('show')) {
+				answer.classList.remove('show');
+				icon.textContent = '▼';
+			} else {
+				answer.classList.add('show');
+				icon.textContent = '▲';
+			}
+		}
+
+		document.getElementById('fileInput').addEventListener('change', function(e) {
+			const fileSelected = document.getElementById('fileSelected');
+			if (this.files.length > 0) {
+				const file = this.files[0];
+				if (file.size > 5 * 1024 * 1024) {
+					fileSelected.innerHTML = 'File too large. Maximum 5MB.';
+					this.value = '';
+				} else {
+					fileSelected.innerHTML = 'Selected: ' + file.name;
+				}
+			} else {
+				fileSelected.innerHTML = '';
+			}
+		});
+
+		document.getElementById('feedbackForm').addEventListener('submit', function(e) {
+			e.preventDefault();
+			const submitBtn = document.getElementById('submitBtn');
+			const successMsg = document.getElementById('successMessage');
+			const name = document.getElementById('name').value;
+			const email = document.getElementById('email').value;
+			const subject = document.getElementById('subject').value;
+			const message = document.getElementById('message').value;
+			submitBtn.disabled = true;
+			submitBtn.textContent = 'Sending...';
+			successMsg.classList.remove('show');
+			const mailtoLink = `mailto:eimemeschatai@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(
+				`Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`
+			)}`;
+			window.location.href = mailtoLink;
+			successMsg.classList.add('show');
+			setTimeout(() => {
+				submitBtn.disabled = false;
+				submitBtn.textContent = 'Send Feedback';
+				document.getElementById('feedbackForm').reset();
+				document.getElementById('fileSelected').innerHTML = '';
+			}, 3000);
+		});
+	</script>
+</body>
+</html>
