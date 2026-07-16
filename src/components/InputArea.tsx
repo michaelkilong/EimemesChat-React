@@ -1,4 +1,5 @@
-// InputArea.tsx — v2.17 — Reverted to direct file input (removed bottom sheet)
+// InputArea.tsx — v2.18 — Native file picker sheet (wrapper only); web keeps direct file input unchanged
+// v2.17 — Reverted to direct file input (removed bottom sheet)
 // v2.16 — Bottom sheet file upload (replaced direct file input trigger)
 // v2.15 — Clear daily-limit block (no input at all)
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -6,8 +7,42 @@ import { processFile, getFileIcon } from '../lib/fileReader';
 import { haptic } from '../lib/haptic';
 import type { Attachment } from '../types';
 
+declare global {
+  interface Window {
+    ReactNativeWebView?: { postMessage: (msg: string) => void };
+    __handleNativeFilePicked?: (base64: string, filename: string, mimeType: string) => void;
+  }
+}
+
 const ACCEPTED = '.pdf,.txt,.md,.csv,.docx,.jpg,.jpeg,.png,.gif,.webp,image/*';
 const MAX_SIZE  = 20 * 1024 * 1024; // 20MB
+
+function isNativeWrapper(): boolean {
+  return typeof window !== 'undefined' && !!window.ReactNativeWebView;
+}
+
+function readThemeColors() {
+  if (typeof window === 'undefined') return {};
+  const cs = getComputedStyle(document.documentElement);
+  const get = (name: string) => cs.getPropertyValue(name).trim();
+  return {
+    bg: get('--bg-a'),
+    surface: get('--glass-2'),
+    text1: get('--text-1'),
+    text3: get('--text-3'),
+    border: get('--border'),
+    accent: get('--accent'),
+  };
+}
+
+function base64ToFile(base64: string, filename: string, mimeType: string): File {
+  const byteString = atob(base64);
+  const byteArray = new Uint8Array(byteString.length);
+  for (let i = 0; i < byteString.length; i++) {
+    byteArray[i] = byteString.charCodeAt(i);
+  }
+  return new File([byteArray], filename, { type: mimeType });
+}
 
 interface Props {
   onSend: (text: string, attachment?: Attachment, useWebSearch?: boolean, useThinking?: boolean) => void;
@@ -38,6 +73,37 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
   const canSend = (value.trim().length > 0 || attachment !== null)
     && !isSending && !isStreaming && !dailyLimitReached && !processing;
 
+  // ── Shared file-processing pipeline — used by both web input and native picker ──
+  const handleIncomingFile = useCallback(async (file: File) => {
+    setFileError('');
+    if (file.size > MAX_SIZE) { setFileError('File too large (max 20MB)'); return; }
+    setProcessing(true);
+    try {
+      setAttachment(await processFile(file));
+    } catch (err) {
+      setFileError('Could not read file. Try another format.');
+      console.error(err);
+    } finally {
+      setProcessing(false);
+    }
+  }, []);
+
+  // ── Receives base64 file data from the native wrapper's custom sheet ──
+  useEffect(() => {
+    window.__handleNativeFilePicked = async (base64: string, filename: string, mimeType: string) => {
+      try {
+        const file = base64ToFile(base64, filename, mimeType);
+        await handleIncomingFile(file);
+      } catch (err) {
+        setFileError('Could not read file. Try another format.');
+        console.error(err);
+      }
+    };
+    return () => {
+      delete window.__handleNativeFilePicked;
+    };
+  }, [handleIncomingFile]);
+
   const handleSend = () => {
     if (!canSend) return;
     haptic.medium();
@@ -59,18 +125,19 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    setFileError('');
-    if (file.size > MAX_SIZE) { setFileError('File too large (max 20MB)'); return; }
-    setProcessing(true);
-    try {
-      setAttachment(await processFile(file));
-    } catch (err) {
-      setFileError('Could not read file. Try another format.');
-      console.error(err);
-    } finally {
-      setProcessing(false);
+    await handleIncomingFile(file);
+  }, [handleIncomingFile]);
+
+  const handleAttachPress = () => {
+    if (isNativeWrapper() && window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'NATIVE_FILE_PICKER',
+        theme: readThemeColors(),
+      }));
+    } else {
+      fileInputRef.current?.click();
     }
-  }, []);
+  };
 
   const busy = isSending || isStreaming;
 
@@ -256,9 +323,8 @@ export default function InputArea({ onSend, onStop, isSending, isStreaming, dail
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {/* Direct file input trigger */}
                   <button
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={handleAttachPress}
                     disabled={busy || processing}
                     title="Attach file"
                     style={{
