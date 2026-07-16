@@ -291,4 +291,4 @@ export default function EditProfileView({ onBack, onSaved }: Props) {
       </div>
     </div>
   );
-      }
+}
