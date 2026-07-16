@@ -123,7 +123,7 @@ export default function EditProfileView({ onBack, onSaved }: Props) {
           setSaving(false);
           onBack();
           return;
-        } catch (retryErr) {
+        } catch (retryErr: any) {
           console.error('Retry also failed:', retryErr.message);
         }
       }
