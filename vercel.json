@@ -7,6 +7,7 @@
   },
   "alias": ["eimemes-chat-ai.vercel.app"],
   "rewrites": [
-    { "source": "/reset-password", "destination": "/reset-password.html" }
+    { "source": "/reset-password", "destination": "/reset-password.html" },
+    { "source": "/legal/:page", "destination": "/legal/:page.html" }
   ]
 }
