@@ -1,6 +1,9 @@
-// PersonalizationView.tsx — v1.3 — Force auth token refresh before Firestore write (native fix)
+// PersonalizationView.tsx — v1.6 — Retry on permission error + forced token refresh
+// v1.5 — Retry on permission error after forced token refresh
+// v1.4 — Robust Firestore write (separate token refresh catch + updateDoc)
+// v1.3 — Force auth token refresh before Firestore write (native fix)
 import React, { useState, useEffect, useRef } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -66,7 +69,6 @@ export default function PersonalizationView({ onBack }: Props) {
   const handleSave = async () => {
     if (!currentUser || saving) return;
 
-    // 1. Quick network check
     if (!navigator.onLine) {
       showToast('No internet connection');
       return;
@@ -76,51 +78,53 @@ export default function PersonalizationView({ onBack }: Props) {
     const finalOccupation = occupationRef.current?.value ?? occupation;
     const finalCustom = customRef.current?.value ?? customInstructions;
 
+    const prefs = {
+      tone,
+      nickname: finalNickname,
+      occupation: finalOccupation,
+      customInstructions: finalCustom,
+    };
+
     setSaving(true);
 
+    const writeWithRetry = async () => {
+      try {
+        // First attempt without token refresh
+        await updateDoc(doc(db, 'users', currentUser.uid), { preferences: prefs });
+      } catch (err: any) {
+        // If permission denied, force a fresh token and retry
+        if (err.code === 'permission-denied' || err.message?.includes('permission')) {
+          console.log('Permission denied, refreshing token…');
+          await currentUser.getIdToken(true);
+          await updateDoc(doc(db, 'users', currentUser.uid), { preferences: prefs });
+        } else {
+          throw err; // rethrow other errors
+        }
+      }
+    };
+
     try {
-      // 2. Force token refresh – this ensures the native WebView has a valid token
-      await currentUser.getIdToken(true);
-
-      // 3. Now save to Firestore
-      await setDoc(
-        doc(db, 'users', currentUser.uid),
-        {
-          preferences: {
-            tone,
-            nickname: finalNickname,
-            occupation: finalOccupation,
-            customInstructions: finalCustom,
-          },
-        },
-        { merge: true }
-      );
-
+      await writeWithRetry();
       haptic.success();
       showToast('Preferences saved');
       onBack();
     } catch (err: any) {
-      console.error('Firestore save failed:', err?.message || err);
-      const msg = err?.message || err?.toString() || 'Unknown error';
-      showToast(`Save failed: ${msg.slice(0, 40)}`);
-
-      // Fallback to localStorage if Firestore still fails
-      try {
-        localStorage.setItem('ec_pending_prefs', JSON.stringify({
-          tone,
-          nickname: finalNickname,
-          occupation: finalOccupation,
-          customInstructions: finalCustom,
-        }));
-      } catch (localErr) {
-        console.error('localStorage fallback failed:', localErr);
+      console.error('Save failed:', err.message);
+      if (err.code === 'permission-denied' || err.message?.includes('permission')) {
+        showToast('Session expired. Please sign out and back in.');
+      } else {
+        showToast(`Save failed: ${err.message?.slice(0, 40)}`);
       }
+      // Fallback to localStorage so no data is lost
+      try {
+        localStorage.setItem('ec_pending_prefs', JSON.stringify(prefs));
+      } catch {}
     } finally {
       setSaving(false);
     }
   };
 
-  // Sync pending preferences if they exist
+  // Sync any pending preferences from localStorage when back online
   useEffect(() => {
     if (!currentUser || !navigator.onLine) return;
     const pending = localStorage.getItem('ec_pending_prefs');
@@ -128,7 +132,7 @@ export default function PersonalizationView({ onBack }: Props) {
     try {
       const prefs = JSON.parse(pending);
       currentUser.getIdToken(true).then(() =>
-        setDoc(doc(db, 'users', currentUser.uid), { preferences: prefs }, { merge: true })
+        updateDoc(doc(db, 'users', currentUser.uid), { preferences: prefs })
       ).then(() => {
         localStorage.removeItem('ec_pending_prefs');
       }).catch(() => {});
