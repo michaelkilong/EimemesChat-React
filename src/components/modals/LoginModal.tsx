@@ -1,4 +1,5 @@
-// components/modals/LoginModal.tsx — v1.11 (custom forgot password, no Firebase reset link)
+// components/modals/LoginModal.tsx — v1.12 (hide terms/toggle on forgot-password screen)
+// v1.11 — Custom forgot password, no Firebase reset link
 // v1.10 — Fixed duplicate verification email
 // v1.9  — Custom verification code instead of Firebase link
 // v1.8  — Fixed isWebView(); native Google Sign‑In credential handoff
@@ -387,26 +388,31 @@ export default function LoginModal({ visible }: Props) {
           </>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', margin: '16px 0', textAlign: 'left' }}>
-          <input
-            type="checkbox" checked={agreed}
-            onChange={e => { setAgreed(e.target.checked); setError(''); }}
-            style={{ marginTop: '3px', accentColor: linkBlue, flexShrink: 0 }}
-          />
-          <label style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.4 }}>
-            I agree to the{' '}
-            <a href="https://app-eimemeschat.vercel.app/terms.html" target="_blank" rel="noreferrer" style={{ color: linkBlue, textDecoration: 'none' }}>Terms</a>
-            {' '}and{' '}
-            <a href="https://app-eimemeschat.vercel.app/privacy.html" target="_blank" rel="noreferrer" style={{ color: linkBlue, textDecoration: 'none' }}>Privacy Policy</a>
-          </label>
-        </div>
+        {/* Terms and toggle are hidden when the forgot-password confirmation is visible */}
+        {!forgotSent && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', margin: '16px 0', textAlign: 'left' }}>
+              <input
+                type="checkbox" checked={agreed}
+                onChange={e => { setAgreed(e.target.checked); setError(''); }}
+                style={{ marginTop: '3px', accentColor: linkBlue, flexShrink: 0 }}
+              />
+              <label style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.4 }}>
+                I agree to the{' '}
+                <a href="https://app-eimemeschat.vercel.app/terms.html" target="_blank" rel="noreferrer" style={{ color: linkBlue, textDecoration: 'none' }}>Terms</a>
+                {' '}and{' '}
+                <a href="https://app-eimemeschat.vercel.app/privacy.html" target="_blank" rel="noreferrer" style={{ color: linkBlue, textDecoration: 'none' }}>Privacy Policy</a>
+              </label>
+            </div>
 
-        <span
-          onClick={() => { if (!anyLoading) { setIsSignUp(!isSignUp); setError(''); setForgotSent(false); } }}
-          style={{ display: 'inline-block', color: linkBlue, cursor: anyLoading ? 'default' : 'pointer', marginTop: '12px', fontSize: '14px', fontWeight: 500, opacity: anyLoading ? 0.5 : 1 }}
-        >
-          {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
-        </span>
+            <span
+              onClick={() => { if (!anyLoading) { setIsSignUp(!isSignUp); setError(''); setForgotSent(false); } }}
+              style={{ display: 'inline-block', color: linkBlue, cursor: anyLoading ? 'default' : 'pointer', marginTop: '12px', fontSize: '14px', fontWeight: 500, opacity: anyLoading ? 0.5 : 1 }}
+            >
+              {isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'}
+            </span>
+          </>
+        )}
 
         {error && <div style={{ color: '#ff6b6b', fontSize: '13.5px', marginTop: '10px', minHeight: '20px' }}>{error}</div>}
       </div>
