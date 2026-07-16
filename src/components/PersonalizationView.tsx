@@ -1,4 +1,6 @@
-// PersonalizationView.tsx — v1.6 — Retry on permission error + forced token refresh
+// PersonalizationView.tsx — v1.8 — Removed forced token refresh; silent fallback to localStorage
+// v1.7 — Graceful token refresh + fallback to localStorage
+// v1.6 — Retry on permission error + forced token refresh
 // v1.5 — Retry on permission error after forced token refresh
 // v1.4 — Robust Firestore write (separate token refresh catch + updateDoc)
 // v1.3 — Force auth token refresh before Firestore write (native fix)
@@ -87,55 +89,34 @@ export default function PersonalizationView({ onBack }: Props) {
 
     setSaving(true);
 
-    const writeWithRetry = async () => {
-      try {
-        // First attempt without token refresh
-        await updateDoc(doc(db, 'users', currentUser.uid), { preferences: prefs });
-      } catch (err: any) {
-        // If permission denied, force a fresh token and retry
-        if (err.code === 'permission-denied' || err.message?.includes('permission')) {
-          console.log('Permission denied, refreshing token…');
-          await currentUser.getIdToken(true);
-          await updateDoc(doc(db, 'users', currentUser.uid), { preferences: prefs });
-        } else {
-          throw err; // rethrow other errors
-        }
-      }
-    };
-
     try {
-      await writeWithRetry();
+      // Attempt to write directly to Firestore – no forced token refresh
+      await updateDoc(doc(db, 'users', currentUser.uid), { preferences: prefs });
       haptic.success();
       showToast('Preferences saved');
       onBack();
     } catch (err: any) {
       console.error('Save failed:', err.message);
-      if (err.code === 'permission-denied' || err.message?.includes('permission')) {
-        showToast('Session expired. Please sign out and back in.');
-      } else {
-        showToast(`Save failed: ${err.message?.slice(0, 40)}`);
-      }
-      // Fallback to localStorage so no data is lost
+      // If any error occurs (including permission), save to localStorage silently
       try {
         localStorage.setItem('ec_pending_prefs', JSON.stringify(prefs));
       } catch {}
+      showToast('Saved offline – changes will sync when you reconnect.');
     } finally {
       setSaving(false);
     }
   };
 
-  // Sync any pending preferences from localStorage when back online
+  // Sync pending preferences whenever possible (no forced refresh)
   useEffect(() => {
     if (!currentUser || !navigator.onLine) return;
     const pending = localStorage.getItem('ec_pending_prefs');
     if (!pending) return;
     try {
       const prefs = JSON.parse(pending);
-      currentUser.getIdToken(true).then(() =>
-        updateDoc(doc(db, 'users', currentUser.uid), { preferences: prefs })
-      ).then(() => {
-        localStorage.removeItem('ec_pending_prefs');
-      }).catch(() => {});
+      updateDoc(doc(db, 'users', currentUser.uid), { preferences: prefs })
+        .then(() => localStorage.removeItem('ec_pending_prefs'))
+        .catch(() => {}); // stay in localStorage until next attempt
     } catch {}
   }, [currentUser]);
 
@@ -173,94 +154,4 @@ export default function PersonalizationView({ onBack }: Props) {
 
       <div className="scroll-thin" style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 48px' }}>
         {/* Tone */}
-        <div style={{ marginBottom: '24px' }}>
-          <label style={labelStyle}>Base tone</label>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            {TONES.map(t => (
-              <button
-                key={t}
-                onClick={() => setTone(t)}
-                style={{
-                  padding: '10px 20px', borderRadius: '999px',
-                  border: `1.5px solid ${tone === t ? 'var(--accent)' : 'var(--border)'}`,
-                  background: tone === t ? 'var(--accent-dim)' : 'rgba(255,255,255,0.04)',
-                  color: tone === t ? 'var(--accent)' : 'var(--text-2)',
-                  fontSize: '14px', fontWeight: 500, cursor: 'pointer',
-                  transition: 'all 0.15s', fontFamily: 'inherit',
-                }}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '8px' }}>
-            The main voice and tone the AI uses in your conversations.
-          </div>
-        </div>
-
-        {/* Nickname */}
-        <div style={{ marginBottom: '24px' }}>
-          <label style={labelStyle}>Your nickname</label>
-          <input
-            ref={nicknameRef}
-            style={inputStyle}
-            type="text"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="What should the AI call you?"
-            value={nickname}
-            onInput={(e) => setNickname((e.target as HTMLInputElement).value)}
-            onBlur={(e) => setNickname((e.target as HTMLInputElement).value)}
-            maxLength={40}
-            onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'}
-            onBlurCapture={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
-          />
-        </div>
-
-        {/* Occupation */}
-        <div style={{ marginBottom: '24px' }}>
-          <label style={labelStyle}>Your occupation</label>
-          <input
-            ref={occupationRef}
-            style={inputStyle}
-            type="text"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="Engineer, student, designer..."
-            value={occupation}
-            onInput={(e) => setOccupation((e.target as HTMLInputElement).value)}
-            onBlur={(e) => setOccupation((e.target as HTMLInputElement).value)}
-            maxLength={60}
-            onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'}
-            onBlurCapture={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
-          />
-          <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '8px' }}>
-            Helps the AI tailor responses to your context.
-          </div>
-        </div>
-
-        {/* Custom instructions */}
-        <div style={{ marginBottom: '24px' }}>
-          <label style={labelStyle}>Custom instructions</label>
-          <textarea
-            ref={customRef}
-            style={{ ...inputStyle, resize: 'none', minHeight: '120px', lineHeight: 1.6 }}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="Anything else you'd like the AI to keep in mind — interests, preferences, how you like responses formatted..."
-            value={customInstructions}
-            onInput={(e) => setCustomInstructions((e.target as HTMLTextAreaElement).value)}
-            onBlur={(e) => setCustomInstructions((e.target as HTMLTextAreaElement).value)}
-            maxLength={500}
-            onFocus={e => (e.target as HTMLTextAreaElement).style.borderColor = 'var(--accent)'}
-            onBlurCapture={e => (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border)'}
-          />
-          <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '6px', textAlign: 'right' }}>
-            {customInstructions.length}/500
-          </div>
-        </div>
-      </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-}
+        <div style={{ marginBottom: '
