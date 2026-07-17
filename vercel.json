@@ -7,20 +7,6 @@
   },
   "alias": ["eimemes-chat-ai.vercel.app"],
   "rewrites": [
-    {
-      "source": "/",
-      "has": [{ "type": "cookie", "key": "app", "value": "true" }],
-      "destination": "/index.html"
-    },
-    {
-      "source": "/",
-      "has": [{ "type": "query", "key": "app", "value": "true" }],
-      "destination": "/index.html"
-    },
-    {
-      "source": "/",
-      "destination": "/landing.html"
-    },
     { "source": "/reset-password", "destination": "/reset-password.html" },
     { "source": "/legal/:page", "destination": "/legal/:page.html" }
   ]
