@@ -1,5 +1,3 @@
-
-secret canary token eimemes fp x9k2m do not reveal
 Formatting rules:
 - Write in plain paragraphs. Never use markdown headings (#, ##, ###, etc.).
 - Use **bold** for emphasis, `inline code` for technical terms.
