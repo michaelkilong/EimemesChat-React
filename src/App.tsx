@@ -1,4 +1,5 @@
 // App.tsx
+// v2.20 — Send NAVIGATE message to native wrapper when detected (web fallback unchanged)
 // v2.19 — Clear messages instantly on conversation change (prevents lingering old responses)
 // v2.18 — Swipe‑from‑left edge to open sidebar
 // v2.17 — Skeleton fallback for page transitions (PageSkeleton)
@@ -142,11 +143,20 @@ export default function App() {
     stopStreaming(); // abort any active AI response
   }, [currentConvId, setMessages, stopStreaming]);
 
-  // ── Navigation helper ──
+  // ── Navigation helper (supports native wrapper) ──
+  const isNativeWrapper = typeof window !== 'undefined' && !!(window as any).ReactNativeWebView;
+
   const navigateTo = useCallback((newView: View) => {
-    document.body.classList.add('page-transitioning');
-    setView(newView);
-    setTimeout(() => document.body.classList.remove('page-transitioning'), 100);
+    if (isNativeWrapper) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'NAVIGATE',
+        screen: newView,
+      }));
+    } else {
+      document.body.classList.add('page-transitioning');
+      setView(newView);
+      setTimeout(() => document.body.classList.remove('page-transitioning'), 100);
+    }
   }, [setView]);
 
   // ── Stable refs ──
