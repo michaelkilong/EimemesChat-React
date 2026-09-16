@@ -1,4 +1,4 @@
-// ReportBugView.tsx — v5.2 (professional success icon)
+// ReportBugView.tsx — v5.3 (discard confirmation on back)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -38,6 +38,15 @@ export default function ReportBugView({ onBack }: Props) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleBack = () => {
+    if (sent || !message.trim()) {
+      onBack();
+      return;
+    }
+    setShowConfirm(true);
+  };
 
   const handleSend = async () => {
     if (!message.trim() || sending) return;
@@ -90,7 +99,7 @@ export default function ReportBugView({ onBack }: Props) {
         flexShrink: 0,
       }}>
         <button
-          onClick={onBack}
+          onClick={handleBack}
           style={{
             width: '40px', height: '40px', borderRadius: '50%',
             background: 'rgba(255,255,255,0.22)',
@@ -216,7 +225,7 @@ export default function ReportBugView({ onBack }: Props) {
               We'll review it as soon as possible.
             </p>
             <button
-              onClick={onBack}
+              onClick={handleBack}
               style={{
                 padding: '10px 24px',
                 background: 'var(--accent-dim)',
@@ -233,6 +242,89 @@ export default function ReportBugView({ onBack }: Props) {
           </div>
         )}
       </div>
+
+      {showConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowConfirm(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface, #1c1c1e)',
+              borderRadius: '20px',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '360px',
+              textAlign: 'center',
+            }}
+          >
+            <p style={{
+              fontSize: '17px',
+              fontWeight: 600,
+              color: 'var(--text-1)',
+              marginBottom: '8px',
+            }}>
+              Discard report?
+            </p>
+            <p style={{
+              fontSize: '14px',
+              color: 'var(--text-2)',
+              marginBottom: '24px',
+              lineHeight: 1.5,
+            }}>
+              Your bug report hasn't been sent yet. Are you sure you want to leave?
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setShowConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px 0',
+                  background: 'var(--accent-dim)',
+                  color: 'var(--accent)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                Keep editing
+              </button>
+              <button
+                onClick={onBack}
+                style={{
+                  flex: 1,
+                  padding: '12px 0',
+                  background: '#ff453a',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
