@@ -1,8 +1,35 @@
-// context/AppContext.tsx — v1.2 (custom emailVerified sync from Firestore)
+// context/AppContext.tsx — v1.3
+//
+// ─── Version History ─────────────────────────────────────────────
+// v1.0  – Initial: currentUser, authReady, view, toast, confirm,
+//         sidebar, theme, font size.
+// v1.1  – Persisted isDark + fontSize to localStorage; applied
+//         data-font-size attribute on <html>.
+// v1.2  – Merged emailVerified from Firebase Auth (emailVerified)
+//         + custom Firestore field (users/{uid}.emailVerified).
+//         Added realtime onSnapshot listener on the user doc.
+// v1.3  – Fixes & hardening:
+//         • Reset firebaseVerified + customVerified whenever
+//           currentUser changes (prevents verified state from
+//           leaking across sign-ins, e.g. A → B without a null gap).
+//         • onSnapshot now sets state unconditionally (so a revoked
+//           flag actually clears) and has an error handler.
+//         • setEmailVerified now updates firebaseVerified after
+//           reload() resolves, instead of doing nothing.
+//         • setView guards against duplicate history entries when
+//           called with the view that's already active.
+//         • Boot effect seeds view from history.state without
+//           clobbering a meaningful URL on refresh/deep-link.
+//         • Pending confirm promise is resolved as false on unmount
+//           (no leaked promises if the provider unmounts mid-dialog).
+//         • Confirm dialog: role="dialog", aria-modal, labelledby,
+//           describedby, Escape-to-cancel, initial focus on Cancel.
+//         • Toast timer cleared on unmount.
+// ────────────────────────────────────────────────────────────────
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import type { User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';   // adjust path if your firebase config file is elsewhere
+import { db } from '../firebase';
 import type { View } from '../types';
 
 interface AppContextType {
@@ -31,40 +58,86 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady,   setAuthReady]   = useState(false);
 
-  // Merged emailVerified – from Firebase Auth + our custom Firestore field
+  // ── emailVerified (Firebase Auth ∪ Firestore custom flag) ───────
   const [firebaseVerified, setFirebaseVerified] = useState(false);
   const [customVerified,   setCustomVerified]   = useState(false);
 
-  // Whenever the user changes, reset and start a Firestore listener
   useEffect(() => {
-    if (!currentUser) {
-      setFirebaseVerified(false);
-      setCustomVerified(false);
-      return;
-    }
-    // If Firebase already marks them verified, use that
-    if (currentUser.emailVerified) {
-      setFirebaseVerified(true);
-    }
-    // Listen to our custom field
-    const unsub = onSnapshot(doc(db, 'users', currentUser.uid), (snap) => {
-      const data = snap.data();
-      if (data?.emailVerified === true) {
-        setCustomVerified(true);
-      }
-    });
+    // Always reset — otherwise a previous user's verified state can leak
+    // into the next one when Firebase swaps users without a null gap.
+    setFirebaseVerified(currentUser?.emailVerified ?? false);
+    setCustomVerified(false);
+
+    if (!currentUser) return;
+
+    const unsub = onSnapshot(
+      doc(db, 'users', currentUser.uid),
+      (snap) => {
+        // Set unconditionally so a revoked flag actually clears.
+        setCustomVerified(snap.data()?.emailVerified === true);
+      },
+      (err) => {
+        console.warn('[AppContext] user doc listener error:', err.message);
+      },
+    );
     return () => unsub();
   }, [currentUser]);
 
   const emailVerified = firebaseVerified || customVerified;
+
   const setEmailVerified = useCallback((v: boolean) => {
     setCustomVerified(v);
     if (v && currentUser && !currentUser.emailVerified) {
-      currentUser.reload().catch(() => {});
+      currentUser.reload()
+        .then(() => {
+          // reload() mutates the User object in place in some SDK
+          // versions; check again and sync state if it flipped.
+          if (currentUser.emailVerified) setFirebaseVerified(true);
+        })
+        .catch(() => {});
     }
   }, [currentUser]);
 
-  const [view,        setView_]       = useState<View>('chat');
+  // ── View / routing ──────────────────────────────────────────────
+  const [view, setView_] = useState<View>('chat');
+  const viewRef = useRef<View>('chat');
+
+  const setView = useCallback((v: View) => {
+    // No-op if we're already on this view — prevents stacking duplicate
+    // history entries when components optimistically re-set the view.
+    if (viewRef.current === v) return;
+    viewRef.current = v;
+    setView_(v);
+
+    if (v === 'chat') {
+      history.replaceState({ view: 'chat' }, '', '/');
+    } else {
+      history.pushState({ view: v }, '', '/');
+    }
+  }, []);
+
+  useEffect(() => {
+    // Seed from history on first mount without clobbering a meaningful URL.
+    const initialState = history.state as { view?: View } | null;
+    const initialView: View = initialState?.view || 'chat';
+    viewRef.current = initialView;
+    setView_(initialView);
+
+    // Only normalize the URL if we had no state to honor.
+    if (!initialState?.view) {
+      history.replaceState({ view: 'chat' }, '', '/');
+    }
+
+    const handlePop = (e: PopStateEvent) => {
+      const v = ((e.state as { view?: View } | null)?.view) || 'chat';
+      viewRef.current = v;
+      setView_(v);
+    };
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, []);
+
+  // ── Sidebar, theme, font ────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark,      setIsDark]      = useState(true);
   const [fontSize,     setFontSizeState] = useState<'small' | 'medium' | 'large'>(
@@ -81,26 +154,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.setAttribute('data-font-size', fontSize);
   }, [fontSize]);
 
-  const setView = useCallback((v: View) => {
-    setView_(v);
-    if (v === 'chat') {
-      history.replaceState({ view: 'chat' }, '', '/');
-    } else {
-      history.pushState({ view: v }, '', '/');
-    }
-  }, []);
-
-  useEffect(() => {
-    history.replaceState({ view: 'chat' }, '', '/');
-    const handlePop = (e: PopStateEvent) => {
-      const v = (e.state?.view as View) || 'chat';
-      setView_(v);
-    };
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
-  }, []);
-
-  // Toast
+  // ── Toast ───────────────────────────────────────────────────────
   const [toastMsg,     setToastMsg]     = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,17 +166,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toastTimer.current = setTimeout(() => setToastVisible(false), dur);
   }, []);
 
-  // Confirm dialog
+  // Clear any pending toast timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = null;
+    };
+  }, []);
+
+  // ── Confirm dialog ──────────────────────────────────────────────
   const [confirmState, setConfirmState] = useState<{
     open: boolean;
     title: string;
     msg: string;
     yesLabel: string;
   }>({ open: false, title: '', msg: '', yesLabel: 'Delete' });
-  const confirmResolve = useRef<((v: boolean) => void) | null>(null);
+
+  const confirmResolve    = useRef<((v: boolean) => void) | null>(null);
+  const confirmCancelRef  = useRef<HTMLButtonElement | null>(null);
 
   const showConfirm = useCallback((msg: string, yesLabel = 'Delete', title = 'Are you sure?') => {
     return new Promise<boolean>(resolve => {
+      // If a previous dialog is still pending, resolve it as false so
+      // its awaiting caller doesn't hang forever.
+      if (confirmResolve.current) {
+        confirmResolve.current(false);
+        confirmResolve.current = null;
+      }
       confirmResolve.current = resolve;
       setConfirmState({ open: true, title, msg, yesLabel });
     });
@@ -138,6 +208,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setConfirmState(s => ({ ...s, open: false }));
     confirmResolve.current?.(false);
     confirmResolve.current = null;
+  }, []);
+
+  // Escape to cancel + initial focus on the safe option (Cancel).
+  useEffect(() => {
+    if (!confirmState.open) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleConfirmNo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+
+    const t = setTimeout(() => confirmCancelRef.current?.focus(), 0);
+
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      clearTimeout(t);
+    };
+  }, [confirmState.open, handleConfirmNo]);
+
+  // Resolve any pending confirm promise if the provider unmounts —
+  // otherwise an awaiting caller hangs forever.
+  useEffect(() => {
+    return () => {
+      confirmResolve.current?.(false);
+      confirmResolve.current = null;
+    };
   }, []);
 
   return (
@@ -159,18 +258,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       {/* Confirm Dialog */}
       <div className={`confirm-overlay ${confirmState.open ? 'show' : ''}`}>
-        <div className="confirm-card">
+        <div
+          className="confirm-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="app-confirm-title"
+          aria-describedby="app-confirm-msg"
+          aria-hidden={!confirmState.open}
+        >
           <div style={{ padding: '24px 22px 18px', textAlign: 'center' }}>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}>
+            <div
+              id="app-confirm-title"
+              style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-1)', marginBottom: '8px' }}
+            >
               {confirmState.title}
             </div>
-            <div style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.5 }}>
+            <div
+              id="app-confirm-msg"
+              style={{ fontSize: '14px', color: 'var(--text-2)', lineHeight: 1.5 }}
+            >
               {confirmState.msg}
             </div>
           </div>
           <div style={{ height: '1px', background: 'var(--border-b)' }} />
           <div style={{ display: 'flex' }}>
             <button
+              ref={confirmCancelRef}
               onClick={handleConfirmNo}
               onMouseEnter={e => { const b = e.currentTarget; b.style.background = 'var(--glass-3)'; b.style.color = 'var(--text-1)'; }}
               onMouseLeave={e => { const b = e.currentTarget; b.style.background = 'none'; b.style.color = 'var(--text-2)'; }}
