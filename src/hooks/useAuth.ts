@@ -1,6 +1,19 @@
-// hooks/useAuth.ts — v1.2 (always reload before trusting emailVerified, per
-// spec; force ID-token refresh once verified so Firestore's
-// token.email_verified rule check never lags behind local app state)
+// hooks/useAuth.ts — v1.4 (revert setEmailVerified call — safe again
+// after AppContext v1.4 collapsed emailVerified into a single state)
+//
+// ─── Version History ─────────────────────────────────────────────
+// v1.0  – Initial: onAuthStateChanged → AppContext, authReady,
+//         ensureDisplayName once.
+// v1.1  – Added getRedirectResult() for Google redirect sign-in.
+// v1.2  – Always reload(user) before trusting emailVerified; force
+//         getIdToken(true) once verified so Firestore rules
+//         (request.auth.token.email_verified) don't lag behind.
+// v1.3  – Briefly removed setEmailVerified while AppContext used a
+//         two-flag design (it was writing into the wrong slot).
+// v1.4  – Put setEmailVerified back: AppContext v1.4 exposes a
+//         single emailVerified state, so setting it from Firebase's
+//         user.emailVerified is now correct and expected.
+// ────────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react';
 import { onAuthStateChanged, getRedirectResult, reload } from 'firebase/auth';
 import { auth } from '../firebase';
