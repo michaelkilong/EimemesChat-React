@@ -1,4 +1,4 @@
-// ReportBugView.tsx — v5.3 (discard confirmation on back)
+// ReportBugView.tsx — v5.4 (theme-aware confirm card)
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { haptic } from '../lib/haptic';
@@ -262,12 +262,14 @@ export default function ReportBugView({ onBack }: Props) {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: 'var(--surface, #1c1c1e)',
+              background: 'var(--input-bg)',
+              border: '1px solid var(--border)',
               borderRadius: '20px',
               padding: '24px',
               width: '100%',
               maxWidth: '360px',
               textAlign: 'center',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
             }}
           >
             <p style={{
