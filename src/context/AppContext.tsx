@@ -1,30 +1,25 @@
-// context/AppContext.tsx — v1.3
+// context/AppContext.tsx — v1.4 (single emailVerified state)
 //
 // ─── Version History ─────────────────────────────────────────────
 // v1.0  – Initial: currentUser, authReady, view, toast, confirm,
 //         sidebar, theme, font size.
-// v1.1  – Persisted isDark + fontSize to localStorage; applied
-//         data-font-size attribute on <html>.
-// v1.2  – Merged emailVerified from Firebase Auth (emailVerified)
-//         + custom Firestore field (users/{uid}.emailVerified).
-//         Added realtime onSnapshot listener on the user doc.
-// v1.3  – Fixes & hardening:
-//         • Reset firebaseVerified + customVerified whenever
-//           currentUser changes (prevents verified state from
-//           leaking across sign-ins, e.g. A → B without a null gap).
-//         • onSnapshot now sets state unconditionally (so a revoked
-//           flag actually clears) and has an error handler.
-//         • setEmailVerified now updates firebaseVerified after
-//           reload() resolves, instead of doing nothing.
-//         • setView guards against duplicate history entries when
-//           called with the view that's already active.
-//         • Boot effect seeds view from history.state without
-//           clobbering a meaningful URL on refresh/deep-link.
-//         • Pending confirm promise is resolved as false on unmount
-//           (no leaked promises if the provider unmounts mid-dialog).
-//         • Confirm dialog: role="dialog", aria-modal, labelledby,
-//           describedby, Escape-to-cancel, initial focus on Cancel.
-//         • Toast timer cleared on unmount.
+// v1.1  – Persisted isDark + fontSize; applied data-font-size.
+// v1.2  – Merged emailVerified from Firebase + Firestore via two
+//         separate flags (firebaseVerified || customVerified).
+// v1.3  – Fixes: leak across sign-ins, snapshot error handler,
+//         setView dedupe, boot URL safety, confirm dialog ARIA,
+//         toast cleanup.
+// v1.4  – Simplified emailVerified back to ONE state.
+//         • Firebase's currentUser.emailVerified sets the base value.
+//         • Firestore users/{uid}.emailVerified can only bump it to
+//           true (verification is one-way), covering the window
+//           between verify-code writing the flag and the ID token
+//           refresh landing.
+//         • Removed firebaseVerified + customVerified — no more
+//           crossover writes from useAuth into the Firestore slot.
+//         • setEmailVerified now triggers a currentUser.reload()
+//           when flipping to true, so Firebase's record catches up
+//           on the client without an app restart.
 // ────────────────────────────────────────────────────────────────
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import type { User } from 'firebase/auth';
@@ -58,23 +53,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady,   setAuthReady]   = useState(false);
 
-  // ── emailVerified (Firebase Auth ∪ Firestore custom flag) ───────
-  const [firebaseVerified, setFirebaseVerified] = useState(false);
-  const [customVerified,   setCustomVerified]   = useState(false);
+  // ── emailVerified ───────────────────────────────────────────────
+  // One state. Firebase is the base value; Firestore can bump to true.
+  const [emailVerified, setEmailVerifiedState] = useState(false);
 
   useEffect(() => {
-    // Always reset — otherwise a previous user's verified state can leak
-    // into the next one when Firebase swaps users without a null gap.
-    setFirebaseVerified(currentUser?.emailVerified ?? false);
-    setCustomVerified(false);
+    // Reset to Firebase's value on every user change. Prevents a
+    // previous user's verified state from leaking into the next one.
+    setEmailVerifiedState(currentUser?.emailVerified ?? false);
 
     if (!currentUser) return;
 
     const unsub = onSnapshot(
       doc(db, 'users', currentUser.uid),
       (snap) => {
-        // Set unconditionally so a revoked flag actually clears.
-        setCustomVerified(snap.data()?.emailVerified === true);
+        // Only flip to true — never back to false. Verification is
+        // one-way, and this covers the window between verify-code
+        // writing the Firestore flag and the ID token refresh landing.
+        if (snap.data()?.emailVerified === true) {
+          setEmailVerifiedState(true);
+        }
       },
       (err) => {
         console.warn('[AppContext] user doc listener error:', err.message);
@@ -83,16 +81,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, [currentUser]);
 
-  const emailVerified = firebaseVerified || customVerified;
-
+  // Public setter. Used by:
+  //  • useAuth — sets from Firebase's user.emailVerified on every
+  //    auth state change.
+  //  • VerificationModal — sets true optimistically after
+  //    /api/verify-code succeeds.
+  // When flipping to true, kick off a reload so the Firebase Auth
+  // record catches up on the client without needing an app restart.
   const setEmailVerified = useCallback((v: boolean) => {
-    setCustomVerified(v);
+    setEmailVerifiedState(v);
     if (v && currentUser && !currentUser.emailVerified) {
       currentUser.reload()
         .then(() => {
-          // reload() mutates the User object in place in some SDK
-          // versions; check again and sync state if it flipped.
-          if (currentUser.emailVerified) setFirebaseVerified(true);
+          if (currentUser.emailVerified) setEmailVerifiedState(true);
         })
         .catch(() => {});
     }
@@ -103,8 +104,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const viewRef = useRef<View>('chat');
 
   const setView = useCallback((v: View) => {
-    // No-op if we're already on this view — prevents stacking duplicate
-    // history entries when components optimistically re-set the view.
+    // No-op if we're already on this view — prevents stacking
+    // duplicate history entries.
     if (viewRef.current === v) return;
     viewRef.current = v;
     setView_(v);
@@ -117,13 +118,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Seed from history on first mount without clobbering a meaningful URL.
+    // Seed from history on first mount without clobbering a
+    // meaningful URL (deep-link / refresh).
     const initialState = history.state as { view?: View } | null;
     const initialView: View = initialState?.view || 'chat';
     viewRef.current = initialView;
     setView_(initialView);
 
-    // Only normalize the URL if we had no state to honor.
     if (!initialState?.view) {
       history.replaceState({ view: 'chat' }, '', '/');
     }
@@ -166,7 +167,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toastTimer.current = setTimeout(() => setToastVisible(false), dur);
   }, []);
 
-  // Clear any pending toast timer on unmount.
   useEffect(() => {
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -182,13 +182,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     yesLabel: string;
   }>({ open: false, title: '', msg: '', yesLabel: 'Delete' });
 
-  const confirmResolve    = useRef<((v: boolean) => void) | null>(null);
-  const confirmCancelRef  = useRef<HTMLButtonElement | null>(null);
+  const confirmResolve   = useRef<((v: boolean) => void) | null>(null);
+  const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
 
   const showConfirm = useCallback((msg: string, yesLabel = 'Delete', title = 'Are you sure?') => {
     return new Promise<boolean>(resolve => {
-      // If a previous dialog is still pending, resolve it as false so
-      // its awaiting caller doesn't hang forever.
       if (confirmResolve.current) {
         confirmResolve.current(false);
         confirmResolve.current = null;
@@ -210,28 +208,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     confirmResolve.current = null;
   }, []);
 
-  // Escape to cancel + initial focus on the safe option (Cancel).
   useEffect(() => {
     if (!confirmState.open) return;
-
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        handleConfirmNo();
-      }
+      if (e.key === 'Escape') { e.preventDefault(); handleConfirmNo(); }
     };
     window.addEventListener('keydown', onKey);
-
     const t = setTimeout(() => confirmCancelRef.current?.focus(), 0);
-
     return () => {
       window.removeEventListener('keydown', onKey);
       clearTimeout(t);
     };
   }, [confirmState.open, handleConfirmNo]);
 
-  // Resolve any pending confirm promise if the provider unmounts —
-  // otherwise an awaiting caller hangs forever.
   useEffect(() => {
     return () => {
       confirmResolve.current?.(false);
@@ -253,10 +242,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }}>
       {children}
 
-      {/* Toast */}
       <div className={`toast ${toastVisible ? 'show' : ''}`}>{toastMsg}</div>
 
-      {/* Confirm Dialog */}
       <div className={`confirm-overlay ${confirmState.open ? 'show' : ''}`}>
         <div
           className="confirm-card"
