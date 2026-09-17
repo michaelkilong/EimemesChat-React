@@ -1,4 +1,5 @@
 // App.tsx
+// v2.21 — Chat-only mode when running inside the native wrapper + native bridges
 // v2.20 — Send NAVIGATE message to native wrapper when detected (web fallback unchanged)
 // v2.19 — Clear messages instantly on conversation change (prevents lingering old responses)
 // v2.18 — Swipe‑from‑left edge to open sidebar
@@ -143,9 +144,10 @@ export default function App() {
     stopStreaming(); // abort any active AI response
   }, [currentConvId, setMessages, stopStreaming]);
 
-  // ── Navigation helper (supports native wrapper) ──
+  // ── Detect native wrapper ──
   const isNativeWrapper = typeof window !== 'undefined' && !!(window as any).ReactNativeWebView;
 
+  // ── Navigation helper (supports native wrapper) ──
   const navigateTo = useCallback((newView: View) => {
     if (isNativeWrapper) {
       (window as any).ReactNativeWebView.postMessage(JSON.stringify({
@@ -157,7 +159,7 @@ export default function App() {
       setView(newView);
       setTimeout(() => document.body.classList.remove('page-transitioning'), 100);
     }
-  }, [setView]);
+  }, [setView, isNativeWrapper]);
 
   // ── Stable refs ──
   const sendMessageRef = useRef(sendMessage);
@@ -217,6 +219,32 @@ export default function App() {
     await clearAllChats();
     setCurrentConvId(null);
   }, [clearAllChats]);
+
+  // ── Native wrapper bridges ──
+  useEffect(() => {
+    if (!isNativeWrapper) return;
+    (window as any).__nativeSend = (text: string, attachment?: any, useWebSearch?: boolean) => {
+      handleSend(text, attachment, useWebSearch);
+    };
+    (window as any).__nativeStop = () => {
+      stopStreaming();
+    };
+    (window as any).__nativeNewChat = () => {
+      handleNewChat();
+    };
+  }, [isNativeWrapper, handleSend, stopStreaming, handleNewChat]);
+
+  // ── Send STATUS updates to native ──
+  useEffect(() => {
+    if (!isNativeWrapper) return;
+    (window as any).ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'STATUS',
+      isStreaming,
+      isSending,
+      dailyLimitReached,
+      chatTitle: convTitle,
+    }));
+  }, [isStreaming, isSending, dailyLimitReached, convTitle, isNativeWrapper]);
 
   // ── Daily limit init ──
   useEffect(() => {
@@ -280,6 +308,34 @@ export default function App() {
 
   if (showLoading) return <LoadingScreen visible />;
 
+  // ── Chat-only mode (native wrapper) ──
+  if (isNativeWrapper) {
+    return (
+      <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: '#13111a' }}>
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <MessageList
+            messages={messages}
+            isTyping={isTyping}
+            isSearching={isSearching}
+            isStreaming={isStreaming}
+            streamText={streamText}
+            streamDone={streamDone}
+            streamModel={streamModel}
+            streamDisclaimer={streamDisclaimer}
+            streamSources={streamSources}
+            streamThinking={streamThinking}
+            isThinking={isThinking}
+            convId={currentConvId}
+            chipsUsed={chipsUsed}
+            onChipClick={handleSend}
+            onRegen={handleRegen}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Full web UI (browser) ──
   return (
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
       {showApp && (
@@ -380,4 +436,4 @@ export default function App() {
       <VerificationModal visible={!!currentUser && !emailVerified} />
     </div>
   );
-}
+    }
