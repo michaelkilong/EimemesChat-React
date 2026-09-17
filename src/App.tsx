@@ -436,4 +436,4 @@ export default function App() {
       <VerificationModal visible={!!currentUser && !emailVerified} />
     </div>
   );
-    }
+}
