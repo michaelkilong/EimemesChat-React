@@ -1,5 +1,6 @@
+// src/firebase.ts (web app)
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, browserLocalPersistence, inMemoryPersistence, setPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -17,4 +18,10 @@ export const auth  = getAuth(app);
 export const db    = getFirestore(app);
 export const gauth = new GoogleAuthProvider();
 
-setPersistence(auth, browserLocalPersistence).catch(console.error);
+// In the native wrapper, Android WebView crashes with browserLocalPersistence.
+// Use in-memory persistence there; keep browserLocalPersistence on real browsers.
+const isNativeWrapper =
+  typeof window !== 'undefined' && !!(window as any).ReactNativeWebView;
+
+setPersistence(auth, isNativeWrapper ? inMemoryPersistence : browserLocalPersistence)
+  .catch(console.error);
