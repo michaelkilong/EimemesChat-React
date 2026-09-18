@@ -1,4 +1,5 @@
 // App.tsx
+// v2.22 — Native wrapper: added __nativeSelectConv + __nativeDeleteConv + convId in STATUS
 // v2.21 — Chat-only mode when running inside the native wrapper + native bridges
 // v2.20 — Send NAVIGATE message to native wrapper when detected (web fallback unchanged)
 // v2.19 — Clear messages instantly on conversation change (prevents lingering old responses)
@@ -232,7 +233,13 @@ export default function App() {
     (window as any).__nativeNewChat = () => {
       handleNewChat();
     };
-  }, [isNativeWrapper, handleSend, stopStreaming, handleNewChat]);
+    (window as any).__nativeSelectConv = (id: string) => {
+      setCurrentConvId(id);
+    };
+    (window as any).__nativeDeleteConv = (id: string) => {
+      handleDeleteConv(id);
+    };
+  }, [isNativeWrapper, handleSend, stopStreaming, handleNewChat, handleDeleteConv]);
 
   // ── Send STATUS updates to native ──
   useEffect(() => {
@@ -243,8 +250,9 @@ export default function App() {
       isSending,
       dailyLimitReached,
       chatTitle: convTitle,
+      convId: currentConvId,
     }));
-  }, [isStreaming, isSending, dailyLimitReached, convTitle, isNativeWrapper]);
+  }, [isStreaming, isSending, dailyLimitReached, convTitle, currentConvId, isNativeWrapper]);
 
   // ── Daily limit init ──
   useEffect(() => {
