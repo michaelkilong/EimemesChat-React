@@ -51,7 +51,7 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`;
 const GEMINI_GEN_URL    = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "openai/gpt-oss-20b";
 const GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
